@@ -49,18 +49,18 @@ parseApp = do
 parseList :: Parser (PExpr a)
 parseList = fmap (Free . AList) $ parseExprInQuote `sepBy` whitespace
 
+parseUnquotable :: Parser (PExpr a)
+parseUnquotable = fmap (Free . AList) $ parseExprInQuasi `sepBy` whitespace
+
 parseQuote :: Parser (PExpr a)
 parseQuote = do
     x <- parseExprInQuote
     return $ (Free . AList) [(Free . ASymbol) "quote", x]
 
 parseQuasi :: Parser (PExpr a)
-parseQuasi = fmap (Free . AList) $ parseExprInQuasi `sepBy` whitespace
-{-
 parseQuasi = do
     x <- parseExprInQuasi
     return $ (Free . AList) [(Free . ASymbol) "quote", x]
-    -}
 
 parseExpr :: Parser (PExpr a)
 parseExpr = parseSymbol
