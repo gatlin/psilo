@@ -28,8 +28,9 @@ parseNumber = try ( do { f <- float
 
 parseSymbol :: Parser PExpr
 parseSymbol = do
-    first <- letter <|> symbol
-    rest  <- many $ letter <|> digit <|> symbol
+    let syms = oneOf "!$%&|*+-/:<=>?@^_~#"
+    first <- letter <|> syms
+    rest  <- many $ letter <|> digit <|> syms
     let sym = [first] ++ rest
     return $ case sym of
                "#t"      -> Boolean True
@@ -38,6 +39,17 @@ parseSymbol = do
 
 parseList :: Parser PExpr
 parseList = fmap List $ parseExpr `sepBy` (whitespace <|> nl)
+
+parseFn :: Parser PExpr
+parseFn = do
+    try (reserved "fn")
+    whitespace
+    name <- identifier
+    whitespace
+    args <- parens $ identifier `sepBy` whitespace
+    whitespace
+    body <- parens parseList
+    return $ Function name args body
 
 parseQuoted :: Parser PExpr
 parseQuoted = do
@@ -49,7 +61,7 @@ parseExpr :: Parser PExpr
 parseExpr = parseSymbol
         <|> parseNumber
         <|> parseQuoted
-        <|> parens parseList
+        <|> parens ( parseFn <|> parseList )
 
 contents :: Parser a -> Parser a
 contents p = do
