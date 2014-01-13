@@ -1,2 +1,7 @@
 psilo
 .cabal-sandbox/*
+cabal.sandbox.config
+dist
+*.o
+*.hi
+*.swp
