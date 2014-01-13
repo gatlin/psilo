@@ -32,4 +32,4 @@ executable preprocess
     , libffi               == 0.1
     , mtl
     , transformers
-    , lispparser
+    , free
