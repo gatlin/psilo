@@ -80,9 +80,9 @@ parseExprInQuote = parseSymbol
 parseExprInQuasi :: Parser (PExpr a)
 parseExprInQuasi = parseSymbol
                <|> parseNumber
-               <|> (try (char '\'') >> parseQuote)
+               <|> (try (char '\'') >> parseQuasi)
                <|> (try (char ',')  >> parseExpr)
-               <|> parens ( parseFn <|> parseQuasi )
+               <|> parens ( parseFn <|> parseUnquotable )
 
 contents :: Parser a -> Parser a
 contents p = do
