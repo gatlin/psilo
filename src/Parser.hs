@@ -43,7 +43,7 @@ parseApp :: Parser (PExpr a)
 parseApp = do
     fun <- parseExpr
     optional whitespace
-    body <- parseExpr
+    body <- parseExpr <|> return (Free (AList []))
     return $ Free ( fun :. body )
 
 parseList :: Parser (PExpr a)
