@@ -40,17 +40,3 @@ type PExpr = Free AST
 instance Show a => Show (PExpr a) where
     show (Pure _)   = ""
     show (Free x) = "Mu ( " ++ show x ++ " ) "
-
-{-
- - Type language
- -}
-
-data Type
-    = Type :-> Type
-    | TVar Integer
-    | TInteger
-    | TFloat
-    | TSymbol
-    | TBoolean
-
-deriving instance Show Type
