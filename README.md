@@ -55,6 +55,15 @@ Here's what happens when I type the Y combinator in at the REPL:
     
 `Mu` here is, incidentally, the Mu combinator, a type-level equivalent to the Y combinator.
 
+Here are some examples of lists and the quote, quasiquote, and unquote operators:
+
+    ready> '(a (b c) d)
+    Mu ( AList [Mu ( ASymbol "quote" ) ,Mu ( AList [Mu ( ASymbol "a" ) ,Mu ( AList [Mu ( ASymbol "b" ) ,Mu ( ASymbol "c" ) ] ) ,Mu ( ASymbol "d" ) ] ) ] ) 
+    ready> `(a (b c) d)
+    Mu ( AList [Mu ( ASymbol "quote" ) ,Mu ( AList [Mu ( ASymbol "a" ) ,Mu ( AList [Mu ( ASymbol "b" ) ,Mu ( ASymbol "c" ) ] ) ,Mu ( ASymbol "d" ) ] ) ] ) 
+    ready> `(a ,(b c) d)
+    Mu ( AList [Mu ( ASymbol "quote" ) ,Mu ( AList [Mu ( ASymbol "a" ) ,Mu ( Mu ( ASymbol "b" )  :. Mu ( ASymbol "c" )  ) ,Mu ( ASymbol "d" ) ] ) ] ) 
+
 4. How to build
 ---
 
