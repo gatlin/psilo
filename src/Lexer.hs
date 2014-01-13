@@ -9,11 +9,19 @@ lexer :: Tok.TokenParser ()
 lexer = Tok.makeTokenParser style
     where ops = ["+","*","-","/","<","="]
           names = ["fn","::"]
+          idStarts = letter <|> char '_'
+          idLetters = letter <|> char '_' <|> digit <|> char '-' <|> char '+'
+          opStarts = oneOf "!$%&|*+-/:<=>?@^_~#"
+          opLetters = oneOf "!$%&|*+-/:<=>?@^_~#" <|> letter <|> digit <|> char '-' <|> char '_'
           style = emptyDef {
                       Tok.commentLine = ";"
                     , Tok.reservedOpNames = ops
                     , Tok.reservedNames = names
                     , Tok.caseSensitive = True
+                    , Tok.identStart = idStarts
+                    , Tok.identLetter = idLetters
+                    , Tok.opStart = opStarts
+                    , Tok.opLetter = opLetters
           }
 
 float :: Parser Double
@@ -33,9 +41,6 @@ nl = skipMany newline
 
 reserved :: String -> Parser ()
 reserved = Tok.reserved lexer
-
-symbol :: Parser Char
-symbol = oneOf "!$%&|*+-/:<=>?@^_~#"
 
 reservedOp :: String -> Parser ()
 reservedOp = Tok.reservedOp lexer
