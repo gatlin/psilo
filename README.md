@@ -45,7 +45,17 @@ normalize-transpose operation, and Rust's memory management.
 
 Also because I have never made a programming language before.
 
-3. How to build
+3. Some kind of example?
+---
+
+Here's what happens when I type the Y combinator in at the REPL:
+
+    ready> (fn (f) ((fn (y) (f (y y))) (fn (y) (f (y y)))))
+    Mu ( ALambda Mu ( AList [Mu ( ASymbol "f" ) ] )  Mu ( Mu ( ALambda Mu ( AList [Mu ( ASymbol "y" ) ] )  Mu ( Mu ( ASymbol "f" )  :. Mu ( Mu ( ASymbol "y" )  :. Mu ( ASymbol "y" )  )  )  )  :. Mu ( ALambda Mu ( AList [Mu ( ASymbol "y" ) ] )  Mu ( Mu ( ASymbol "f" )  :. Mu ( Mu ( ASymbol "y" )  :. Mu ( ASymbol "y" )  )  )  )  )  ) 
+    
+`Mu` here is, incidentally, the Mu combinator, a type-level equivalent to the Y combinator.
+
+4. How to build
 ---
 
 You need the Glasgow Haskell Compiler and a number of libraries; I suggest
@@ -69,7 +79,7 @@ And return to the Edenic, pre-build post-checkout status of the code with
 
     make clean
 
-4. Questions / comments / hate mail
+5. Questions / comments / hate mail
 ---
 
 Use the Issues feature of GitHub.
