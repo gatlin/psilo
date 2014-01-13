@@ -32,17 +32,17 @@ parseSymbol = do
 
 parseFn :: Parser (PExpr a)
 parseFn = do
-    reserved "\\"
-    whitespace
+    reserved "fn"
+    optional whitespace
     args <- parens parseList
-    whitespace
+    optional whitespace
     body <- parseExpr
     return $ Free $ ALambda args body
 
 parseApp :: Parser (PExpr a)
 parseApp = do
     fun <- parseExpr
-    whitespace
+    optional whitespace
     body <- parseExpr
     return $ Free ( fun :. body )
 
@@ -65,23 +65,23 @@ parseQuasi = do
 parseExpr :: Parser (PExpr a)
 parseExpr = parseSymbol
         <|> parseNumber
-        <|> (try (char '\'') >> parseQuote)
-        <|> (try (char '`')  >> parseQuasi)
+        <|> (try (reserved "\'") >> parseQuote)
+        <|> (try (reserved "`")  >> parseQuasi)
         <|> parens ( parseFn <|> parseApp )
 
 -- | Essentially removes the ability to evaluate any terms
 parseExprInQuote :: Parser (PExpr a)
 parseExprInQuote = parseSymbol
                <|> parseNumber
-               <|> (try (char '\'') >> parseQuote)
+               <|> (try (reserved "\'") >> parseQuote)
                <|> parens ( parseFn <|> parseList)
 
 -- | Begin a list but allow for the unquote operator
 parseExprInQuasi :: Parser (PExpr a)
 parseExprInQuasi = parseSymbol
                <|> parseNumber
-               <|> (try (char '\'') >> parseQuasi)
-               <|> (try (char ',')  >> parseExpr)
+               <|> (try (reserved "\'") >> parseQuasi)
+               <|> (try (reserved ",")  >> parseExpr)
                <|> parens ( parseFn <|> parseUnquotable )
 
 contents :: Parser a -> Parser a
