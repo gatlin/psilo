@@ -1,6 +1,6 @@
 module Syntax where
 
-type Symbol = String
+type Sym = String
 
 data PExpr
     = Float Double
@@ -8,7 +8,8 @@ data PExpr
     | Boolean Bool
     | List [PExpr]
     | Quoted [PExpr]
-    | Symbol String
-    | Function Symbol [Symbol] PExpr
+    | Symbol Sym
+    | Function Sym [Sym] PExpr
+    | Let [PExpr] PExpr
     deriving (Eq, Ord, Show)
 
