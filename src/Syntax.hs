@@ -20,7 +20,8 @@ import Data.Traversable (Traversable, sequence)
 type Sym = String
 
 data AST a
-    = ALambda Sym a
+    = ALambda a a
+    | AList [a]
     | a :. a
     | AInteger Integer
     | AFloat Double

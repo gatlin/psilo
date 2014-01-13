@@ -32,12 +32,12 @@ parseSymbol = do
 
 parseFn :: Parser (PExpr a)
 parseFn = do
-    reserved "fn"
+    reserved "\\"
     whitespace
-    arg <- identifier
+    args <- parens parseList
     whitespace
     body <- parseExpr
-    return $ Free $ ALambda arg body
+    return $ Free $ ALambda args body
 
 parseApp :: Parser (PExpr a)
 parseApp = do
@@ -46,10 +46,43 @@ parseApp = do
     body <- parseExpr
     return $ Free ( fun :. body )
 
+parseList :: Parser (PExpr a)
+parseList = fmap (Free . AList) $ parseExprInQuote `sepBy` whitespace
+
+parseQuote :: Parser (PExpr a)
+parseQuote = do
+    x <- parseExprInQuote
+    return $ (Free . AList) [(Free . ASymbol) "quote", x]
+
+parseQuasi :: Parser (PExpr a)
+parseQuasi = fmap (Free . AList) $ parseExprInQuasi `sepBy` whitespace
+{-
+parseQuasi = do
+    x <- parseExprInQuasi
+    return $ (Free . AList) [(Free . ASymbol) "quote", x]
+    -}
+
 parseExpr :: Parser (PExpr a)
 parseExpr = parseSymbol
         <|> parseNumber
+        <|> (try (char '\'') >> parseQuote)
+        <|> (try (char '`')  >> parseQuasi)
         <|> parens ( parseFn <|> parseApp )
+
+-- | Essentially removes the ability to evaluate any terms
+parseExprInQuote :: Parser (PExpr a)
+parseExprInQuote = parseSymbol
+               <|> parseNumber
+               <|> (try (char '\'') >> parseQuote)
+               <|> parens ( parseFn <|> parseList)
+
+-- | Begin a list but allow for the unquote operator
+parseExprInQuasi :: Parser (PExpr a)
+parseExprInQuasi = parseSymbol
+               <|> parseNumber
+               <|> (try (char '\'') >> parseQuote)
+               <|> (try (char ',')  >> parseExpr)
+               <|> parens ( parseFn <|> parseQuasi )
 
 contents :: Parser a -> Parser a
 contents p = do
