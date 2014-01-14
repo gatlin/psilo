@@ -54,26 +54,26 @@ parseUnquotable = fmap (Free . AList) $ parseExprInQuasi `sepBy` whitespace
 
 parseQuote :: Parser (PExpr a)
 parseQuote = do
-    x <- parseExprInQuote
+    x <- parseSymbol <|> parseNumber <|> parseList
     return $ (Free . AList) [(Free . ASymbol) "quote", x]
 
 parseQuasi :: Parser (PExpr a)
 parseQuasi = do
-    x <- parseExprInQuasi
+    x <- parseSymbol <|> parseNumber <|> parseUnquotable
     return $ (Free . AList) [(Free . ASymbol) "quote", x]
 
 parseExpr :: Parser (PExpr a)
 parseExpr = parseSymbol
         <|> parseNumber
-        <|> (try (reserved "\'") >> parseQuote)
-        <|> (try (reserved "`")  >> parseQuasi)
+        <|> (try (char '\'') >> parseQuote)
+        <|> (try (char '`')  >> parseQuasi)
         <|> parens ( parseFn <|> parseApp )
 
 -- | Essentially removes the ability to evaluate any terms
 parseExprInQuote :: Parser (PExpr a)
 parseExprInQuote = parseSymbol
                <|> parseNumber
-               <|> (try (reserved "\'") >> parseQuote)
+               <|> (try (char '\'') >> parseQuote)
                <|> parens ( parseFn <|> parseList)
 
 -- | Begin a list but allow for the unquote operator
