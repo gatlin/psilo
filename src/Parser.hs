@@ -93,7 +93,7 @@ parseExprInQuote :: Parser (PExpr a)
 parseExprInQuote = parseSymbol
                <|> parseNumber
                <|> (try (char '\'') >> parseQuote)
-               <|> parens ( parseList)
+               <|> parens ( parseList )
 
 -- | Begin a list but allow for the unquote operator
 parseExprInQuasi :: Parser (PExpr a)
