@@ -70,6 +70,7 @@ parseQuasi = do
     x <- parseSymbol <|> parseNumber <|> parseUnquotable
     return $ (Free . AList) [(Free . ASymbol) "quote", x]
 
+parseLet :: Parser (PExpr a)
 parseLet = do
     reserved "let"
     optional whitespace
