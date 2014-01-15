@@ -18,9 +18,11 @@ import Data.Traversable (Traversable, sequence)
  -}
 
 type Sym = String
+data LambdaName = Named Sym | Anonymous
+    deriving (Eq, Show, Ord)
 
 data AST a
-    = ALambda a a
+    = ALambda LambdaName a a
     | AList [a]
     | a :. a
     | AInteger Integer
@@ -36,6 +38,8 @@ deriving instance Eq a => Eq (AST a)
 deriving instance Ord a => Ord (AST a)
 
 type PExpr = Free AST
+
+aLambda n = liftF $ ALambda n id id
 
 instance Show a => Show (PExpr a) where
     show (Pure _)   = ""

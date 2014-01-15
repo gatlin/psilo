@@ -10,3 +10,4 @@ psilo:
 
 clean:
 	rm psilo
+	rm src/*.{hi,o}
