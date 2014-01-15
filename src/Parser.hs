@@ -105,7 +105,7 @@ parseExprInQuasi = parseSymbol
 
 contents :: Parser a -> Parser a
 contents p = do
-    whitespace <|> nl
+    whitespace
     r <- p
     eof
     return r
