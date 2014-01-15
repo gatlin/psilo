@@ -3,6 +3,7 @@ module Parser where
 import Text.Parsec
 import Text.Parsec.String (Parser)
 import Control.Applicative ((<$>))
+import Control.Monad (mapAndUnzipM)
 import Control.Monad.Free
 
 import qualified Text.Parsec.Expr as Ex
@@ -34,17 +35,24 @@ parseFn :: Parser (PExpr a)
 parseFn = do
     reserved "fn"
     optional whitespace
+    name <- optionMaybe identifier
     args <- parens parseList
     optional whitespace
     body <- parseExpr
-    return $ Free $ ALambda args body
+    let name' = case name of
+                    Nothing -> Anonymous
+                    Just n  -> Named n
+    return $ Free $ ALambda name' args body
 
 parseApp :: Parser (PExpr a)
 parseApp = do
     fun <- parseExpr
     optional whitespace
     body <- parseExpr <|> return (Free (AList []))
-    return $ Free ( fun :. body )
+    case body of
+        (Free (AList _)) -> return $ Free (fun :. body)
+        _                -> let body' = (Free . AList) [body]
+                            in  return $ Free (fun :. body')
 
 parseList :: Parser (PExpr a)
 parseList = fmap (Free . AList) $ parseExprInQuote `sepBy` whitespace
@@ -62,19 +70,30 @@ parseQuasi = do
     x <- parseSymbol <|> parseNumber <|> parseUnquotable
     return $ (Free . AList) [(Free . ASymbol) "quote", x]
 
+parseLet = do
+    reserved "let"
+    optional whitespace
+    (Free (AList assns)) <- parens parseList
+    body  <- parseExpr <|> return (Free (AList []))
+    (args,operands) <- (flip mapAndUnzipM) assns $ \(Free (AList (x:y:_))) -> return (x,y)
+    args' <- return $ Free $ AList args
+    operands' <- return $ Free $ AList operands
+    fun <- return $ Free $ ALambda Anonymous args' body
+    return $ Free (fun :. operands')
+
 parseExpr :: Parser (PExpr a)
 parseExpr = parseSymbol
         <|> parseNumber
         <|> (try (char '\'') >> parseQuote)
         <|> (try (char '`')  >> parseQuasi)
-        <|> parens ( parseFn <|> parseApp )
+        <|> parens ( parseFn <|> parseLet <|> parseApp )
 
 -- | Essentially removes the ability to evaluate any terms
 parseExprInQuote :: Parser (PExpr a)
 parseExprInQuote = parseSymbol
                <|> parseNumber
                <|> (try (char '\'') >> parseQuote)
-               <|> parens ( parseFn <|> parseList)
+               <|> parens ( parseList)
 
 -- | Begin a list but allow for the unquote operator
 parseExprInQuasi :: Parser (PExpr a)
@@ -82,7 +101,7 @@ parseExprInQuasi = parseSymbol
                <|> parseNumber
                <|> (try (reserved "\'") >> parseQuasi)
                <|> (try (reserved ",")  >> parseExpr)
-               <|> parens ( parseFn <|> parseUnquotable )
+               <|> parens ( parseUnquotable )
 
 contents :: Parser a -> Parser a
 contents p = do
