@@ -50,7 +50,9 @@ parseApp = do
     optional whitespace
     fun <- parseExpr
     optional whitespace
-    body <- (try (char '\'') >> parens parseList) <|> (try (char '`') >> parens parseUnquotable)
+    body <- (try (char '\'') >> parens parseList)
+        <|> (try (char '`') >> parens parseUnquotable)
+        <|> parseExpr
     return $ Free (AApply fun body)
 
 parseList :: Parser (PExpr a)

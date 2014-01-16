@@ -48,21 +48,71 @@ Also because I have never made a programming language before.
 3. Some kind of example?
 ---
 
-Here's what happens when I type the Y combinator in at the REPL:
+Here's what happens when I evaluate the Y combinator (in the core syntax):
 
-    ready> (fn (f) ((fn (y) (f (y y))) (fn (y) (f (y y)))))
-    Mu ( ALambda Mu ( AList [Mu ( ASymbol "f" ) ] )  Mu ( Mu ( ALambda Mu ( AList [Mu ( ASymbol "y" ) ] )  Mu ( Mu ( ASymbol "f" )  :. Mu ( Mu ( ASymbol "y" )  :. Mu ( ASymbol "y" )  )  )  )  :. Mu ( ALambda Mu ( AList [Mu ( ASymbol "y" ) ] )  Mu ( Mu ( ASymbol "f" )  :. Mu ( Mu ( ASymbol "y" )  :. Mu ( ASymbol "y" )  )  )  )  )  ) 
-    
+    ;; Y combinator
+    (fn (f)
+      (apply
+        (fn (y)
+          (apply y y))
+        (fn (y)
+          (apply
+            f
+            (apply y y)))))
+
+    ;; result
+
+    Mu (
+      ALambda Anonymous Mu (
+        AList [
+          Mu ( ASymbol "f" )
+        ]
+      )
+      Mu (
+        AApply
+          Mu (
+            ALambda Anonymous Mu (
+              AList [
+                Mu ( ASymbol "y" )
+              ]
+            )
+            Mu (
+              AApply
+                Mu ( ASymbol "y" )
+                Mu ( ASymbol "y" )
+            )
+          )
+          Mu (
+            ALambda Anonymous Mu (
+              AList [
+                Mu ( ASymbol "y" )
+              ]
+            )
+            Mu (
+              AApply
+                Mu (ASymbol "f" )
+                Mu (
+                  AApply
+                    Mu ( ASymbol "y" )
+                    Mu ( ASymbol "y" )
+                )
+            )
+          )
+      )
+    )
+
 `Mu` here is, incidentally, the Mu combinator, a type-level equivalent to the Y combinator.
 
 Here are some examples of lists and the quote, quasiquote, and unquote operators:
 
-    ready> '(a (b c) d)
-    Mu ( AList [Mu ( ASymbol "quote" ) ,Mu ( AList [Mu ( ASymbol "a" ) ,Mu ( AList [Mu ( ASymbol "b" ) ,Mu ( ASymbol "c" ) ] ) ,Mu ( ASymbol "d" ) ] ) ] ) 
-    ready> `(a (b c) d)
-    Mu ( AList [Mu ( ASymbol "quote" ) ,Mu ( AList [Mu ( ASymbol "a" ) ,Mu ( AList [Mu ( ASymbol "b" ) ,Mu ( ASymbol "c" ) ] ) ,Mu ( ASymbol "d" ) ] ) ] ) 
-    ready> `(a ,(b c) d)
-    Mu ( AList [Mu ( ASymbol "quote" ) ,Mu ( AList [Mu ( ASymbol "a" ) ,Mu ( Mu ( ASymbol "b" )  :. Mu ( ASymbol "c" )  ) ,Mu ( ASymbol "d" ) ] ) ] ) 
+    ready> '(a (apply b c) d)
+    Mu ( AList [Mu ( ASymbol "quote" ) ,Mu ( AList [Mu ( AList [Mu ( ASymbol "a" ) ,Mu ( AList [Mu ( ASymbol "apply" ) ,Mu ( ASymbol "b" ) ,Mu ( ASymbol "c" ) ] ) ,Mu ( ASymbol "d" ) ] ) ] ) ] )
+
+    ready> `(a (apply b c) d)
+    Mu ( AList [Mu ( ASymbol "quote" ) ,Mu ( AList [Mu ( AList [Mu ( ASymbol "a" ) ,Mu ( AList [Mu ( ASymbol "apply" ) ,Mu ( ASymbol "b" ) ,Mu ( ASymbol "c" ) ] ) ,Mu ( ASymbol "d" ) ] ) ] ) ] )
+
+    ready> `(a ,(apply b c) d)
+    Mu ( AList [Mu ( ASymbol "quote" ) ,Mu ( AList [Mu ( AList [Mu ( ASymbol "a" ) ,Mu ( AApply Mu ( ASymbol "b" )  Mu ( ASymbol "c" )  ) ,Mu ( ASymbol "d" ) ] ) ] ) ] ) 
 
 4. How to build
 ---
