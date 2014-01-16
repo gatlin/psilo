@@ -90,13 +90,24 @@ parseQuasi = do
     x <- parseSymbol <|> parseNumber <|> parseUnquotable
     return $ (Free . AList) [(Free . ASymbol) "quote", x]
 
+parseLetBinding :: Parser (PExpr a)
+parseLetBinding = do
+    optional whitespace
+    sym <- parseSymbol
+    optional whitespace
+    val <- parseExpr
+    return $ Free . AList $ [sym, val]
+
+parseLetBindings :: Parser (PExpr a)
+parseLetBindings = fmap (Free . AList) $ parens parseLetBinding `sepBy` whitespace
+
 -- | This translates into the application of an anonymous function to a list of
 -- arguments.
 parseLet :: Parser (PExpr a)
 parseLet = do
     reserved "let"
     optional whitespace
-    (Free (AList assns)) <- parens parseUnquotable
+    (Free (AList assns)) <- parens parseLetBindings
     body  <- parseExpr <|> return (Free (AList []))
     (args,operands) <- (flip mapAndUnzipM) assns $ \(Free (AList (x:y:_))) -> return (x,y)
     args' <- return $ Free $ AList args
