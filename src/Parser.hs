@@ -20,6 +20,9 @@ parseNumber = try ( do { f <- float
                        ; return $ Free $ AInteger n
                        } )
 
+-- | Symbols are like "atoms" in other lisps or Erlang. They are equivalent
+-- only to themselves and have no intrinsic value. They are mostly used to
+-- bind values in lambda abstractions.
 parseSymbol :: Parser (PExpr a)
 parseSymbol = do
     let syms = oneOf "!$%&|*+-/:<=>?@^_~#"
@@ -31,12 +34,14 @@ parseSymbol = do
                "#f"      -> Free $ ABoolean False
                otherwise -> Free $ ASymbol sym
 
+-- | Lambda abstractions. Optional name. Accepts a list of symbols to bound and
+-- an expression to evaluate inside the newly created scope.
 parseFn :: Parser (PExpr a)
 parseFn = do
     reserved "fn"
     optional whitespace
     name <- optionMaybe identifier
-    args <- parens parseQuotedList
+    args <- parens parseSymbolList
     optional whitespace
     body <- parseExpr
     let name' = case name of
@@ -44,6 +49,8 @@ parseFn = do
                     Just n  -> Named n
     return $ Free $ ALambda name' args body
 
+-- | The application of a function to a list of arguments, a single symbol, or
+-- an arbitrary expression value.
 parseApp :: Parser (PExpr a)
 parseApp = do
     reserved "apply"
@@ -55,22 +62,36 @@ parseApp = do
         <|> parseExpr
     return $ Free (AApply fun body)
 
+-- | Special restricted list for lambda argument lists. Can only contain
+-- symbols.
+parseSymbolList :: Parser (PExpr a)
+parseSymbolList = fmap (Free . AList) $ parseSymbol `sepBy` whitespace
+
+-- | Regular list created by the quote (') operator. Enters a state where
+-- everything is treated as a literal - no applications allowed.
 parseQuotedList :: Parser (PExpr a)
 parseQuotedList = fmap (Free . AList) $ parseExprInQuote `sepBy` whitespace
 
+-- | Similar to a quoted list, except a comma operator (,) may be used to go
+-- back into a state where application is allowed.
 parseUnquotable :: Parser (PExpr a)
 parseUnquotable = fmap (Free . AList) $ parseExprInQuasi `sepBy` whitespace
 
+-- | Many things may be quoted, not just lists.
 parseQuote :: Parser (PExpr a)
 parseQuote = do
     x <- parseSymbol <|> parseNumber <|> parseQuotedList
     return $ (Free . AList) [(Free . ASymbol) "quote", x]
 
+-- | You can quasi-quote anything you can quote, though this is of dubious
+-- utility.
 parseQuasi :: Parser (PExpr a)
 parseQuasi = do
     x <- parseSymbol <|> parseNumber <|> parseUnquotable
     return $ (Free . AList) [(Free . ASymbol) "quote", x]
 
+-- | This translates into the application of an anonymous function to a list of
+-- arguments.
 parseLet :: Parser (PExpr a)
 parseLet = do
     reserved "let"
