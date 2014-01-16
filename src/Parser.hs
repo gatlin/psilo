@@ -46,13 +46,12 @@ parseFn = do
 
 parseApp :: Parser (PExpr a)
 parseApp = do
+    reserved "apply"
+    optional whitespace
     fun <- parseExpr
     optional whitespace
-    body <- parseExpr <|> return (Free (AList []))
-    case body of
-        (Free (AList _)) -> return $ Free (fun :. body)
-        _                -> let body' = (Free . AList) [body]
-                            in  return $ Free (fun :. body')
+    body <- (try (char '\'') >> parens parseList) <|> (try (char '`') >> parens parseUnquotable)
+    return $ Free (AApply fun body)
 
 parseList :: Parser (PExpr a)
 parseList = fmap (Free . AList) $ parseExprInQuote `sepBy` whitespace
@@ -80,8 +79,9 @@ parseLet = do
     args' <- return $ Free $ AList args
     operands' <- return $ Free $ AList operands
     fun <- return $ Free $ ALambda Anonymous args' body
-    return $ Free (fun :. operands')
+    return $ Free (AApply fun operands')
 
+-- | Top level expression parser
 parseExpr :: Parser (PExpr a)
 parseExpr = parseSymbol
         <|> parseNumber
@@ -89,14 +89,14 @@ parseExpr = parseSymbol
         <|> (try (char '`')  >> parseQuasi)
         <|> parens ( parseFn <|> parseLet <|> parseApp )
 
--- | Essentially removes the ability to evaluate any terms
+-- | Expression parser inside a quoted list
 parseExprInQuote :: Parser (PExpr a)
 parseExprInQuote = parseSymbol
                <|> parseNumber
                <|> (try (char '\'') >> parseQuote)
                <|> parens ( parseList )
 
--- | Begin a list but allow for the unquote operator
+-- | Expression parser inside a quasiquoted list
 parseExprInQuasi :: Parser (PExpr a)
 parseExprInQuasi = parseSymbol
                <|> parseNumber

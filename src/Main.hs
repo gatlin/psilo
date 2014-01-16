@@ -6,6 +6,9 @@ import Syntax
 import Control.Monad.Trans
 import System.Console.Haskeline
 
+import System.Environment
+import System.IO
+
 process :: String -> IO ()
 process line = do
     let res = parseTopLevel line
@@ -13,11 +16,21 @@ process line = do
         Left err -> print err
         Right ex -> mapM_ print (ex :: [PExpr ()])
 
-main :: IO ()
-main = runInputT defaultSettings loop
+repl :: IO ()
+repl = runInputT defaultSettings loop
     where
     loop = do
         minput <- getInputLine "ready> "
         case minput of
             Nothing -> outputStrLn "Goodbye."
             Just input -> (liftIO $ process input) >> loop
+
+execFile :: String -> IO ()
+execFile fname = readFile fname >>= process
+
+main :: IO ()
+main = do
+    args <- getArgs
+    case args of
+        []      -> repl >> return ()
+        [fname] -> execFile fname >> return ()

@@ -24,7 +24,7 @@ data LambdaName = Named Sym | Anonymous
 data AST a
     = ALambda LambdaName a a
     | AList [a]
-    | a :. a
+    | AApply a a
     | AInteger Integer
     | AFloat Double
     | ABoolean Bool
