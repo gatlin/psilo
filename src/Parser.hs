@@ -80,14 +80,14 @@ parseUnquotable = fmap (Free . AList) $ parseExprInQuasi `sepBy` whitespace
 -- | Many things may be quoted, not just lists.
 parseQuote :: Parser (PExpr a)
 parseQuote = do
-    x <- parseSymbol <|> parseNumber <|> parseQuotedList
+    x <- parseSymbol <|> parseNumber <|> parens parseQuotedList
     return $ (Free . AList) [(Free . ASymbol) "quote", x]
 
 -- | You can quasi-quote anything you can quote, though this is of dubious
 -- utility.
 parseQuasi :: Parser (PExpr a)
 parseQuasi = do
-    x <- parseSymbol <|> parseNumber <|> parseUnquotable
+    x <- parseSymbol <|> parseNumber <|> parens parseUnquotable
     return $ (Free . AList) [(Free . ASymbol) "quote", x]
 
 parseLetBinding :: Parser (PExpr a)
@@ -134,7 +134,7 @@ parseExprInQuote = parseSymbol
 parseExprInQuasi :: Parser (PExpr a)
 parseExprInQuasi = parseSymbol
                <|> parseNumber
-               <|> (try (reserved "\'") >> parseQuasi)
+               <|> (try (reserved "\'") >> parens parseQuasi)
                <|> (try (reserved ",")  >> parseExpr)
                <|> parens ( parseUnquotable )
 
