@@ -48,6 +48,20 @@ Also because I have never made a programming language before.
 3. Some kind of example?
 ---
 
+The goal is to provide a practical median between a minimal, orthogonal core
+language and something useful in real world scenarios.
+
+Right now the core syntax is a slightly modified lambda calculus wherein all
+functions are unary; *however* all functions take as their single parameter a
+list (much like Perl, actually) which is deconstructed to pass arguments.
+
+The goal is to support Common Lisp style compile-time macros for further
+extension by users; the goal is for all non-core syntax to be provided by
+macros in the default distribution.
+
+3.1 Examples now!
+---
+
 Here's what happens when I evaluate the Y combinator (in the core syntax):
 
     ;; Y combinator
@@ -113,6 +127,48 @@ Here are some examples of lists and the quote, quasiquote, and unquote operators
 
     ready> `(a ,(apply b c) d)
     Mu ( AList [Mu ( ASymbol "quote" ) ,Mu ( AList [Mu ( AList [Mu ( ASymbol "a" ) ,Mu ( AApply Mu ( ASymbol "b" )  Mu ( ASymbol "c" )  ) ,Mu ( ASymbol "d" ) ] ) ] ) ] ) 
+
+Also supported are let bindings, which boil down to lambda functions:
+
+    ;; input
+
+    (let ((x ,(apply f '()))
+          (y 1))
+      (apply x y))
+
+    (apply
+      (fn (x y)
+        (apply x y))
+      `(,(apply f '()) 1))
+
+    ;; output (for both)
+
+    Mu (
+      AApply
+        Mu (
+          ALambda Anonymous Mu (
+            AList [
+              Mu ( ASymbol "x" )
+              Mu ( ASymbol "y" )
+            ]
+          )
+          Mu (
+            AApply
+              Mu ( ASymbol "x" )
+              Mu ( ASymbol "y" )
+          )
+        )
+        Mu (
+          AList [
+            Mu (
+              AApply
+                Mu (ASymbol "f" )
+                Mu ( AList [] )
+            )
+            Mu ( AInteger 1 )
+          ]
+        )
+    )
 
 4. How to build
 ---

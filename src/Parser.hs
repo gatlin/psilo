@@ -36,7 +36,7 @@ parseFn = do
     reserved "fn"
     optional whitespace
     name <- optionMaybe identifier
-    args <- parens parseList
+    args <- parens parseQuotedList
     optional whitespace
     body <- parseExpr
     let name' = case name of
@@ -50,20 +50,20 @@ parseApp = do
     optional whitespace
     fun <- parseExpr
     optional whitespace
-    body <- (try (char '\'') >> parens parseList)
+    body <- (try (char '\'') >> parens parseQuotedList)
         <|> (try (char '`') >> parens parseUnquotable)
         <|> parseExpr
     return $ Free (AApply fun body)
 
-parseList :: Parser (PExpr a)
-parseList = fmap (Free . AList) $ parseExprInQuote `sepBy` whitespace
+parseQuotedList :: Parser (PExpr a)
+parseQuotedList = fmap (Free . AList) $ parseExprInQuote `sepBy` whitespace
 
 parseUnquotable :: Parser (PExpr a)
 parseUnquotable = fmap (Free . AList) $ parseExprInQuasi `sepBy` whitespace
 
 parseQuote :: Parser (PExpr a)
 parseQuote = do
-    x <- parseSymbol <|> parseNumber <|> parseList
+    x <- parseSymbol <|> parseNumber <|> parseQuotedList
     return $ (Free . AList) [(Free . ASymbol) "quote", x]
 
 parseQuasi :: Parser (PExpr a)
@@ -75,7 +75,7 @@ parseLet :: Parser (PExpr a)
 parseLet = do
     reserved "let"
     optional whitespace
-    (Free (AList assns)) <- parens parseList
+    (Free (AList assns)) <- parens parseUnquotable
     body  <- parseExpr <|> return (Free (AList []))
     (args,operands) <- (flip mapAndUnzipM) assns $ \(Free (AList (x:y:_))) -> return (x,y)
     args' <- return $ Free $ AList args
@@ -96,7 +96,7 @@ parseExprInQuote :: Parser (PExpr a)
 parseExprInQuote = parseSymbol
                <|> parseNumber
                <|> (try (char '\'') >> parseQuote)
-               <|> parens ( parseList )
+               <|> parens ( parseQuotedList )
 
 -- | Expression parser inside a quasiquoted list
 parseExprInQuasi :: Parser (PExpr a)

@@ -8,7 +8,7 @@ import qualified Text.Parsec.Token as Tok
 lexer :: Tok.TokenParser ()
 lexer = Tok.makeTokenParser style
     where ops = ["+","*","-","/","<","="]
-          names = ["fn","::","let","apply"]
+          names = ["fn","::","let","apply","list"]
           idStarts = letter <|> char '_'
           idLetters = letter <|> char '_' <|> digit <|> char '-' <|> char '+'
           opStarts = oneOf "!$%&|*+-/:<=>?@^_~#"
