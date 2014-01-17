@@ -10,7 +10,7 @@ lexer = Tok.makeTokenParser style
     where ops = ["+","*","-","/","<","="]
           names = ["fn","::","let","apply"]
           idStarts = letter <|> char '_'
-          idLetters = letter <|> char '_' <|> digit <|> char '-' <|> char '+'
+          idLetters = letter <|> char '_' <|> digit <|> char '-' <|> char '+' <|> char '?'
           opStarts = oneOf "!$%&|*+-/:<=>?@^_~#"
           opLetters = oneOf "!$%&|*+-/:<=>?@^_~#" <|> letter <|> digit <|> char '-' <|> char '_'
           style = emptyDef {
