@@ -70,7 +70,7 @@ parseApp = do
 -- | Special restricted list for lambda argument lists. Can only contain
 -- symbols.
 parseSymbolList :: Parser (PExpr a)
-parseSymbolList = fmap (Free . AList) $ parseSymbol `sepBy` whitespace
+parseSymbolList = fmap (Free . AList) $ (parseSymbol <|> parens parseSymbolList) `sepBy` whitespace
 
 -- | Regular list created by the quote (') operator. Enters a state where
 -- everything is treated as a literal - no applications allowed.
@@ -139,8 +139,8 @@ parseExprInQuote = parseSymbol
 parseExprInQuasi :: Parser (PExpr a)
 parseExprInQuasi = parseSymbol
                <|> parseNumber
-               <|> (try (reserved "\'") >> parens parseQuote)
-               <|> (try (reserved "`" ) >> parens parseQuasi)
+               <|> (try (reserved "'") >> parseQuote)
+               <|> (try (reserved "`" ) >> parseQuasi)
                <|> (try (reserved ",")  >> parseExpr)
                <|> parens ( parseUnquotable )
 
