@@ -66,13 +66,10 @@ Here's what happens when I evaluate the Y combinator (in the core syntax):
 
     ;; Y combinator
     (fn (f)
-      (apply
-        (fn (y)
-          (apply y y))
-        (fn (y)
-          (apply
-            f
-            (apply y y)))))
+      ((fn (y)
+         (f (y y)))
+       (fn (y)
+         (f (y y)))))
 
     ;; result
 
@@ -92,28 +89,53 @@ Here's what happens when I evaluate the Y combinator (in the core syntax):
             )
             Mu (
               AApply
-                Mu ( ASymbol "y" )
-                Mu ( ASymbol "y" )
-            )
-          )
-          Mu (
-            ALambda Anonymous Mu (
-              AList [
-                Mu ( ASymbol "y" )
-              ]
-            )
-            Mu (
-              AApply
-                Mu (ASymbol "f" )
+                Mu ( ASymbol "f" )
                 Mu (
-                  AApply
-                    Mu ( ASymbol "y" )
-                    Mu ( ASymbol "y" )
+                  AList [
+                    Mu (
+                      AApply
+                        Mu ( ASymbol "y" )
+                        Mu (
+                          AList [
+                            Mu ( ASymbol "y" )
+                          ]
+                        )
+                    )
+                  ]
                 )
             )
           )
+          Mu (
+            AList [
+              Mu (
+                ALambda Anonymous Mu (
+                  AList [
+                    Mu ( ASymbol "y" )
+                  ]
+                )
+                Mu (
+                  AApply
+                    Mu ( ASymbol "f" )
+                    Mu (
+                      AList [
+                        Mu (
+                          AApply
+                            Mu ( ASymbol "y" )
+                            Mu (
+                              AList [
+                                Mu ( ASymbol "y" )
+                              ]
+                            )
+                        )
+                      ]
+                    )
+                )
+              )
+            ]
+          )
       )
     )
+
 
 `Mu` here is, incidentally, the Mu combinator, a type-level equivalent to the Y combinator.
 
@@ -154,15 +176,21 @@ Also supported are let bindings, which boil down to lambda functions:
           Mu (
             AApply
               Mu ( ASymbol "x" )
-              Mu ( ASymbol "y" )
+              Mu (
+                AList [
+                  Mu ( ASymbol "y" )
+                ]
+              )
           )
         )
         Mu (
           AList [
             Mu (
               AApply
-                Mu (ASymbol "f" )
-                Mu ( AList [] )
+                Mu ( ASymbol "f" )
+                Mu (
+                  AList []
+                )
             )
             Mu ( AInteger 1 )
           ]

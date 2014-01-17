@@ -59,7 +59,6 @@ parseApp = do
         optional whitespace
         body <- (try (char '\'') >> parens parseQuotedList)
             <|> (try (char '`') >> parens parseUnquotable)
-            <|> parseExpr
         return $ Free (AApply fun body))
     <|> (do
         fst <- parseSymbol <|> parens parseFn
