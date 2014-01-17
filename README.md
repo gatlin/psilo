@@ -66,13 +66,10 @@ Here's what happens when I evaluate the Y combinator (in the core syntax):
 
     ;; Y combinator
     (fn (f)
-      (apply
-        (fn (y)
-          (apply y y))
-        (fn (y)
-          (apply
-            f
-            (apply y y)))))
+      ((fn (y)
+         (f (y y)))
+       (fn (y)
+         (f (y y)))))
 
     ;; result
 
