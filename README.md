@@ -135,6 +135,7 @@ Here's what happens when I evaluate the Y combinator (in the core syntax):
 `Mu` here is, incidentally, the Mu combinator, a type-level equivalent to the Y combinator.
 
 Here are some examples of lists and the quote, quasiquote, and unquote operators:
+
     ready> '(a (b c) d)
     Mu ( AList [Mu ( ASymbol "quote" ) ,Mu ( AList [Mu ( ASymbol "a" ) ,Mu ( AList [Mu ( ASymbol "b" ) ,Mu ( ASymbol "c" ) ] ) ,Mu ( ASymbol "d" ) ] ) ] )
 
