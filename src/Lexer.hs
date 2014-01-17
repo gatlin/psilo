@@ -22,6 +22,8 @@ lexer = Tok.makeTokenParser style
                     , Tok.identLetter = idLetters
                     , Tok.opStart = opStarts
                     , Tok.opLetter = opLetters
+                    , Tok.commentStart = "/*"
+                    , Tok.commentEnd = "*/"
           }
 
 float :: Parser Double

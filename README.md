@@ -59,8 +59,7 @@ The goal is to support Common Lisp style compile-time macros for further
 extension by users; the goal is for all non-core syntax to be provided by
 macros in the default distribution.
 
-3.1 Examples now!
----
+### 3.1 Okay examples now!
 
 Here's what happens when I evaluate the Y combinator (in the core syntax):
 
@@ -195,6 +194,11 @@ Also supported are let bindings, which boil down to lambda functions:
           ]
         )
     )
+
+### 3.2 More examples!
+
+More information can be found in the `eg` directory. Those files are valid
+input to the compiler as it stands (however incomplete).
 
 4. How to build
 ---
