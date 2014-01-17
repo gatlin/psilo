@@ -55,10 +55,6 @@ Right now the core syntax is a slightly modified lambda calculus wherein all
 functions are unary; *however* all functions take as their single parameter a
 list (much like Perl, actually) which is deconstructed to pass arguments.
 
-The goal is to support Common Lisp style compile-time macros for further
-extension by users; the goal is for all non-core syntax to be provided by
-macros in the default distribution.
-
 ### 3.1 Okay examples now!
 
 Here's what happens when I evaluate the Y combinator (in the core syntax):
