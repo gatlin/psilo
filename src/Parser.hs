@@ -53,14 +53,20 @@ parseFn = do
 -- an arbitrary expression value.
 parseApp :: Parser (PExpr a)
 parseApp = do
-    reserved "apply"
-    optional whitespace
-    fun <- parseExpr
-    optional whitespace
-    body <- (try (char '\'') >> parens parseQuotedList)
-        <|> (try (char '`') >> parens parseUnquotable)
-        <|> parseExpr
-    return $ Free (AApply fun body)
+    try (reserved "apply") >> (do
+        optional whitespace
+        fun <- parseExpr
+        optional whitespace
+        body <- (try (char '\'') >> parens parseQuotedList)
+            <|> (try (char '`') >> parens parseUnquotable)
+            <|> parseExpr
+        return $ Free (AApply fun body))
+    <|> (do
+        fst <- parseSymbol <|> parens parseFn
+        optional whitespace
+        rst <- fmap (Free . AList) $ parseExpr `sepBy` whitespace
+        return $ Free (AApply fst rst))
+
 
 -- | Special restricted list for lambda argument lists. Can only contain
 -- symbols.
@@ -134,7 +140,8 @@ parseExprInQuote = parseSymbol
 parseExprInQuasi :: Parser (PExpr a)
 parseExprInQuasi = parseSymbol
                <|> parseNumber
-               <|> (try (reserved "\'") >> parens parseQuasi)
+               <|> (try (reserved "\'") >> parens parseQuote)
+               <|> (try (reserved "`" ) >> parens parseQuasi)
                <|> (try (reserved ",")  >> parseExpr)
                <|> parens ( parseUnquotable )
 

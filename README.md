@@ -132,14 +132,13 @@ Also supported are let bindings, which boil down to lambda functions:
 
     ;; input
 
-    (let ((x (apply f '()))
+    (let ((x (f))
           (y 1))
-      (apply x y))
+      (x y))
 
-    (apply
-      (fn (x y)
-        (apply x y))
-      `(,(apply f '()) 1))
+    ((fn (x y)
+       (x y))
+     (f) 1)
 
     ;; output (for both)
 
