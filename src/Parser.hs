@@ -93,7 +93,12 @@ parseQuote = do
 parseQuasi :: Parser (PExpr a)
 parseQuasi = do
     x <- parseSymbol <|> parseNumber <|> parens parseUnquotable
-    return $ (Free . AList) [(Free . ASymbol) "quote", x]
+    return $ (Free . AList) [(Free . ASymbol) "quasi", x]
+
+parseComma :: Parser (PExpr a)
+parseComma = do
+    x <- parseSymbol <|> parseExpr
+    return $ (Free . AList) [(Free . ASymbol) "comma", x]
 
 parseLetBinding :: Parser (PExpr a)
 parseLetBinding = do
@@ -139,9 +144,9 @@ parseExprInQuote = parseSymbol
 parseExprInQuasi :: Parser (PExpr a)
 parseExprInQuasi = parseSymbol
                <|> parseNumber
-               <|> (try (reserved "'") >> parseQuote)
+               <|> (try (reserved "'") >>  parseQuote)
                <|> (try (reserved "`" ) >> parseQuasi)
-               <|> (try (reserved ",")  >> parseExpr)
+               <|> (try (char ',')  >>     parseComma)
                <|> parens ( parseUnquotable )
 
 contents :: Parser a -> Parser a

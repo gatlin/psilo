@@ -140,15 +140,14 @@ Here's what happens when I evaluate the Y combinator (in the core syntax):
 `Mu` here is, incidentally, the Mu combinator, a type-level equivalent to the Y combinator.
 
 Here are some examples of lists and the quote, quasiquote, and unquote operators:
+    ready> '(a (b c) d)
+    Mu ( AList [Mu ( ASymbol "quote" ) ,Mu ( AList [Mu ( ASymbol "a" ) ,Mu ( AList [Mu ( ASymbol "b" ) ,Mu ( ASymbol "c" ) ] ) ,Mu ( ASymbol "d" ) ] ) ] )
 
-    ready> '(a (apply b c) d)
-    Mu ( AList [Mu ( ASymbol "quote" ) ,Mu ( AList [Mu ( AList [Mu ( ASymbol "a" ) ,Mu ( AList [Mu ( ASymbol "apply" ) ,Mu ( ASymbol "b" ) ,Mu ( ASymbol "c" ) ] ) ,Mu ( ASymbol "d" ) ] ) ] ) ] )
+    ready> `(a (b c) d)
+    Mu ( AList [Mu ( ASymbol "quasi" ) ,Mu ( AList [Mu ( ASymbol "a" ) ,Mu ( AList [Mu ( ASymbol "b" ) ,Mu ( ASymbol "c" ) ] ) ,Mu ( ASymbol "d" ) ] ) ] )
 
-    ready> `(a (apply b c) d)
-    Mu ( AList [Mu ( ASymbol "quote" ) ,Mu ( AList [Mu ( AList [Mu ( ASymbol "a" ) ,Mu ( AList [Mu ( ASymbol "apply" ) ,Mu ( ASymbol "b" ) ,Mu ( ASymbol "c" ) ] ) ,Mu ( ASymbol "d" ) ] ) ] ) ] )
-
-    ready> `(a ,(apply b c) d)
-    Mu ( AList [Mu ( ASymbol "quote" ) ,Mu ( AList [Mu ( AList [Mu ( ASymbol "a" ) ,Mu ( AApply Mu ( ASymbol "b" )  Mu ( ASymbol "c" )  ) ,Mu ( ASymbol "d" ) ] ) ] ) ] ) 
+    ready> `(a ,(b c) d)
+    Mu ( AList [Mu ( ASymbol "quasi" ) ,Mu ( AList [Mu ( ASymbol "a" ) ,Mu ( AList [Mu ( ASymbol "comma" ) ,Mu ( AApply Mu ( ASymbol "b" )  Mu ( AList [Mu ( ASymbol "c" ) ] )  ) ] ) ,Mu ( ASymbol "d" ) ] ) ] ) 
 
 Also supported are let bindings, which boil down to lambda functions:
 
