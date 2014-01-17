@@ -154,15 +154,21 @@ Also supported are let bindings, which boil down to lambda functions:
           Mu (
             AApply
               Mu ( ASymbol "x" )
-              Mu ( ASymbol "y" )
+              Mu (
+                AList [
+                  Mu ( ASymbol "y" )
+                ]
+              )
           )
         )
         Mu (
           AList [
             Mu (
               AApply
-                Mu (ASymbol "f" )
-                Mu ( AList [] )
+                Mu ( ASymbol "f" )
+                Mu (
+                  AList []
+                )
             )
             Mu ( AInteger 1 )
           ]
