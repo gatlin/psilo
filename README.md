@@ -92,28 +92,53 @@ Here's what happens when I evaluate the Y combinator (in the core syntax):
             )
             Mu (
               AApply
-                Mu ( ASymbol "y" )
-                Mu ( ASymbol "y" )
-            )
-          )
-          Mu (
-            ALambda Anonymous Mu (
-              AList [
-                Mu ( ASymbol "y" )
-              ]
-            )
-            Mu (
-              AApply
-                Mu (ASymbol "f" )
+                Mu ( ASymbol "f" )
                 Mu (
-                  AApply
-                    Mu ( ASymbol "y" )
-                    Mu ( ASymbol "y" )
+                  AList [
+                    Mu (
+                      AApply
+                        Mu ( ASymbol "y" )
+                        Mu (
+                          AList [
+                            Mu ( ASymbol "y" )
+                          ]
+                        )
+                    )
+                  ]
                 )
             )
           )
+          Mu (
+            AList [
+              Mu (
+                ALambda Anonymous Mu (
+                  AList [
+                    Mu ( ASymbol "y" )
+                  ]
+                )
+                Mu (
+                  AApply
+                    Mu ( ASymbol "f" )
+                    Mu (
+                      AList [
+                        Mu (
+                          AApply
+                            Mu ( ASymbol "y" )
+                            Mu (
+                              AList [
+                                Mu ( ASymbol "y" )
+                              ]
+                            )
+                        )
+                      ]
+                    )
+                )
+              )
+            ]
+          )
       )
     )
+
 
 `Mu` here is, incidentally, the Mu combinator, a type-level equivalent to the Y combinator.
 
