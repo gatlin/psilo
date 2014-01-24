@@ -29,6 +29,7 @@ data AST a
     | AFloat Double
     | ABoolean Bool
     | ASymbol Sym
+    | AVector [a]
 
 deriving instance Show a => Show (AST a)
 deriving instance Functor AST

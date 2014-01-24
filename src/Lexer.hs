@@ -35,6 +35,9 @@ integer = Tok.integer lexer
 parens :: Parser a -> Parser a
 parens = Tok.parens lexer
 
+brackets :: Parser a -> Parser a
+brackets = Tok.brackets lexer
+
 whitespace :: Parser ()
 whitespace = Tok.whiteSpace lexer
 

@@ -66,6 +66,10 @@ parseApp = do
         rst <- fmap (Free . AList) $ parseExpr `sepBy` whitespace
         return $ Free (AApply fst rst))
 
+-- | Vectors are homogeneously typed, ordered multi-sets laid out sequentially
+-- in memory.
+parseVector :: Parser (PExpr a)
+parseVector = fmap (Free . AVector) $ brackets $ parseExpr `sepBy` whitespace
 
 -- | Special restricted list for lambda argument lists. Can only contain
 -- symbols.
@@ -131,6 +135,7 @@ parseExpr = parseSymbol
         <|> parseNumber
         <|> (try (char '\'') >> parseQuote)
         <|> (try (char '`')  >> parseQuasi)
+        <|> parseVector
         <|> parens ( parseFn <|> parseLet <|> parseApp )
 
 -- | Expression parser inside a quoted list
