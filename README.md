@@ -14,8 +14,14 @@ features:
 - No run-time garbage collection necessary owing to uniqueness types
 - Static typing for compile-time verification and optimization
 - Malleable syntax with Common Lisp-esque macros
-- Dead-simple parallelism with special lists called "sequences"
+- Dead-simple parallelism with special lists called vectors
 - Orthogonal core syntax and semantics for your performance and my sanity
+
+    (let ((square (fn (x) (* x x)))
+          (my-vector [1 2 3 4 5 6]))
+      (square my-vector))
+
+    ; => [1 4 9 16 25 36]
 
 1. Status
 ---
