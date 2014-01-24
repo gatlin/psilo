@@ -57,82 +57,12 @@ list (much like Perl, actually) which is deconstructed to pass arguments.
 
 ### 3.1 Okay examples now!
 
-Here's what happens when I evaluate the Y combinator (in the core syntax):
+Here's what the Y combinator looks like (in `eg/Y.sl`):
 
     ;; Y combinator
     (fn (f)
-      ((fn (y)
-         (f (y y)))
-       (fn (y)
-         (f (y y)))))
-
-    ;; result
-
-    Mu (
-      ALambda Anonymous Mu (
-        AList [
-          Mu ( ASymbol "f" )
-        ]
-      )
-      Mu (
-        AApply
-          Mu (
-            ALambda Anonymous Mu (
-              AList [
-                Mu ( ASymbol "y" )
-              ]
-            )
-            Mu (
-              AApply
-                Mu ( ASymbol "f" )
-                Mu (
-                  AList [
-                    Mu (
-                      AApply
-                        Mu ( ASymbol "y" )
-                        Mu (
-                          AList [
-                            Mu ( ASymbol "y" )
-                          ]
-                        )
-                    )
-                  ]
-                )
-            )
-          )
-          Mu (
-            AList [
-              Mu (
-                ALambda Anonymous Mu (
-                  AList [
-                    Mu ( ASymbol "y" )
-                  ]
-                )
-                Mu (
-                  AApply
-                    Mu ( ASymbol "f" )
-                    Mu (
-                      AList [
-                        Mu (
-                          AApply
-                            Mu ( ASymbol "y" )
-                            Mu (
-                              AList [
-                                Mu ( ASymbol "y" )
-                              ]
-                            )
-                        )
-                      ]
-                    )
-                )
-              )
-            ]
-          )
-      )
-    )
-
-
-`Mu` here is, incidentally, the Mu combinator, a type-level equivalent to the Y combinator.
+      ((fn (x) (f (fn (y) ((x x) y))))
+       (fn (x) (f (fn (y) ((x x) y))))))
 
 Here are some examples of lists and the quote, quasiquote, and unquote operators:
 
@@ -191,6 +121,9 @@ Also supported are let bindings, which boil down to lambda functions:
           ]
         )
     )
+
+Mu here is the type-level fixpoint combinator; internally the parser wraps all
+expressions in a Mu application.
 
 ### 3.2 More examples!
 
