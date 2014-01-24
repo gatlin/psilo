@@ -1,8 +1,7 @@
 /* Y combinator */
 
-
-(fn Y (f)
-  ((fn (y)
-     (f (y y)))
-   (fn (y)
-     (f (y y)))))
+(fn (f)
+  ((fn (x)
+     (f (fn (y) ((x x) y))))
+   (fn (x)
+     (f (fn (y) ((x x) y))))))

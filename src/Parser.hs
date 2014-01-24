@@ -61,7 +61,7 @@ parseApp = do
             <|> (try (char '`') >> parens parseUnquotable)
         return $ Free (AApply fun body))
     <|> (do
-        fst <- parseSymbol <|> parens parseFn
+        fst <- try parseSymbol <|> try (parens parseFn) <|> parens parseApp
         optional whitespace
         rst <- fmap (Free . AList) $ parseExpr `sepBy` whitespace
         return $ Free (AApply fst rst))
