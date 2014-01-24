@@ -37,11 +37,11 @@ article][comonads].
 
 ### 1.1 Roadmap
 
-1. Take a file as input, not a REPL
-2. Basic type checking
-3. Add unique types to the kind system
-4. Algebraic data types (as closures)
-5. We'll see?
+1. [ x ] Take a file as input, not a REPL
+2. [   ] Basic type checking
+3. [   ] Add unique types to the kind system
+4. [   ] Algebraic data types (as closures)
+5. [   ] We'll see?
 
 2. Why?
 ---
