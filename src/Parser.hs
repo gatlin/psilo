@@ -41,7 +41,7 @@ parseFn = do
     reserved "fn"
     optional whitespace
     name <- optionMaybe identifier
-    args <- parens parseSymbolList
+    args <- parens parseQuotedList
     optional whitespace
     body <- parseExpr
     let name' = case name of
@@ -70,11 +70,6 @@ parseApp = do
 -- in memory.
 parseVector :: Parser (PExpr a)
 parseVector = fmap (Free . AVector) $ brackets $ parseExpr `sepBy` whitespace
-
--- | Special restricted list for lambda argument lists. Can only contain
--- symbols.
-parseSymbolList :: Parser (PExpr a)
-parseSymbolList = fmap (Free . AList) $ (parseSymbol <|> parens parseSymbolList) `sepBy` whitespace
 
 -- | Regular list created by the quote (') operator. Enters a state where
 -- everything is treated as a literal - no applications allowed.
