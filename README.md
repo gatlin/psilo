@@ -63,73 +63,112 @@ list (much like Perl, actually) which is deconstructed to pass arguments.
 
 ### 3.1 Okay examples now!
 
-Here's what the Y combinator looks like (in `eg/Y.sl`):
+Eventually, the goal is for the following to be a complete psilo program:
 
-    ;; Y combinator
-    (fn (f)
-      ((fn (x) (f (fn (y) ((x x) y))))
-       (fn (x) (f (fn (y) ((x x) y))))))
-
-Here are some examples of lists and the quote, quasiquote, and unquote operators:
-
-    ready> '(a (b c) d)
-    Mu ( AList [Mu ( ASymbol "quote" ) ,Mu ( AList [Mu ( ASymbol "a" ) ,Mu ( AList [Mu ( ASymbol "b" ) ,Mu ( ASymbol "c" ) ] ) ,Mu ( ASymbol "d" ) ] ) ] )
-
-    ready> `(a (b c) d)
-    Mu ( AList [Mu ( ASymbol "quasi" ) ,Mu ( AList [Mu ( ASymbol "a" ) ,Mu ( AList [Mu ( ASymbol "b" ) ,Mu ( ASymbol "c" ) ] ) ,Mu ( ASymbol "d" ) ] ) ] )
-
-    ready> `(a ,(b c) d)
-    Mu ( AList [Mu ( ASymbol "quasi" ) ,Mu ( AList [Mu ( ASymbol "a" ) ,Mu ( AList [Mu ( ASymbol "comma" ) ,Mu ( AApply Mu ( ASymbol "b" )  Mu ( AList [Mu ( ASymbol "c" ) ] )  ) ] ) ,Mu ( ASymbol "d" ) ] ) ] ) 
-
-Also supported are let bindings, which boil down to lambda functions:
-
-    ;; input
-
-    (let ((x (f))
-          (y 1))
-      (x y))
-
-    ((fn (x y)
-       (x y))
-     (f) 1)
-
-    ;; output (for both)
-
-    Mu (
-      AApply
-        Mu (
-          ALambda Anonymous Mu (
-            AList [
-              Mu ( ASymbol "x" )
-              Mu ( ASymbol "y" )
-            ]
-          )
-          Mu (
-            AApply
-              Mu ( ASymbol "x" )
-              Mu (
-                AList [
-                  Mu ( ASymbol "y" )
-                ]
-              )
-          )
-        )
-        Mu (
-          AList [
-            Mu (
-              AApply
-                Mu ( ASymbol "f" )
-                Mu (
-                  AList []
-                )
-            )
-            Mu ( AInteger 1 )
-          ]
-        )
-    )
-
-Mu here is the type-level fixpoint combinator; internally the parser wraps all
-expressions in a Mu application.
+    ;; psilo has functions as you might expect
+    (fn square (x) (* x x))
+    
+    ;; and algebraic data types
+    (adt Person ()
+      (Human (name : String)
+             (age  : Int))
+    
+      (Corporation (name  : String)
+                   (state : String)
+                   (age   : Int)
+                   (taxId : String)))
+                   
+    ;; You can overload functions, like the `show` function
+    (:: show : Person -> String)
+    (fn show ((Human name age))
+      (concat name
+              ", aged "
+              (show age)
+              " years"))
+              
+    (fn show ((Corporation name state age taxId))
+      (concat name
+              ", a "
+              state
+              " corporation; "
+              (show age)
+              " years old ("
+              taxId
+              ")"))
+              
+    ;; Idiomatically, you can mutate values like so
+    
+    ; a function which mutates a person
+    (:: birthday : Person -> Person)
+    (fn birthday ((Human name age))
+      (Person name (+ 1 age)))
+    (fn birthday ((Corporation name state age taxId))
+      (Corporation name state (+ 1 age) taxId))
+      
+    (fn ex1 ()
+      (let ((p (Human "gatlin" 25)))
+        (let ((p (birthday p)))
+          (Human->age p))))
+    ; (ex1) => 26
+    
+    ;; In the previous example, because p was shadowed using itself,
+    ;; it was updated in-place in memory.
+    
+    ;; To write imperative code, one must define a monad, like in Haskell.
+    ;; In psilo we have tried to make this process more intuitive:
+    
+    (adt SimpleIO (a)
+      (Print String a)
+      (Read  (String -> a)))
+      
+    (free SimpleIO with-io
+      (print (Print s k) (let ((_ (c-printf s)))
+                           (with-io k)))
+      (read  (Read k)    (let ((input (c-scanf)))
+                           (with-io (k input)))))
+                     
+    (fn prompt (s)
+      (do (print s)
+          (set x (read))
+          (return x)))
+          
+    ;; NB: there is a special syntax for set:
+          
+    (fn ex2 ()
+      (with-io (do
+        (name := (prompt "What is your name?"))
+        (print (concat name " is a stupid name.")))))
+        
+    ;; psilo also has vectors, which are homogeneously typed aggregate values
+    ;; laid out sequentially in memory. They may be manipulated by stream fusion,
+    ;; and have a very special property, which I'll show by example:
+    
+    (let ((x (vector '(1 2 3))))
+      (square x))
+      
+    ; => [1 4 9]
+    
+    ;; Here is something really interesting though:
+    
+    (adt Stream (a) (End) (Next a (Stream a)))
+    
+    (:: buffer : Int -> Stream a -> [a])
+    (fn buffer (_ (End)) [])
+    (fn buffer (n (Next h t))
+      (concat [h] (buffer (- n 1) t)))
+      
+    (:: audio-xform : Int -> Int)
+    (fn audio-xform (x) (...))
+    
+    ; and given some AudioIO monad ...
+    
+    (:: ex3 : AudioIO ())
+    (fn ex3 ()
+      (with-sensor-io (do
+        (stream := (make-audio-input-stream params ...))
+        (buf    := (buffer 1000 stream))
+        (buf-2  := (audio-xform buf))
+        (output-audio buf-2))))
 
 ### 3.2 More examples!
 
