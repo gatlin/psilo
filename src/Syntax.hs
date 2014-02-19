@@ -40,8 +40,6 @@ deriving instance Ord a => Ord (AST a)
 
 type PExpr = Free AST
 
-aLambda n = liftF $ ALambda n id id
-
 instance Show a => Show (PExpr a) where
     show (Pure _)   = ""
     show (Free x) = "Mu ( " ++ show x ++ " ) "

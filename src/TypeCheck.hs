@@ -57,7 +57,7 @@ instance Monoid TypeResult where
 
 data TypeState t m = TypeState {
     varId :: Int,
-    memo :: M.Map t m
+    memo  :: M.Map t m
 }
 
 type TypeCheck t = State (TypeState t (Type, TypeResult)) (Type, TypeResult)
@@ -105,7 +105,7 @@ generateConstraints (() :< ALambda s b) = do
         assumptions = as
     })
 
-generateConstraints (() :< a :. b) = do
+generateConstraints (() :< AApply a b) = do
     var <- freshVarId
     ar  <- memoizedTC generateConstraints a
     br  <- memoizedTC generateConstraints b
