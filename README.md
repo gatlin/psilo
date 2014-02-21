@@ -17,7 +17,13 @@ features:
 - Dead-simple parallelism with special lists called vectors
 - Orthogonal core syntax and semantics for your performance and my sanity
 
-1. Syonopsis
+### Status
+
+The parser isn't even completed, the typechecker is nonexistent, and I'm not
+fully done with how the grammar should look. This README is essentially psilo
+at the moment.
+
+1. Synopsis
 ---
 
 ### Basics
