@@ -17,165 +17,230 @@ features:
 - Dead-simple parallelism with special lists called vectors
 - Orthogonal core syntax and semantics for your performance and my sanity
 
-    (let ((square (fn (x) (* x x)))
-          (my-vector [1 2 3 4 5 6]))
-      (square my-vector))
-
-    ; => [1 4 9 16 25 36]
-
-1. Status
+1. Syonopsis
 ---
 
-**SUPER DUPER INCOMPLETE. LIKE, THE PARSER ISN'T EVEN DONE.** Right now what
-builds is a nice, lame interpreter that spits out the parse of what you typed.
-Not even all of the core syntax is enabled.
+### Basics
 
-However, the code is somewhat useful right now as an example of how to use
-[parsec][parsec] with free monads being used as a [mu combinator][mu]. That
-means it'll be real easy to perform type checking with comonads [as per this
-article][comonads].
+psilo is strongly typed, implementing a type system akin to Haskell's:
 
-### 1.1 Roadmap
+    (:: square ((Numeric n) :=> n :-> n))
+    (fn square (&x) (* x x))
 
-1. [ x ] Take a file as input, not a REPL
-2. [   ] Basic type checking
-3. [   ] Add unique types to the kind system
-4. [   ] Algebraic data types (as closures)
-5. [   ] We'll see?
+But type annotations are almost always optional:
 
-2. Why?
----
+    (fn add1 (n) (+ 1 n))
 
-Because I want Haskell's type system, lisp's homiconicity, sequenceL's
-normalize-transpose operation, and Rust's memory management.
+Closures are not only possible but encouraged:
 
-Also because I have never made a programming language before.
+    (fn read-some-pipe (config)
+      (let ((pipe (make-pipe config)))
+        (fn ()
+          (read-pipe pipe))))
 
-3. Some kind of example?
----
+If you find yourself writing code like this:
 
-The goal is to provide a practical median between a minimal, orthogonal core
-language and something useful in real world scenarios.
-
-Right now the core syntax is a slightly modified lambda calculus wherein all
-functions are unary; *however* all functions take as their single parameter a
-list (much like Perl, actually) which is deconstructed to pass arguments.
-
-### 3.1 Okay examples now!
-
-Eventually, the goal is for the following to be a complete psilo program:
-
-    ;; psilo has functions as you might expect
-    (fn square (x) (* x x))
-    
-    ;; and algebraic data types
-    (adt Person ()
-      (Human (name : String)
-             (age  : Int))
-    
-      (Corporation (name  : String)
-                   (state : String)
-                   (age   : Int)
-                   (taxId : String)))
-                   
-    ;; You can overload functions, like the `show` function
-    (:: show : Person -> String)
-    (fn show ((Human name age))
-      (concat name
-              ", aged "
-              (show age)
-              " years"))
-              
-    (fn show ((Corporation name state age taxId))
-      (concat name
-              ", a "
-              state
-              " corporation; "
-              (show age)
-              " years old ("
-              taxId
-              ")"))
-              
-    ;; Idiomatically, you can mutate values like so
-    
-    ; a function which mutates a person
-    (:: birthday : Person -> Person)
-    (fn birthday ((Human name age))
-      (Person name (+ 1 age)))
-    (fn birthday ((Corporation name state age taxId))
-      (Corporation name state (+ 1 age) taxId))
-      
     (fn ex1 ()
-      (let ((p (Human "gatlin" 25)))
-        (let ((p (birthday p)))
-          (Human->age p))))
-    ; (ex1) => 26
-    
-    ;; In the previous example, because p was shadowed using itself,
-    ;; it was updated in-place in memory.
-    
-    ;; To write imperative code, one must define a monad, like in Haskell.
-    ;; In psilo we have tried to make this process more intuitive:
-    
-    (adt SimpleIO (a)
-      (Print String a)
-      (Read  (String -> a)))
-      
-    (free SimpleIO with-io
-      (print (Print s k) (let ((_ (c-printf s)))
-                           (with-io k)))
-      (read  (Read k)    (let ((input (c-scanf)))
-                           (with-io (k input)))))
-                     
-    (fn prompt (s)
-      (do (print s)
-          (set x (read))
-          (return x)))
-          
-    ;; NB: there is a special syntax for set:
-          
+      (let ((x (foo)))
+        (let ((y (bar x)))
+          (baz y x))))
+
+you can write it like so:
+
+    (fn ex1 ()
+      (do (= x (foo))
+          (= y (bar x))
+          (baz y x)))
+
+Additionally, for readibility you can make a function infix using the
+following convention:
+
+    (fn ex1 ()
+      (do (x := (foo))
+          (y := (bar x))
+          (baz y x)))
+
+### Linear types
+
+Under special circumstances, you can also mutate values:
+
     (fn ex2 ()
-      (with-io (do
-        (name := (prompt "What is your name?"))
-        (print (concat name " is a stupid name.")))))
-        
-    ;; psilo also has vectors, which are homogeneously typed aggregate values
-    ;; laid out sequentially in memory. They may be manipulated by stream fusion,
-    ;; and have a very special property, which I'll show by example:
-    
-    (let ((x (vector '(1 2 3))))
-      (square x))
-      
+      (do (x := 5)
+          (x := (x :+ 1))
+          x))
+
+If value is used *linearly*, it may be mutated. A linear value must be used
+exactly once in any scope before it is reassigned or returned, or
+it must be explicitly freed.
+
+    (fn ex3-good ()
+      (do (x := 5)
+          (x := (+ 1 x))
+          (y := (square x))
+          y))
+
+    ; bad: x is mutated, but used twice
+    (fn ex4-bad ()
+      (do (x := 5)
+          (x := (x :+ 1))
+          (y := (square x))
+          (z := (1 :+ (square x)))
+          (y :* z)))
+
+However, you can *reference* a variable in a function argument list in order to
+get an immutable copy of a value that you may share to you heart's content ...
+within that function.
+
+    ; x is linear because it is eventually reassigned, but it can be used
+    ; twice inside "square" because of the reference
+    (fn square (&x) (* x x))
+    (fn ex5 ()
+      (do (x := 5)
+          (x := (square x))
+          x))
+
+Since mutable values are linear by default anyway, you can be certain when a
+reference is made that there will be no others at the same time.
+
+### Conditionals
+
+Psilo doesn't actually have an if statement in the language, but the standard
+library comes with short-circuiting `and` and `or` functions, and I included
+this anyway:
+
+    (:: if (Boolean :-> a :-> a :-> a))
+    (fn if (condition then else)
+      (or (and condition then) else))
+
+Otherwise psilo has one native conditional form, the case:
+
+    (fn ex6 (val)
+      (? val
+        ((0 ("Condition 0"))
+         (1 ("Condition 1"))
+         (_ ("Unknown condition")))))
+
+You must take care to cover all cases, though the `_` symbol can help with
+that.
+
+### Pointers
+
+Psilo has pointers, too:
+
+    ; create a pointer to an integer, update the value at the pointer
+    (fn ex7 ()
+      (do (x := (make 5))
+          (*x := (1 :+ *x))
+          *x))
+
+All pointers are linear, no exceptions.
+
+### Lists and Vectors
+
+Psilo has two native aggregate data structures: lists and vectors.
+
+Lists are heterogeneously typed ordered multi-sets. Lists are fixed in length.
+
+You create a list by quoting an expression:
+
+    '(1 2 3)
+
+Lists are used to write functions which accept or return multiple values:
+
+    (:: check-status (server-name)
+      (? (is-running server-name)
+        (True '(1 "Server is running"))
+        (False '(0 "Server is not running"))))
+
+Different kinds of lists are also important in the macro facilities (TODO).
+
+Vectors are different. They are homogeneously typed ordered multi-sets. Vectors
+are of arbitrary length and may be extended. Vectors have a special property
+called normalize-transpose:
+
+    (fn square (&x) (* x x))
+    (square [1 2 3])
+
     ; => [1 4 9]
-    
-    ;; Here is something really interesting though:
-    
-    (adt Stream (a) (End) (Next a (Stream a)))
-    
-    (:: buffer : Int -> Stream a -> [a])
-    (fn buffer (_ (End)) [])
-    (fn buffer (n (Next h t))
-      (concat [h] (buffer (- n 1) t)))
-      
-    (:: audio-xform : Int -> Int)
-    (fn audio-xform (x) (...))
-    
-    ; and given some AudioIO monad ...
-    
-    (:: ex3 : AudioIO ())
-    (fn ex3 ()
-      (with-sensor-io (do
-        (stream := (make-audio-input-stream params ...))
-        (buf    := (buffer 1000 stream))
-        (buf-2  := (audio-xform buf))
-        (output-audio buf-2))))
 
-### 3.2 More examples!
+Or a more complicated example:
 
-More information can be found in the `eg` directory. Those files are valid
-input to the compiler as it stands (however incomplete).
+    (:: ex8 ((Numeric n) :=> [n]))
+    (fn ex8 ()
+      (do (v1 := [10 20 30])
+          (v2 := [1 2])
+          (v3 := (v1 :+ v2))
+          v3))
 
-4. How to build
+    ; => [11 12 21 22 31 32]
+
+When you give a vector of values of type `a` (denoted `[a]`) to a function
+which expects a scalar `a`, the operation is *normalized* and then *transposed*
+such that one gets a predictably shaped vector outcome.
+
+### Algebraic Data Types
+
+You can create algebraic data types like so:
+
+    (adt Stream (a)
+      ((Nil)
+       (Cons a (Stream a))))
+
+And you can write pattern-matching functions for them:
+
+    (:: stream-length ((Stream a) :-> Int))
+    (fn stream-length ((Nil)) 0)
+    (fn stream-length ((Cons h t))
+      (1 :+ (stream-length t)))
+
+    (:: stream-to-vector ((Stream a) :-> [a]))
+    (fn stream-to-vector ((Nil)) [])
+    (fn stream-to-vector ((Cons h t))
+      ([h] :++ (stream-to-vector t)))
+
+### Delimited continuations
+
+By default, computations execute sequentially. However, you can alter your
+program's flow-control semantics and strengthen type safety with delimited
+continuations.
+
+The following example demonstrates an IO continuation that is almost the same
+as the default but which mandates the usage of specific functions:
+
+    (cont SimpleIO
+      ((:: say (String :-> (SimpleIO ())))
+       (fn say (s k)
+         (let ((_ (c-printf))) (call/cc k))))
+
+      ((:: read (SimpleIO String))
+       (fn read (k)
+         (do (in := (c-scanf))
+             (call/cc (k in))))))
+
+    ; A function which can only be used within our continuation
+    (:: prompt (String :-> (SimpleIO String)))
+    (fn prompt (s)
+      (do-with SimpleIO
+        (say s)
+        (read)))
+
+    ; And now we use our continuation:
+    (:: ex9 ())
+    (fn ex9 ()
+      (do-with SimpleIO
+        (name := (prompt "What is your name? "))
+        (say (name :++ " is a wonderful name."))))
+
+For the brave: delimited continuations in psilo are reminiscent of monads in
+Haskell or Scala, except here they are designed to be easy to create,
+understand, and use. Additionally they lend type-safety and allow for the
+creation of EDSLs.
+
+### Macros
+
+Haven't decided this yet, sorry :)
+
+3. How to build
 ---
 
 You need the Glasgow Haskell Compiler and a number of libraries; I suggest
@@ -199,7 +264,7 @@ And return to the Edenic, pre-build post-checkout status of the code with
 
     make clean
 
-5. Questions / comments / hate mail
+4. Questions / comments / hate mail
 ---
 
 Use the Issues feature of GitHub.
