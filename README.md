@@ -228,7 +228,7 @@ as the default but which mandates the usage of specific functions:
     (fn prompt (s)
       (do-with SimpleIO
         (say s)
-        (read)))
+        (call/cc (read))))
 
     ; And now we use our continuation:
     (:: ex9 ())
