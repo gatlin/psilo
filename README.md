@@ -215,20 +215,20 @@ as the default but which mandates the usage of specific functions:
 
     (cont SimpleIO
       ((:: say (String :-> (SimpleIO ())))
-       (fn say (s k)
+       (fn say (s)
          (let ((_ (c-printf))) (call/cc k))))
 
       ((:: read (SimpleIO String))
-       (fn read (k)
+       (fn read ()
          (do (in := (c-scanf))
-             (call/cc (k in))))))
+             (call/cc in)))))
 
     ; A function which can only be used within our continuation
     (:: prompt (String :-> (SimpleIO String)))
-    (fn prompt (s k)
+    (fn prompt (s)
       (do-with SimpleIO
         (say s)
-        (call/cc (k (read)))))
+        (call/cc (read))))
 
     ; And now we use our continuation:
     (:: ex9 ())
