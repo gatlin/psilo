@@ -225,10 +225,10 @@ as the default but which mandates the usage of specific functions:
 
     ; A function which can only be used within our continuation
     (:: prompt (String :-> (SimpleIO String)))
-    (fn prompt (s)
+    (fn prompt (s k)
       (do-with SimpleIO
         (say s)
-        (call/cc (read))))
+        (call/cc (k (read)))))
 
     ; And now we use our continuation:
     (:: ex9 ())
