@@ -216,7 +216,7 @@ as the default but which mandates the usage of specific functions:
     (cont SimpleIO
       ((:: say (String :-> (SimpleIO ())))
        (fn say (s)
-         (let ((_ (c-printf))) (call/cc k))))
+         (let ((_ (c-printf))) (call/cc))))
 
       ((:: read (SimpleIO String))
        (fn read ()
