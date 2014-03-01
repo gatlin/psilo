@@ -30,38 +30,43 @@ at the moment.
 
 psilo is strongly typed, implementing a type system akin to Haskell's:
 
-    (:: square ((Numeric n) :=> n :-> n))
-    (fn square (&x) (* x x))
+    (: square (=> (Number n) (-> n n)))
+    (= square (fn (x) (* x x)))
+
+While the language is prefix in lisp tradition, you can use colons to make
+operators infix for readability:
+
+    (square :: (Number n) :=> n :-> n)
+    (square := fn (x) (* x x))
 
 But type annotations are almost always optional:
 
-    (fn add1 (n) (+ 1 n))
+    (square := fn (x) (* x x))
 
 Closures are not only possible but encouraged:
 
-    (fn read-some-pipe (config)
-      (let ((pipe (make-pipe config)))
+    (read-some-pipe := fn (config)
+      (let ((pipe (make-pipe-config)))
         (fn ()
           (read-pipe pipe))))
 
 If you find yourself writing code like this:
 
-    (fn ex1 ()
-      (let ((x (foo)))
-        (let ((y (bar x)))
-          (baz y x))))
+    (ex1 := fn ()
+      (let ((x (foo))
+            (y (bar x)))
+        (baz y x)))
 
-you can write it like so:
+you can write it like so with do-notation:
 
-    (fn ex1 ()
+    (ex1 := fn ()
       (do (= x (foo))
           (= y (bar x))
           (baz y x)))
 
-Additionally, for readibility you can make a function infix using the
-following convention:
+And with the colon syntax, you can write the following:
 
-    (fn ex1 ()
+    (ex1 := fn ()
       (do (x := (foo))
           (y := (bar x))
           (baz y x)))
@@ -70,23 +75,23 @@ following convention:
 
 Under special circumstances, you can also mutate values:
 
-    (fn ex2 ()
+    (ex2 := fn ()
       (do (x := 5)
-          (x := (x :+ 1))
+          (x := (+ x 1))
           x))
 
 If value is used *linearly*, it may be mutated. A linear value must be used
 exactly once in any scope before it is reassigned or returned, or
 it must be explicitly freed.
 
-    (fn ex3-good ()
+    (ex3-good := fn ()
       (do (x := 5)
           (x := (+ 1 x))
           (y := (square x))
           y))
 
     ; bad: x is mutated, but used twice
-    (fn ex4-bad ()
+    (ex4-bad := fn ()
       (do (x := 5)
           (x := (x :+ 1))
           (y := (square x))
@@ -99,8 +104,8 @@ within that function.
 
     ; x is linear because it is eventually reassigned, but it can be used
     ; twice inside "square" because of the reference
-    (fn square (&x) (* x x))
-    (fn ex5 ()
+    (square := fn (&x) (* x x))
+    (ex5 := fn ()
       (do (x := 5)
           (x := (square x))
           x))
@@ -114,13 +119,13 @@ Psilo doesn't actually have an if statement in the language, but the standard
 library comes with short-circuiting `and` and `or` functions, and I included
 this anyway:
 
-    (:: if (Boolean :-> a :-> a :-> a))
-    (fn if (condition then else)
+    (if :: Boolean :-> a :-> a :-> a)
+    (if := fn (condition then else)
       (or (and condition then) else))
 
 Otherwise psilo has one native conditional form, the case:
 
-    (fn ex6 (val)
+    (ex6 := fn (val)
       (? val
         ((0 ("Condition 0"))
          (1 ("Condition 1"))
@@ -134,7 +139,7 @@ that.
 Psilo has pointers, too:
 
     ; create a pointer to an integer, update the value at the pointer
-    (fn ex7 ()
+    (ex7 := fn()
       (do (x := (make 5))
           (*x := (1 :+ *x))
           *x))
@@ -153,7 +158,7 @@ You create a list by quoting an expression:
 
 Lists are used to write functions which accept or return multiple values:
 
-    (:: check-status (server-name)
+    (check-status := fn (server-name)
       (? (is-running server-name)
         (True '(1 "Server is running"))
         (False '(0 "Server is not running"))))
@@ -164,15 +169,15 @@ Vectors are different. They are homogeneously typed ordered multi-sets. Vectors
 are of arbitrary length and may be extended. Vectors have a special property
 called normalize-transpose:
 
-    (fn square (&x) (* x x))
+    (square := fn (&x) (* x x))
     (square [1 2 3])
 
     ; => [1 4 9]
 
 Or a more complicated example:
 
-    (:: ex8 ((Numeric n) :=> [n]))
-    (fn ex8 ()
+    (ex8 :: (Numeric n) :=> [n])
+    (ex8 := fn()
       (do (v1 := [10 20 30])
           (v2 := [1 2])
           (v3 := (v1 :+ v2))
@@ -194,14 +199,14 @@ You can create algebraic data types like so:
 
 And you can write pattern-matching functions for them:
 
-    (:: stream-length ((Stream a) :-> Int))
-    (fn stream-length ((Nil)) 0)
-    (fn stream-length ((Cons h t))
+    (stream-length :: (Stream a) :-> Int)
+    (stream-length := fn ((Nil)) 0)
+    (stream-length := fn ((Cons h t))
       (1 :+ (stream-length t)))
 
-    (:: stream-to-vector ((Stream a) :-> [a]))
-    (fn stream-to-vector ((Nil)) [])
-    (fn stream-to-vector ((Cons h t))
+    (stream-to-vector :: (Stream a) :-> [a])
+    (stream-to-vector := fn ((Nil)) [])
+    (stream-to-vector := fn ((Cons h t))
       ([h] :++ (stream-to-vector t)))
 
 ### Delimited continuations
@@ -214,25 +219,25 @@ The following example demonstrates an IO continuation that is almost the same
 as the default but which mandates the usage of specific functions:
 
     (cont SimpleIO
-      ((:: say (String :-> (SimpleIO ())))
-       (fn say (s)
+      ((say :: String :-> (SimpleIO ()))
+       (say := fn(s)
          (let ((_ (c-printf))) (call/cc))))
 
-      ((:: read (SimpleIO String))
-       (fn read ()
+      ((read :: (SimpleIO String))
+       (read := fn ()
          (do (in := (c-scanf))
              (call/cc in)))))
 
     ; A function which can only be used within our continuation
-    (:: prompt (String :-> (SimpleIO String)))
-    (fn prompt (s)
+    (prompt :: String :-> (SimpleIO String))
+    (prompt := fn (s)
       (do-with SimpleIO
         (say s)
         (call/cc (read))))
 
     ; And now we use our continuation:
-    (:: ex9 ())
-    (fn ex9 ()
+    (ex9 :: ())
+    (ex9 := fn ()
       (do-with SimpleIO
         (name := (prompt "What is your name? "))
         (say (name :++ " is a wonderful name."))))
