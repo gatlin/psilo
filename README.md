@@ -115,24 +115,42 @@ reference is made that there will be no others at the same time.
 
 ### Conditionals
 
-Psilo doesn't actually have an if statement in the language, but the standard
-library comes with short-circuiting `and` and `or` functions, and I included
-this anyway:
-
-    (if :: Boolean :-> a :-> a :-> a)
-    (if := fn (condition then else)
-      (or (and condition then) else))
-
-Otherwise psilo has one native conditional form, the case:
+psilo doesn't actually have if-statements built into the language; for that
+matter, it doesn't have Boolean values either. Instead, it has a case syntax,
+denoted by `?`:
 
     (ex6 := fn (val)
       (? val
-        ((0 ("Condition 0"))
-         (1 ("Condition 1"))
-         (_ ("Unknown condition")))))
+        ((0     ("Condition 0"))
+         (1     ("Condition 1"))
+         (_     ("Unknown condition")))))
 
-You must take care to cover all cases, though the `_` symbol can help with
-that.
+#### For the curious
+
+Read about algebraic data types below, and then the following definitions of
+Boolean values, logical operators, and if-statements will make more sense:
+
+    (adt (Boolean)
+      ((True) (False)))
+
+    (and :: Boolean :-> Boolean :-> Boolean)
+    (and := fn ((True) (True)) (True))
+    (and := fn (_ _) (False))
+
+    (or :: Boolean :-> Boolean :-> Boolean)
+    (or := fn ((False) (False)) (False))
+    (or := fn (_ _) (True))
+
+    (not :: Boolean :-> Boolean)
+    (not := fn ((True)) (False))
+    (not := fn ((False) (True)))
+
+    (if :: Boolean :-> a :-> a :-> a)
+    (if := fn ((True) then _) (then))
+    (if := fn ((False) _ else) (else))
+
+With only a few modifications, this is how Boolean types and logic will be
+integrated into psilo.
 
 ### Pointers
 
