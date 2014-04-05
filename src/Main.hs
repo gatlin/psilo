@@ -20,7 +20,7 @@ repl :: IO ()
 repl = runInputT defaultSettings loop
     where
     loop = do
-        minput <- getInputLine "ready> "
+        minput <- getInputLine "psilo> "
         case minput of
             Nothing -> outputStrLn "Goodbye."
             Just input -> (liftIO $ process input) >> loop
