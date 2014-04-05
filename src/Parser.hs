@@ -37,7 +37,7 @@ parseFn :: Parser (PExpr a)
 parseFn = do
     reserved "fn"
     optional whitespace
-    args <- parens parseQuotedList
+    args <- parens parseQuotedList <|> parseSymbol
     optional whitespace
     body <- parseExpr
     return $ Free $ ALambda args body
