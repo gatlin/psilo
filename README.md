@@ -26,7 +26,21 @@ at the moment.
 1. Synopsis
 ---
 
-I'm still working on the grammar, actually, so stay tuned.
+The grammar is a work in progress. At the moment, psilo code looks like this:
+
+    (let ((square (\ (x) (* x x)))
+          (add1   (\ (x) (+ 1 x))))
+      (add1 (square 5)))
+
+    ; => 26
+
+    (let ((square (\ (x) (* x x)))
+          (v      [ 1 2 3 4 5 ] ))
+      (square v))
+
+    ; => [ 1 4 9 16 25 ]
+    ; the function automatically normalized and transposed over the elements
+    ; of the vector.
 
 2. How to build
 ---
