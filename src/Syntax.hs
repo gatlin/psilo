@@ -22,7 +22,7 @@ data LambdaName = Named Sym | Anonymous
     deriving (Eq, Show, Ord)
 
 data AST a
-    = ALambda LambdaName a a
+    = ALambda a a
     | AList [a]
     | AApply a a
     | AInteger Integer
@@ -42,4 +42,4 @@ type PExpr = Free AST
 
 instance Show a => Show (PExpr a) where
     show (Pure _)   = ""
-    show (Free x) = "Mu ( " ++ show x ++ " ) "
+    show (Free x) = " ( " ++ show x ++ " ) "

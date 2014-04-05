@@ -40,14 +40,10 @@ parseFn :: Parser (PExpr a)
 parseFn = do
     reserved "fn"
     optional whitespace
-    name <- optionMaybe identifier
     args <- parens parseQuotedList
     optional whitespace
     body <- parseExpr
-    let name' = case name of
-                    Nothing -> Anonymous
-                    Just n  -> Named n
-    return $ Free $ ALambda name' args body
+    return $ Free $ ALambda args body
 
 -- | The application of a function to a list of arguments, a single symbol, or
 -- an arbitrary expression value.
@@ -121,7 +117,7 @@ parseLet = do
     (args,operands) <- (flip mapAndUnzipM) assns $ \(Free (AList (x:y:_))) -> return (x,y)
     args' <- return $ Free $ AList args
     operands' <- return $ Free $ AList operands
-    fun <- return $ Free $ ALambda Anonymous args' body
+    fun <- return $ Free $ ALambda args' body
     return $ Free (AApply fun operands')
 
 -- | Top level expression parser
