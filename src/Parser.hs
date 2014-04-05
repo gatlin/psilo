@@ -29,10 +29,7 @@ parseSymbol = do
     first <- letter <|> syms
     rest  <- many $ letter <|> digit <|> syms
     let sym = [first] ++ rest
-    return $ case sym of
-               "#t"      -> Free $ ABoolean True
-               "#f"      -> Free $ ABoolean False
-               otherwise -> Free $ ASymbol sym
+    return $ Free $ ASymbol sym
 
 -- | Lambda abstractions. Optional name. Accepts a list of symbols to bound and
 -- an expression to evaluate inside the newly created scope.
