@@ -35,7 +35,7 @@ parseSymbol = do
 -- an expression to evaluate inside the newly created scope.
 parseFn :: Parser (PExpr a)
 parseFn = do
-    reserved "fn"
+    reserved "\\"
     optional whitespace
     args <- parens parseQuotedList <|> parseSymbol
     optional whitespace
