@@ -13,7 +13,7 @@ features:
 
 - No run-time garbage collection necessary owing to uniqueness types
 - Static typing for compile-time verification and optimization
-- Malleable syntax with Common Lisp-esque macros
+- Malleable syntax with fexpr-esque macros
 - Dead-simple parallelism with special lists called vectors
 - Orthogonal core syntax and semantics for your performance and my sanity
 
@@ -38,11 +38,7 @@ The grammar is a work in progress. At the moment, psilo code looks like this:
           (v      [ 1 2 3 4 5 ] ))
       (square v))
 
-    ; => [ 1 4 9 16 25 ]
-    ; the function automatically normalized and transposed over the elements
-    ; of the vector.
-
-2. How to build
+3. How to build
 ---
 
 You need the Glasgow Haskell Compiler and a number of libraries; I suggest
@@ -66,7 +62,7 @@ And return to the Edenic, pre-build post-checkout status of the code with
 
     make clean
 
-3. Questions / comments / hate mail
+4. Questions / comments / hate mail
 ---
 
 Use the Issues feature of GitHub.
