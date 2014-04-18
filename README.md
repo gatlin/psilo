@@ -38,6 +38,8 @@ The grammar is a work in progress. At the moment, psilo code looks like this:
           (v      [ 1 2 3 4 5 ] ))
       (square v))
 
+    ; => [ 1 4 9 16 25 ]
+
 3. How to build
 ---
 
