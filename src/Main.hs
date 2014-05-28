@@ -2,6 +2,7 @@ module Main where
 
 import Parser
 import Syntax
+import Evaluator
 
 import Control.Monad.Trans
 import System.Console.Haskeline
@@ -9,12 +10,16 @@ import System.Console.Haskeline
 import System.Environment
 import System.IO
 
-process :: String -> IO ()
-process line = do
+eval :: String -> IO ()
+eval line = do
     let res = parseTopLevel line
     case res of
         Left err -> print err
-        Right ex -> mapM_ print (ex :: [PExpr ()])
+        Right ex -> mapM_ execute (ex :: [Expr ()])
+
+    where execute v = do
+              (val, _) <- runMachine . interpret $ v
+              putStrLn . show $ val
 
 repl :: IO ()
 repl = runInputT defaultSettings loop
@@ -23,10 +28,10 @@ repl = runInputT defaultSettings loop
         minput <- getInputLine "psilo> "
         case minput of
             Nothing -> outputStrLn "Goodbye."
-            Just input -> (liftIO $ process input) >> loop
+            Just input -> (liftIO $ eval input) >> loop
 
 execFile :: String -> IO ()
-execFile fname = readFile fname >>= process
+execFile fname = readFile fname >>= eval
 
 main :: IO ()
 main = do

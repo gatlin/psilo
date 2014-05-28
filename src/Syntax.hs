@@ -17,19 +17,16 @@ import Data.Traversable (Traversable, sequence)
  - Expression syntax
  -}
 
-type Sym = String
-data LambdaName = Named Sym | Anonymous
-    deriving (Eq, Show, Ord)
+type Symbol = String
 
 data AST a
-    = ALambda a a
-    | AList [a]
+    = AInteger Integer
+    | ASymbol Symbol
+    | ALambda Symbol a
+    | AAdd    a
+    | AMult   a
     | AApply a a
-    | AInteger Integer
-    | AFloat Double
-    | ABoolean Bool
-    | ASymbol Sym
-    | AVector [a]
+    | AList [a]
 
 deriving instance Show a => Show (AST a)
 deriving instance Functor AST
@@ -38,8 +35,8 @@ deriving instance Traversable AST
 deriving instance Eq a => Eq (AST a)
 deriving instance Ord a => Ord (AST a)
 
-type PExpr = Free AST
+type Expr = Free AST
 
-instance Show a => Show (PExpr a) where
+instance Show a => Show (Expr a) where
     show (Pure _)   = ""
     show (Free x) = " ( " ++ show x ++ " ) "

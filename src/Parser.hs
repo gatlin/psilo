@@ -12,39 +12,59 @@ import qualified Text.Parsec.Token as Tok
 import Syntax
 import Lexer
 
-parseNumber :: Parser (PExpr a)
-parseNumber = try ( do { f <- float
-                       ; return $ Free $ AFloat f
-                       } )
-          <|> try ( do { n <- integer
+parseNumber :: Parser (Expr a)
+parseNumber = try ( do { n <- integer
                        ; return $ Free $ AInteger n
                        } )
 
 -- | Symbols are like "atoms" in other lisps or Erlang. They are equivalent
 -- only to themselves and have no intrinsic value. They are mostly used to
 -- bind values in lambda abstractions.
-parseSymbol :: Parser (PExpr a)
+parseSymbol :: Parser (Expr a)
 parseSymbol = do
-    let syms = oneOf "!$%&|*+-/:<=>?@^_~#"
-    first <- letter <|> syms
-    rest  <- many $ letter <|> digit <|> syms
-    let sym = [first] ++ rest
+    sym <- identifier
     return $ Free $ ASymbol sym
 
 -- | Lambda abstractions. Optional name. Accepts a list of symbols to bound and
 -- an expression to evaluate inside the newly created scope.
-parseFn :: Parser (PExpr a)
+parseFn :: Parser (Expr a)
 parseFn = do
-    reserved "\\"
+    reserved "fn"
     optional whitespace
-    args <- parens parseQuotedList <|> parseSymbol
+    (Free (ASymbol arg)) <- parens parseSymbol
     optional whitespace
     body <- parseExpr
-    return $ Free $ ALambda args body
+    return $ Free $ ALambda arg body
+
+parseLetBinding :: Parser (Expr a)
+parseLetBinding = do
+    optional whitespace
+    sym <- parseSymbol
+    optional whitespace
+    val <- parseExpr
+    return $ Free . AList $ [sym, val]
+
+parseLetBindings :: Parser (Expr a)
+parseLetBindings = fmap (Free . AList) $ parens parseLetBinding `sepBy` whitespace
+
+-- | This translates into the application of an anonymous function to a list of
+-- arguments.
+parseLet :: Parser (Expr a)
+parseLet = do
+    reserved "let"
+    optional whitespace
+    (Free (AList assns)) <- parens parseLetBindings
+    body  <- parseExpr <|> return (Free (AList []))
+    (args,operands) <- (flip mapAndUnzipM) assns $ \(Free (AList (x:y:_))) -> return (x,y)
+    --args' <- return $ Free $ AList args
+    operands' <- return $ Free $ AList operands
+    (Free (ASymbol arg1)) <- return $ args !! 0
+    fun <- return $ Free $ ALambda arg1 body
+    return $ Free (AApply fun operands')
 
 -- | The application of a function to a list of arguments, a single symbol, or
 -- an arbitrary expression value.
-parseApp :: Parser (PExpr a)
+parseApp :: Parser (Expr a)
 parseApp = do
     try (reserved "apply") >> (do
         optional whitespace
@@ -59,82 +79,63 @@ parseApp = do
         rst <- fmap (Free . AList) $ parseExpr `sepBy` whitespace
         return $ Free (AApply fst rst))
 
--- | Vectors are homogeneously typed, ordered multi-sets laid out sequentially
--- in memory.
-parseVector :: Parser (PExpr a)
-parseVector = fmap (Free . AVector) $ brackets $ parseExpr `sepBy` whitespace
-
 -- | Regular list created by the quote (') operator. Enters a state where
 -- everything is treated as a literal - no applications allowed.
-parseQuotedList :: Parser (PExpr a)
+parseQuotedList :: Parser (Expr a)
 parseQuotedList = fmap (Free . AList) $ parseExprInQuote `sepBy` whitespace
 
 -- | Similar to a quoted list, except a comma operator (,) may be used to go
 -- back into a state where application is allowed.
-parseUnquotable :: Parser (PExpr a)
+parseUnquotable :: Parser (Expr a)
 parseUnquotable = fmap (Free . AList) $ parseExprInQuasi `sepBy` whitespace
 
 -- | Many things may be quoted, not just lists.
-parseQuote :: Parser (PExpr a)
+parseQuote :: Parser (Expr a)
 parseQuote = do
     x <- parseSymbol <|> parseNumber <|> parens parseQuotedList
     return $ (Free . AList) [(Free . ASymbol) "quote", x]
 
 -- | You can quasi-quote anything you can quote, though this is of dubious
 -- utility.
-parseQuasi :: Parser (PExpr a)
+parseQuasi :: Parser (Expr a)
 parseQuasi = do
     x <- parseSymbol <|> parseNumber <|> parens parseUnquotable
     return $ (Free . AList) [(Free . ASymbol) "quasi", x]
 
-parseComma :: Parser (PExpr a)
+parseComma :: Parser (Expr a)
 parseComma = do
     x <- parseSymbol <|> parseExpr
     return $ (Free . AList) [(Free . ASymbol) "comma", x]
 
-parseLetBinding :: Parser (PExpr a)
-parseLetBinding = do
-    optional whitespace
-    sym <- parseSymbol
-    optional whitespace
-    val <- parseExpr
-    return $ Free . AList $ [sym, val]
+parseAdd :: Parser (Expr a)
+parseAdd = do
+    reservedOp "+"
+    args <- parseQuotedList
+    return $ Free $ AAdd args
 
-parseLetBindings :: Parser (PExpr a)
-parseLetBindings = fmap (Free . AList) $ parens parseLetBinding `sepBy` whitespace
-
--- | This translates into the application of an anonymous function to a list of
--- arguments.
-parseLet :: Parser (PExpr a)
-parseLet = do
-    reserved "let"
-    optional whitespace
-    (Free (AList assns)) <- parens parseLetBindings
-    body  <- parseExpr <|> return (Free (AList []))
-    (args,operands) <- (flip mapAndUnzipM) assns $ \(Free (AList (x:y:_))) -> return (x,y)
-    args' <- return $ Free $ AList args
-    operands' <- return $ Free $ AList operands
-    fun <- return $ Free $ ALambda args' body
-    return $ Free (AApply fun operands')
+parseMult :: Parser (Expr a)
+parseMult = do
+    reservedOp "*"
+    args <- parseQuotedList
+    return $ Free $ AMult args
 
 -- | Top level expression parser
-parseExpr :: Parser (PExpr a)
+parseExpr :: Parser (Expr a)
 parseExpr = parseSymbol
         <|> parseNumber
         <|> (try (char '\'') >> parseQuote)
         <|> (try (char '`')  >> parseQuasi)
-        <|> parseVector
-        <|> parens ( parseFn <|> parseLet <|> parseApp )
+        <|> parens ( parseMult <|> parseAdd <|> parseFn <|> parseLet <|> parseApp )
 
 -- | Expression parser inside a quoted list
-parseExprInQuote :: Parser (PExpr a)
+parseExprInQuote :: Parser (Expr a)
 parseExprInQuote = parseSymbol
                <|> parseNumber
                <|> (try (char '\'') >> parseQuote)
-               <|> parens ( parseQuotedList )
+               <|> parens ( parseMult <|> parseAdd <|> parseQuotedList )
 
 -- | Expression parser inside a quasiquoted list
-parseExprInQuasi :: Parser (PExpr a)
+parseExprInQuasi :: Parser (Expr a)
 parseExprInQuasi = parseSymbol
                <|> parseNumber
                <|> (try (reserved "'") >>  parseQuote)
@@ -149,13 +150,13 @@ contents p = do
     eof
     return r
 
-topLevel :: Parser [PExpr a]
+topLevel :: Parser [Expr a]
 topLevel = many $ do
     x <- parseExpr
     return x
 
-doParse :: String -> Either ParseError (PExpr a)
+doParse :: String -> Either ParseError (Expr a)
 doParse s = parse (contents parseExpr) "<stdin>" s
 
-parseTopLevel :: String -> Either ParseError [PExpr a]
+parseTopLevel :: String -> Either ParseError [Expr a]
 parseTopLevel s = parse (contents topLevel) "<stdin>" s

@@ -8,7 +8,7 @@ import qualified Text.Parsec.Token as Tok
 lexer :: Tok.TokenParser ()
 lexer = Tok.makeTokenParser style
     where ops = ["+","*","-","/","<","="]
-          names = ["\\","::","let","apply"]
+          names = ["fn","::","let","apply"]
           idStarts = letter <|> char '_'
           idLetters = letter <|> char '_' <|> digit <|> char '-' <|> char '+' <|> char '?'
           opStarts = oneOf "!$%&|*+-/:<=>?@^_~#"
@@ -26,17 +26,11 @@ lexer = Tok.makeTokenParser style
                     , Tok.commentEnd = "*/"
           }
 
-float :: Parser Double
-float = Tok.float lexer
-
 integer :: Parser Integer
 integer = Tok.integer lexer
 
 parens :: Parser a -> Parser a
 parens = Tok.parens lexer
-
-brackets :: Parser a -> Parser a
-brackets = Tok.brackets lexer
 
 whitespace :: Parser ()
 whitespace = Tok.whiteSpace lexer
