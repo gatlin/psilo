@@ -12,6 +12,19 @@ import qualified Text.Parsec.Token as Tok
 import Syntax
 import Lexer
 
+{-
+ - Parser
+ -
+ - This implements the basic s-expression syntax along with some sugar, like
+ - `let` bindings.
+ -
+ - The result of one of the top-level parsing functions is a `Parser (Expr a)`
+ - value from which the `Expr` value may be extracted and given to the
+ - evaluator.
+ -
+ - This is probably sub-optimal; parsec is a harsh master.
+ -}
+
 parseNumber :: Parser (Expr a)
 parseNumber = try ( do { n <- integer
                        ; return $ Free $ AInteger n

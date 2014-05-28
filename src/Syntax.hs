@@ -15,6 +15,21 @@ import Data.Traversable (Traversable, sequence)
 
 {-
  - Expression syntax
+ -
+ - The AST is a non-recursive data type. To add recursion to psilo's syntax, I
+ - could use the Mu combinator:
+ -
+ -   newtype Mu f = Mu (f (Mu f))
+ -   type Expr = Mu AST
+ -
+ - However, it so happens that the Free monad has a very similar definition:
+ -
+ -   data Free f a = Pure a | Free (f (Free f a))
+ -   type Expr = Free AST
+ -
+ - Additionally, using `Free` yields a monad which permits sophisticated
+ - evaluation using a relatively straight-forward case-wise "run" function (see
+ - the Evaluator module).
  -}
 
 type Symbol = String
