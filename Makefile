@@ -6,7 +6,7 @@ preprocessor:
 	ghc $(OPTS) --make preprocessor.hs -o preprocessor
 
 psilo:
-	ghc $(OPTS) --make src/{Evaluator,Syntax,Lexer,Parser,Main}.hs -o psilo
+	ghc $(OPTS) --make src/{Evaluator,Syntax,Lexer,Parser,Main}.lhs -o psilo
 
 clean:
 	rm psilo
