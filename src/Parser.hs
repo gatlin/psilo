@@ -29,7 +29,7 @@ parseSymbol = do
 -- an expression to evaluate inside the newly created scope.
 parseFn :: Parser (Expr a)
 parseFn = do
-    reserved "fn"
+    reserved "\\"
     optional whitespace
     (Free (ASymbol arg)) <- parens parseSymbol
     optional whitespace
