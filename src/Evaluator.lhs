@@ -228,6 +228,26 @@ orchestrate the necessary side effects.
 >     (NumV r) <- return $ args' !! 1
 >     return $ NumV $ l * r
 
+### A note on lambdas
+
+The below code for lambdas, while technically correct, has a huge problem: it
+copies its *entire* environment. A much smarter trick would be to only copy
+that which is actually used.
+
+Also, function application is currently very stupid. It is intended that
+functions will take one argument, a list containing the actual values to be
+processed. At the moment this is not honored, but the process is simple:
+
+1. If the operand list is sufficiently long, zip it with the list of symbols in
+the function.
+
+2. Create an `Environment` out of this zipped list.
+
+3. Form a union between this new environment and the current, favoring the new
+one.
+
+4. Proceed.
+
 > interpret (Free (ALambda arg body)) = do
 >     (MEnv currentEnv) <- ask
 >     return $ ClosV arg body currentEnv
