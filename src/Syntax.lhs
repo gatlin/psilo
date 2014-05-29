@@ -1,18 +1,3 @@
-> {-# LANGUAGE DeriveFunctor #-}
-> {-# LANGUAGE DeriveFoldable #-}
-> {-# LANGUAGE DeriveTraversable #-}
-> {-# LANGUAGE StandaloneDeriving #-}
-> {-# LANGUAGE TypeSynonymInstances #-}
-> {-# LANGUAGE FlexibleInstances #-}
-> {-# LANGUAGE OverlappingInstances #-}
->
-> module Syntax where
->
-> import Prelude hiding (sequence)
-> import Control.Monad.Free
-> import Data.Foldable (Foldable, fold)
-> import Data.Traversable (Traversable, sequence)
-
 Expression syntax
 ===
 
@@ -30,6 +15,21 @@ However, it so happens that the Free monad has a very similar definition:
 Additionally, using `Free` yields a monad which permits sophisticated
 evaluation using a relatively straight-forward case-wise "run" function (see
 the Evaluator module).
+
+> {-# LANGUAGE DeriveFunctor #-}
+> {-# LANGUAGE DeriveFoldable #-}
+> {-# LANGUAGE DeriveTraversable #-}
+> {-# LANGUAGE StandaloneDeriving #-}
+> {-# LANGUAGE TypeSynonymInstances #-}
+> {-# LANGUAGE FlexibleInstances #-}
+> {-# LANGUAGE OverlappingInstances #-}
+>
+> module Syntax where
+>
+> import Prelude hiding (sequence)
+> import Control.Monad.Free
+> import Data.Foldable (Foldable, fold)
+> import Data.Traversable (Traversable, sequence)
 
 > type Symbol = String
 >
