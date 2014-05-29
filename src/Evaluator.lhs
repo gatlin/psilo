@@ -246,7 +246,8 @@ the function.
 3. Form a union between this new environment and the current, favoring the new
 one.
 
-4. Proceed.
+`ClosV` and `ALambda` will need to change to accept a list of arguments, but
+this is trivial.
 
 > interpret (Free (ALambda arg body)) = do
 >     (MEnv currentEnv) <- ask
