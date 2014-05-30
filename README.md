@@ -33,11 +33,6 @@ Philosophical Features:
 - Advanced computer science ideas should be exposed, but not mandatory for
   writing high quality programs.
 
-<<<<<<< HEAD
-=======
-- 
-
->>>>>>> c64a2b6... readme is a novel again
 ### Status
 
 **29 May 2014** A nascent evaluator is now committed. By no means is it
@@ -91,12 +86,9 @@ A list's type is the product of its constituent types, and it is equivalent
 only to itself. Really, there is no list. It's a syntactic mechanism for
 grouping values; lists do not exist at runtime.
 
-<<<<<<< HEAD
 Strictly speaking, all psilo functions accept exactly one argument: a list of a
 particular type (hence why argument lists use parentheses: they are lists).
 
-=======
->>>>>>> c64a2b6... readme is a novel again
 ### 2.2 Evaluation semantics
 
 psilo is non-strict. In the basic case values are reduced only when and as much
