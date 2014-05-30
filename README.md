@@ -169,7 +169,7 @@ with no problems.
 #### 2.5.2 Type signatures
 
 So far we have not used any explicit type signatures because they can almost
-always be inferenced. However, if the need arises, one may type functions like
+always be inferred. However, if the need arises, one may type functions like
 so:
 
     (\ ({x | Integer}
