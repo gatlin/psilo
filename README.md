@@ -109,13 +109,13 @@ exactly once in an expression.
 
 This makes writing certain kinds of programs very annoying; eg
 
-    (= square (x) (\* x x))
+    (= square (x) (* x x))
 
 is illegal on the face of it. However, since a function receiving a linear
 value is provably the only owner of that value, a function can declare a linear
 value to be *borrowed* for the duration of its scope like so:
 
-    (= square (&:x) (\* x x))
+    (= square (&:x) (* x x))
 
 Borrowed values are immutable; you may think of them as equivalent to `const`
 references in C++.
