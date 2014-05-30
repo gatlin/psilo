@@ -228,7 +228,8 @@ orchestrate the necessary side effects.
 >     (NumV r) <- return $ args' !! 1
 >     return $ NumV $ l * r
 
-### A note on lambdas
+A note on lambdas
+---
 
 The below code for lambdas, while technically correct, has a huge problem: it
 copies its *entire* environment. A much smarter trick would be to only copy
