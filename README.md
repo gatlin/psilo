@@ -19,9 +19,15 @@ features:
 
 ### Status
 
-The parser isn't even completed, the typechecker is nonexistent, and I'm not
-fully done with how the grammar should look. This README is essentially psilo
-at the moment.
+**29 May 2014** A nascent evaluator is now committed. By no means is it
+complete, but I can successfully run computations in a rough subset of the
+language, so that's something!
+
+The parser is not done but I am now on much better footing than I was before so
+I can continue with it as planned.
+
+Also the source code is now Literate Haskell as I want the psilo compiler to
+also be a human-language guide to the language's structure and implementation.
 
 1. Synopsis
 ---
