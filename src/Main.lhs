@@ -1,5 +1,6 @@
-psilo
-===
+---
+title: "psilo"
+...
 
 This is the main program outline. If an argument is present on the command line
 then we execute the program in that file and halt. Otherwise we fire up a repl.

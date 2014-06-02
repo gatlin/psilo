@@ -1,5 +1,6 @@
-The Lexer
 ---
+title: "The Lexer"
+...
 
 psilo has a comparatively simple grammar and lexing it is fairly
 straightforward. Parsec has a number of utilities for accomplishing exactly

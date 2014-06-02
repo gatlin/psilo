@@ -15,6 +15,9 @@ if hash pandoc 2>/dev/null; then
     ###
     # readme
     pandoc -s -t latex -f markdown -o ./tex/readme.tex ../README.md
+    pandoc -s -S -t html+header_attributes -f markdown \
+    --template=templates/main.tmpl.html --toc \
+    -o ./html/src/index.html ../README.md
 
     ###
     # src dir
@@ -23,10 +26,10 @@ if hash pandoc 2>/dev/null; then
         extension="${filename##*.}"
         filename="${filename%.*}"
         out=$(echo $filename | tr '[:upper:]' '[:lower:]')
-        pandoc -s -t latex  -f markdown+lhs -o ./tex/$out.tex $f
-        pandoc -s -t html5  -f markdown+lhs \
+        pandoc -s -t latex -f markdown+lhs -o ./tex/$out.tex $f
+        pandoc -s -t html5 -f markdown+lhs+yaml_metadata_block \
         --template=templates/src.tmpl.html \
-        -o ./html/$out.html $f
+        -o ./html/src/$out.html $f
     done
 else
     echo "Install pandoc to generate documentation."

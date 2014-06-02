@@ -8,6 +8,6 @@ preprocessor:
 psilo:
 	ghc $(OPTS) --make src/{Evaluator,Syntax,Lexer,Parser,Main}.lhs -o psilo
 
-clean:
+clean: doc
 	rm psilo
 	rm src/*.{hi,o}

@@ -1,5 +1,6 @@
-Parser
-===
+---
+title: "The Parser"
+...
 
 This implements the basic s-expression syntax along with some sugar, like
 `let` bindings.

@@ -1,5 +1,6 @@
-Expression syntax
-===
+---
+title: "Expression syntax"
+...
 
 The AST is a non-recursive data type. To add recursion to psilo's syntax, I
 could use the Mu combinator, which is the type-level equivalent of the Y

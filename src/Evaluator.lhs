@@ -1,5 +1,6 @@
-The psilo Virtual Machine
-===
+---
+title: "The psilo Virtual Machine"
+...
 
 The virtual machine consists of two things:
 

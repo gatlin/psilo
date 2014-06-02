@@ -10,3 +10,4 @@ clean:
 	then \
 		rm -r pdf; \
 	fi;
+	rm -r html/src/*
