@@ -10,10 +10,9 @@ if [ ! -d doc ]; then
 #    mkdir -p doc/html
 fi
 
-
 ###
 # readme
-pandoc -s -t latex -f markdown -o ./doc/tex/readme.tex
+pandoc -s -t latex -f markdown -o ./doc/tex/readme.tex README.md
 
 ###
 # src dir
