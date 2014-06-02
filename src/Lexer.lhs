@@ -1,3 +1,12 @@
+The Lexer
+---
+
+psilo has a comparatively simple grammar and lexing it is fairly
+straightforward. Parsec has a number of utilities for accomplishing exactly
+what I wish to accomplish so I happily and humbly defer to its facilities.
+
+The main purpose of this module is to remove some clutter from `Parser`.
+
 > module Lexer where
 >
 > import Text.Parsec

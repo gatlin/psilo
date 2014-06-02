@@ -2,7 +2,8 @@ Expression syntax
 ===
 
 The AST is a non-recursive data type. To add recursion to psilo's syntax, I
-could use the Mu combinator:
+could use the Mu combinator, which is the type-level equivalent of the Y
+combinator:
 
     newtype Mu f = Mu (f (Mu f))
     type Expr = Mu AST
@@ -10,11 +11,24 @@ could use the Mu combinator:
 However, it so happens that the Free monad has a very similar definition:
 
     data Free f a = Pure a | Free (f (Free f a))
-    type Expr = Free AST
 
-Additionally, using `Free` yields a monad which permits sophisticated
-evaluation using a relatively straight-forward case-wise "run" function (see
-the Evaluator module).
+Note the second constructor. So, instead, I use `Free`.
+
+The `Free` monad constructor takes any `Functor` type and yields a monad for
+"free": you get generic instances of the `>>=` and `return` functions. These
+essentially build up values layer by layer and do not give your type any
+evaluation semantics.
+
+Instead, it is on the programmer to write an interpreter function to unwrap and
+perform some computation on these values. This is exactly what the
+`interpreter` function from the `Evaluator` module does.
+
+Thus, by using `Free`, not only do I get a recursive syntax definition with
+minimal complexity but I also get a suite of tools for building up expressions
+in my syntax and then tearing them down to yield a result, including `do`
+notation.
+
+Not bad, huh?
 
 > {-# LANGUAGE DeriveFunctor #-}
 > {-# LANGUAGE DeriveFoldable #-}

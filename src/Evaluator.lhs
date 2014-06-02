@@ -1,15 +1,14 @@
-The Virtual Machine
+The psilo Virtual Machine
 ===
 
 The virtual machine consists of two things:
 
-* a statically scoped mapping from symbols to store locations
-* a persistent mapping from locations to values
+* a statically scoped mapping from symbols to store locations (the
+* "environment"); and
+* a persistent mapping from locations to values (the "store").
 
-To that end, a Machine is a monad transformer stack with the environment
-held in a Reader and the store held in a State. The execution of psilo
-programs in this scheme amounts to translating Expr values to Machine
-values.
+Thus a `Machine` is a monad composed of `ReaderT` and `StateT` monad
+transformers.
 
 The Reader monad permits function-local overwriting of the contained state
 which is automatically rolled back -- precisely the behavior we want out of
@@ -17,6 +16,9 @@ our lexical environment.
 
 The State monad, on the other hand, is persistent until the end of the
 machine's execution and thus handles dynamic scope and state.
+
+Imports and language extensions
+---
 
 > {-# LANGUAGE DeriveFunctor #-}
 > {-# LANGUAGE DeriveFoldable #-}
@@ -50,9 +52,9 @@ machine's execution and thus handles dynamic scope and state.
 The Machine
 ---
 
-The machine is a monad transformer stack of a State on top of a Reader. The
-State monad contains the persistent storage while the Reader monad contains the
-static environment bindings.
+Borrowing (stealing?) from Krishnamurthi's inimitable "Programming Languages:
+Application and Interpretation," the environment does not map symbols to values
+but to *locations* in the store. The store, then, maps location to values.
 
 > type Location = Int
 > data Value = forall a . Show a => ClosV { symV  :: Symbol
@@ -62,7 +64,6 @@ static environment bindings.
 >            | NumV Integer
 >            | ListV [Value]
 >            | NilV
-> --           | BoxV { boxV :: Location } -- not ready yet
 >
 > deriving instance Show Value
 >
@@ -72,18 +73,28 @@ static environment bindings.
 > emptyEnv = Map.empty
 > emptyStore = IntMap.empty
 >
+
+The store must also keep track of how many locations it has handed out. As the
+`StateT` monad can only hold one value as state, I wrap a `Store` and an `Int`
+together in one data type.
+
 > data MStore = MStore { mStore :: Store
 >                      , mLoc :: Int
 >                      }
 >     deriving Show
->
+
+I do the same thing with `Environment` defensively in case I need to store more
+data in the `ReaderT` in the future.
+
 > data MEnv = MEnv { mEnv :: Environment }
 >     deriving Show
->
+
+Behold: the `Machine` monad, a stack of monad transformers.
+
 > newtype Machine a = M { runM :: ReaderT MEnv (StateT MStore IO) a }
 >     deriving (Monad, MonadIO, MonadState MStore, MonadReader MEnv)
 
-Self-explanatory
+
 
 > initialStore :: MStore
 > initialStore = MStore { mStore = emptyStore
@@ -93,20 +104,29 @@ Self-explanatory
 > initialEnv :: MEnv
 > initialEnv = MEnv { mEnv = emptyEnv }
 
-Run a Machine monad
+With the above default initial states for the environment and the store, I'm
+ready to define the mapping from a `Machine` to `IO`, which is essentially just
+calling the various monad transformer `run` functions in succession.
 
 > runMachine :: Machine a -> IO (a, MStore)
 > runMachine k = runStateT (runReaderT (runM k) initialEnv) initialStore
->
 
-The operation language for our machine.
+Now all that is left is a means of building a `Machine` from psilo code.
+
+The operation language
 ---
 
-In our view, executing this language is paramount to a transformation from
-the Expr language to a machine mutation language.
+Executing a psilo program on this machine amounts to:
 
-We will use this language to define the translation from Expr to our
-Machine.
+1. Unwinding `Expr` values and concurrently
+2. Building the corresponding `Machine` values.
+
+To aid in this second step I define an intermediate operation language, `Op`,
+which will encapsulate some common machine-oriented tasks. This should simplify
+the proper interpreter function.
+
+`Op` allows for manipulation of the environment and store, and also provides
+fresh store locations on demand.
 
 > data OpF k
 >     = Bind   Symbol Location k
@@ -117,6 +137,12 @@ Machine.
 >     deriving Functor
 
 > type Op = Free OpF
+
+Nevermind the `Free` constructor for now.
+
+The utility of the following convenience functions will be clearer when we get
+to the interpreter. A crude explanation is that these are the "commands" we
+will write `Op` programs in.
 
 > bind :: Symbol -> Location -> Op ()
 > bind s l = liftF $ Bind s l ()
@@ -139,24 +165,50 @@ Machine.
 > bindVar :: Symbol -> Location -> MEnv -> MEnv
 > bindVar sym loc (MEnv env) = MEnv $ Map.insert sym loc env
 
-Build a Machine computation out of Ops
+The `Op` interpreter and the `Free` monad
+---
 
 > runOp :: Op a -> Machine a
+
+For each branch of our `OpF` data type definition, we have a case for the `Op`
+interpreter to handle.
+
+`Op` and `OpF` are slightly different: the former is the latter transformed by
+the `Free` monad type constructor. `Free` is exactly that: you give it a
+functor value and get a monad for "free"; ie, you get a data type which
+implements `>>=` and `return`.
+
+However, `Free` monads all get the same generic implementations of `>>=` and
+`bind`. All the semantics of your data type must be specified in a *run*
+function of some kind which breaks down these aggregate values to build some
+result. `runOp` is such a function for `Op`.
+
+`Free` creates types which have a base case for storing "Pure" values (in
+Haskell, the `return` function may also be called `pure` because it wraps a
+*pure* value in a monadic context). `Free` values all have a continuation
+argument (which I call `next`, conventionally), whereas `Pure` values do not:
+they are leaves of a syntax tree.
+
 > runOp (Pure v) = return v
 
-Bind a location to a symbol
+All the other value constructors are wrapped in `Free`.
+
+`bind`ing is the act of associating a symbol with a location in memory.
 
 > runOp (Free (Bind sym loc next)) = do
 >     env <- ask
 >     local (bindVar sym loc) $ runOp next
 
-Lookup a location for the given symbol
+The inverse operation is called a `lookup` in our parlance:
 
 > runOp (Free (Lookup sym next)) = do
 >     loc <- asks (lookupVar sym)
 >     runOp $ next loc
 
-Store a value in a given location
+If we have a location (perhaps by calling `fresh`) to store a value in - and a
+value - we can associate them by `get`ting the state, picking out the `Store`,
+and inserting our location and value in the map. Then we `put` the state back
+in and continue on our merry way.
 
 > runOp (Free (Store loc val next)) = do
 >     state  <- get
@@ -165,7 +217,7 @@ Store a value in a given location
 >     put $ state { mStore = sto' }
 >     runOp next
 
-Fetch a value from a given location
+By this point should be able to figure out what `fetch` does.
 
 > runOp (Free (Fetch loc next)) = do
 >     state  <- get
@@ -173,13 +225,16 @@ Fetch a value from a given location
 >     val    <- return $ sto IntMap.! loc
 >     runOp $ next val
 
-Increment the current location and return the most recent unused one
+`fresh` gets the state, extracts the location, increments it, puts it back in,
+and returns the original.
 
 > runOp (Free (Fresh next)) = do
 >     state <- get
 >     loc   <- return $ mLoc state
 >     put $ state { mLoc = (loc + 1) }
 >     runOp $ next loc
+
+To illustrate what `Op` code looks like have a look at `opTest`:
 
 > opTest :: Machine ()
 > opTest = runOp $ do
@@ -191,18 +246,31 @@ Increment the current location and return the most recent unused one
 >     store 0 $ NumV (val * 2)
 >     return ()
 
-Interpretation
+Interpreting psilo
 ---
 
-Now that we have a static environment and a dynamic store,
-it is time to actually interpret programs.
+Now that we have a static environment and a dynamic store, a machine which
+holds them, and a low-level operation language to control the machine, we can
+now set ourselves to interpreting psilo.
 
-We do so by translating monadic Expr values into monadic Machine values.
-During this translation, our monad transformer stack allows us to manage and
-orchestrate the necessary side effects.
+As stated elsewhere, executing psilo programs is the act of
+
+1. transforming `Expr` values to `Machine` values and
+2. unwinding `Machine` values.
+
+The function `interpret` handles the first part. You can even tell by its type:
+ `Expr a -> Machine Value`.
 
 > interpret :: Show a => Expr a -> Machine Value
+
+`Expr` is defined as `type Expr = Free AST`. Since `Expr` is a `Free` monad, as
+with `Op`, we handle the base case of being handed a `Pure` value. In this
+case, we return `NilV`.
+
 > interpret (Pure v) = return NilV
+
+The rest of the interpreter is remarkably simple. Each case corresponds to a
+branch in our `AST` definition.
 
 > interpret (Free (AInteger n)) = return $ NumV n
 > interpret (Free (ASymbol  s)) = do
@@ -227,9 +295,6 @@ orchestrate the necessary side effects.
 >     (NumV l) <- return $ args' !! 0
 >     (NumV r) <- return $ args' !! 1
 >     return $ NumV $ l * r
-
-A note on lambdas
----
 
 The below code for lambdas, while technically correct, has a huge problem: it
 copies its *entire* environment. A much smarter trick would be to only copy
@@ -263,3 +328,6 @@ this is trivial.
 >     env'    <- return $ Map.insert sym newLoc env
 >     local (\(MEnv e) -> MEnv (Map.union env' e)) $ do
 >         interpret body
+
+This interpreter is flexible and powerful because we built up the appropriate
+abstractions.

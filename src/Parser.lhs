@@ -40,8 +40,9 @@ bind values in lambda abstractions.
 >     return $ Free $ ASymbol sym
 >
 
-Lambda abstractions. Optional name. Accepts a list of symbols to bound and
-an expression to evaluate inside the newly created scope.
+Lamba abstractions, or *functions*. A function definition is a list of symbols
+to bind to the elements of the argument list, and a psilo expression to
+evaluate in the context of the arguments.
 
 > parseFn :: Parser (Expr a)
 > parseFn = do
@@ -51,7 +52,10 @@ an expression to evaluate inside the newly created scope.
 >     optional whitespace
 >     body <- parseExpr
 >     return $ Free $ ALambda arg body
->
+
+`let` bindings are formally equivalent to wrapping an expression in an outer
+closure and immediately evaluating it, like so:
+
 > parseLetBinding :: Parser (Expr a)
 > parseLetBinding = do
 >     optional whitespace
@@ -63,10 +67,6 @@ an expression to evaluate inside the newly created scope.
 > parseLetBindings :: Parser (Expr a)
 > parseLetBindings = fmap (Free . AList) $ parens parseLetBinding `sepBy` whitespace
 >
-
-This translates into the application of an anonymous function to a list of
-arguments.
-
 > parseLet :: Parser (Expr a)
 > parseLet = do
 >     reserved "let"
