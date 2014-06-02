@@ -15,7 +15,7 @@ if hash pandoc 2>/dev/null; then
     ###
     # readme
     pandoc -s -t latex -f markdown -o ./tex/readme.tex ../README.md
-    pandoc -s -S -t html+header_attributes -f markdown \
+    pandoc -s -S -t html5 -f markdown_github \
     --template=templates/main.tmpl.html --toc \
     -o ./html/src/index.html ../README.md
 

@@ -50,28 +50,30 @@ also be a human-language guide to the language's structure and implementation.
 
 The grammar is a work in progress. At the moment, psilo code looks like this:
 
-    (let ((square (\ (&:x) (* x x)))
-          (add1   (\ (&:x) (+ 1 x))))
-      (add1 (square 5)))
+```
+(let ((square (\ (&:x) (* x x)))
+      (add1   (\ (&:x) (+ 1 x))))
+  (add1 (square 5)))
 
-    ; => 26
+; => 26
 
-    (let ((square (\ (&:x) (* x x)))
-          (a      [ 1 2 3 4 5 ] ))
-      (square a))
+(let ((square (\ (&:x) (* x x)))
+      (a      [ 1 2 3 4 5 ] ))
+  (square a))
 
-    ; => [ 1 4 9 16 25 ]
+; => [ 1 4 9 16 25 ]
 
-    (adt Stream (a)
-      (Nil)
-      (Next a (Stream a)))
+(adt Stream (a)
+  (Nil)
+  (Next a (Stream a)))
 
-    (= stream-length (&:strm)
-      (= stream-length-helper (&:strm acc)
-        (? strm
-          (`(Nil)       0)
-          (`(Next h ,t) (stream-length-helper t (+ 1 acc)))))
-      (stream-length-helper strm 0))
+(= stream-length (&:strm)
+  (= stream-length-helper (&:strm acc)
+    (? strm
+      (`(Nil)       0)
+      (`(Next h ,t) (stream-length-helper t (+ 1 acc)))))
+  (stream-length-helper strm 0))
+```
 
 2. Detail
 ---
@@ -109,13 +111,17 @@ exactly once in an expression.
 
 This makes writing certain kinds of programs very annoying; eg
 
-    (= square (x) (* x x))
+```
+(= square (x) (* x x))
+```
 
 is illegal on the face of it. However, since a function receiving a linear
 value is provably the only owner of that value, a function can declare a linear
 value to be *borrowed* for the duration of its scope like so:
 
-    (= square (&:x) (* x x))
+```
+(= square (&:x) (* x x))
+```
 
 Borrowed values are immutable; you may think of them as equivalent to `const`
 references in C++.
@@ -125,10 +131,12 @@ references in C++.
 Linearity is adopted in psilo so that programmers may mutate values
 efficiently. In the core syntax of psilo:
 
-    (let ((x (foo))           ; 1
-          (y (bar)))          ; 2
-      (let ((x (baz x y)))    ; 3
-        (qux x)))             ; 4
+```
+(let ((x (foo))           ; 1
+      (y (bar)))          ; 2
+  (let ((x (baz x y)))    ; 3
+    (qux x)))             ; 4
+```
 
 The code above:
 
@@ -147,7 +155,9 @@ traditional imperative language; we will get to that shortly.
 
 Functions are created with the `\` operator:
 
-    (\ (x) (foo x))
+```
+(\ (x) (foo x))
+```
 
 Functions are referentially transparent: given some input value *x* a function
 must always return *y*. No exceptions. Much of the rest of the language is
@@ -156,8 +166,10 @@ perform side effects, one is going to *earn* them.
 
 It is harmless to apply a non-function to an empty argument list, eg
 
-    (let ((x (5)))
-      (foo (x)))
+```
+(let ((x (5)))
+  (foo (x)))
+```
 
 In the example I
 
@@ -172,43 +184,53 @@ So far we have not used any explicit type signatures because they can almost
 always be inferred. However, if the need arises, one may type functions like
 so:
 
-    (\ ({x | Integer}
-        {y | String }) -> Foo
-      (make-foo x y))
+```
+(\ ({x | Integer}
+    {y | String }) -> Foo
+  (make-foo x y))
+```
 
 Braces (`{` and `}`) delimit argument types. From the `|` until the closing
 brace, you may write your type signature. psilo, like other languages with
 expressive type systems, allows type variables as well:
 
-    (\ ({x | a}) -> (Bar a)
-      (bar-something x))
+```
+(\ ({x | a}) -> (Bar a)
+  (bar-something x))
+```
 
 Also note the `->` symbol to indicate the function's return type.
 
 To type variables in `let` bindings:
 
-    (let (({x | Integer} 5)
-          ({y | String } "huh"))
-      (make-foo x y))
+```
+(let (({x | Integer} 5)
+      ({y | String } "huh"))
+  (make-foo x y))
+```
 
 #### 2.5.3 `=` notation
 
 Strictly speaking, all psilo programs are a single `let` expression being
 evaluated:
 
-    (let ((square (\ (&:x) (\* x x)))
-          (add-1  (\ (&:x) (+ 1 x))))
-      (square
-        (add-1 5)))
+```
+(let ((square (\ (&:x) (\* x x)))
+      (add-1  (\ (&:x) (+ 1 x))))
+  (square
+    (add-1 5)))
+```
 
 This, however, is less than ideal syntactically. The following is equivalent:
 
-    (= square (&:x) (\* x x))
-    (= add-1  (&:x) (+ 1 x))
+```
+(= square (&:x) (\* x x))
+(= add-1  (&:x) (+ 1 x))
 
-    (= main ()
-      (square
-        (add-1 5)))
+(= main ()
+  (square
+    (add-1 5)))
+```
 
 (Actually, they're not *quite* equivalent: symbols bound via `=` form a
 recursive `let`.)
@@ -229,27 +251,29 @@ to the programmer. Be patient; a web is being woven.
 
 Example:
 
-    ; a simple model of a person
-    (= make-person (name-arg age-arg)
-      (let ((name name-arg)
-            (age  age-arg))
-        (\ (msg)
-          (? msg
-            ('birthday    (let ((age (+ 1 age)))
-                            (make-person name age)))
-            ('say-hello   (let ((_ (display (++ "Hello, my name is "
-                                                &:name
-                                                " and I am "
-                                                (show &:age)
-                                                " years old."))))
-                            (make-person name age)))))))
+```
+; a simple model of a person
+(= make-person (name-arg age-arg)
+  (let ((name name-arg)
+        (age  age-arg))
+    (\ (msg)
+      (? msg
+        ('birthday    (let ((age (+ 1 age)))
+                        (make-person name age)))
+        ('say-hello   (let ((_ (display (++ "Hello, my name is "
+                                            &:name
+                                            " and I am "
+                                            (show &:age)
+                                            " years old."))))
+                        (make-person name age)))))))
 
-    (= person-example ()
-      (let ((p (make-person "gatlin" 24)))
-        (let ((p (p 'birthday)))
-          (p 'say-hello'))))
+(= person-example ()
+  (let ((p (make-person "gatlin" 24)))
+    (let ((p (p 'birthday)))
+      (p 'say-hello'))))
 
-    ; output: "Hello, my name is gatlin and I am 25 years old."
+; output: "Hello, my name is gatlin and I am 25 years old."
+```
 
 In the above code, `person-example` creates a person, mutates that person, and
 then performs an effectful computation with it (him?).
@@ -266,15 +290,17 @@ kind of first-class macro (or *fexpr* in some parlances).
 
 Just for kicks, let's add lisp-style `if` statements to psilo:
 
-      (= if (&:cond &:then &:else)
-        (? (cond)
-          (`(True)    (then))
-          (`(False)   (else))))
+```
+(= if (&:cond &:then &:else)
+(? (cond)
+  (`(True)    (then))
+  (`(False)   (else))))
 
-      (= if-example ()
-        (if (< 2 4)
-            "2 is less than 4!"
-            "2 is NOT less than 4! Everything is wrong RUN"))
+(= if-example ()
+(if (< 2 4)
+  "2 is less than 4!"
+  "2 is NOT less than 4! Everything is wrong RUN"))
+```
 
 Note that the first argument to `?` has parentheses, because we want to
 evaluate it. Since you can evaluate non functions all day long with no
@@ -288,57 +314,63 @@ author humbly accepts alternate syntax suggestions.
 The above pattern is so useful that psilo provides its logical successor: the
 algebraic data type. Examples are the most illuminating definition:
 
-    (adt Person ()
-      (Person String Integer))
+```
+(adt Person ()
+  (Person String Integer))
 
-    (= birthday (person)
-      (? (person)
-        (`(Person ,name ,age)     (Person name (+ 1 age)))))
+(= birthday (person)
+  (? (person)
+    (`(Person ,name ,age)     (Person name (+ 1 age)))))
 
-    (= say-hello (&:person)
-      (? (person)
-        (`(Person ,name ,age)
-          (let ((_ (display (++ "Hello my name is "
-                                 name
-                                 " and I am " (show age) " years old."))))
-            (Person name age)))))
+(= say-hello (&:person)
+  (? (person)
+    (`(Person ,name ,age)
+      (let ((_ (display (++ "Hello my name is "
+                             name
+                             " and I am " (show age) " years old."))))
+        (Person name age)))))
 
-    (= person-example ()
-      (let ((p (Person "gatlin" 24)))
-        (let ((p (birthday p)))
-          (say-hello p))))
+(= person-example ()
+  (let ((p (Person "gatlin" 24)))
+    (let ((p (birthday p)))
+      (say-hello p))))
+```
 
 Of course, ADTs may have multiple value constructors, eg:
 
-    (adt Person ()
-      (Human String Integer)         ; name age
-      (Corp  String Integer String)) ; name age tax-id
+```
+(adt Person ()
+  (Human String Integer)         ; name age
+  (Corp  String Integer String)) ; name age tax-id
 
-    (= birthday (person)
-      (? (person)
-        (`(Human ,name ,age)  (Human name (+ 1 age)))
-        (`(Corp  ,name ,age ,tax-id) (Corp name (+ 1 age) tax-id))))
+(= birthday (person)
+  (? (person)
+    (`(Human ,name ,age)  (Human name (+ 1 age)))
+    (`(Corp  ,name ,age ,tax-id) (Corp name (+ 1 age) tax-id))))
+```
 
 ADTs may also accept type parameters to do useful things:
 
-    (adt Stream (a)
-      (Nil)
-      (Next a (Stream a)))
+```
+(adt Stream (a)
+  (Nil)
+  (Next a (Stream a)))
 
-    (= stream-length-helper (&:strm acc)
-      (? (strm)
-        (`(Nil)       0)
-        (`(Next h ,t) (stream-length-helper t (+ 1 acc)))))
+(= stream-length-helper (&:strm acc)
+  (? (strm)
+    (`(Nil)       0)
+    (`(Next h ,t) (stream-length-helper t (+ 1 acc)))))
 
-    (= stream-length (&:strm)
-      (stream-length-helper strm 0))
+(= stream-length (&:strm)
+  (stream-length-helper strm 0))
 
-    (= stream-example ()
-      (let ((s (Next 1 (Next 2 (Next 3 (Nil))))))
-        (let ((len (stream-length s)))
-          (++ "The stream has "
-              (show len)
-              " elements."))))
+(= stream-example ()
+  (let ((s (Next 1 (Next 2 (Next 3 (Nil))))))
+    (let ((len (stream-length s)))
+      (++ "The stream has "
+          (show len)
+          " elements."))))
+```
 
 ### 2.7 Delimited continuations, `do`, and program-as-language
 
@@ -352,28 +384,30 @@ mathematical function composition (eg, `f(g(x))` first performs `g` then `f`).
 However, this does not mean we cannot build it ourselves. **You do not have to
 understand all of the following code to actually use psilo.**
 
-    ;;; Provided in standard library by yours truly
-    (language I (Then I))
+```
+;;; Provided in standard library by yours truly
+(language I (Then I))
 
-    (= imperatively ({imp | I a}) -> a
-      (? imp
-        (`(Terminal ,v)   v)
-        (`(Then   ,next)  (imperatively (next)))))
+(= imperatively ({imp | I a}) -> a
+  (? imp
+    (`(Terminal ,v)   v)
+    (`(Then   ,next)  (imperatively (next)))))
 
-    (= begin (exprs)
-      (imperatively (do exprs)))
+(= begin (exprs)
+  (imperatively (do exprs)))
 
-    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    ;;; YOU WOULD WRITE THIS PART
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;; YOU WOULD WRITE THIS PART
 
-    (= square-imperative (&:x)
-      (return (* x x)))
+(= square-imperative (&:x)
+  (return (* x x)))
 
-    (= imperative-example ()
-      (begin
-        (x := 5)
-        (x := (do (square-imperative x)))
-        (display (show x))))
+(= imperative-example ()
+  (begin
+    (x := 5)
+    (x := (do (square-imperative x)))
+    (display (show x))))
+```
 
 Yes, the one exception to psilo's prefix notation is the `:=` operator. In
 fact this is not an exception: any operator may be moved one place to the right
@@ -396,73 +430,77 @@ Follow me for a moment. Languages are often specified in Backus-Naur Form
 
 In psilo, you can create a language similarly with ADTs:
 
-    (adt Arithmetic ()
-      (K    Integer)
-      (Add  Arithmetic Arithmetic)
-      (Mult Arithmetic Arithmetic)
-      (Neg  Arithmetic))
+```
+(adt Arithmetic ()
+  (K    Integer)
+  (Add  Arithmetic Arithmetic)
+  (Mult Arithmetic Arithmetic)
+  (Neg  Arithmetic))
 
-    (= calc ({arith | Arithmetic}) -> Integer
-      (? arith
-        (`(K ,n)    (n))
-        (`(Add ,l ,r)  (+ (calc l)
-                          (calc r)))
-        (`(Mult ,l ,r) (* (calc l)
-                          (calc r)))
-        (`(Neg  ,n)    (* n -1))))
+(= calc ({arith | Arithmetic}) -> Integer
+  (? arith
+    (`(K ,n)    (n))
+    (`(Add ,l ,r)  (+ (calc l)
+                      (calc r)))
+    (`(Mult ,l ,r) (* (calc l)
+                      (calc r)))
+    (`(Neg  ,n)    (* n -1))))
 
-    (= calc-ex () -> Integer
-      (Add (K 1)
-           (Mult (K 2)
-                 (K 3))))
+(= calc-ex () -> Integer
+  (Add (K 1)
+       (Mult (K 2)
+             (K 3))))
+```
 
 What if you wanted an imperative control language, say, for a robotic camera?
 
-    ; assume types for Degree, ImageData, etc
-    (adt Rotation ()
-      (Up Degree) (Down Degree) (Left Degree) (Right Degree))
+```
+; assume types for Degree, ImageData, etc
+(adt Rotation ()
+  (Up Degree) (Down Degree) (Left Degree) (Right Degree))
 
-    (language CameraInst k
-      (Shoot    (ImageData -> k))
-      (Rotate   Rotation k)
-      (SetZoom  Float  k))
+(language CameraInst k
+  (Shoot    (ImageData -> k))
+  (Rotate   Rotation k)
+  (SetZoom  Float  k))
 
-    (= with-camera ({&:camera    | Camera    }
-                    {instruction | CameraInst}) -> ()
-      (? instruction
-        (`(Term v)      ())
+(= with-camera ({&:camera    | Camera    }
+                {instruction | CameraInst}) -> ()
+  (? instruction
+    (`(Term v)      ())
 
-        (`(Shoot ,next)
-          (let ((d  (tell-camera-shoot camera)))
-            (with-camera camera (next d))))
+    (`(Shoot ,next)
+      (let ((d  (tell-camera-shoot camera)))
+        (with-camera camera (next d))))
 
-        (`(Rotate ,rot ,next)
-          (let ((_ (tell-camera-rotate camera rot)))
-            (with-camera camera (next))))
+    (`(Rotate ,rot ,next)
+      (let ((_ (tell-camera-rotate camera rot)))
+        (with-camera camera (next))))
 
-        (`(SetZoom ,amt ,next)
-          (let ((_ (set-camera-zoom camera amt)))
-            (with-camera camera (next))))))
+    (`(SetZoom ,amt ,next)
+      (let ((_ (set-camera-zoom camera amt)))
+        (with-camera camera (next))))))
 
-    (= camera-ex ()
-      (with-camera (new-camera) (do
-        (SetZoom 14.0)
-        (Rotate (Up 23))
-        (Rotate (Left 42))
-        (image := (Shoot))
-        (image))))
+(= camera-ex ()
+  (with-camera (new-camera) (do
+    (SetZoom 14.0)
+    (Rotate (Up 23))
+    (Rotate (Left 42))
+    (image := (Shoot))
+    (image))))
 
-    (= camera-ex-2 ()
-      (begin
-        (which-camera := (ask-user-for-camera))
-        (if (eq? which-camera "")
-            (display "Invalid choice.")
-            (begin
-              ((with-camera (get-camera which-camera)
-                (do (SetZoom 4.0)
-                    (Rotate (Right 23))
-                    (image := (Shoot))
-                    (image))))))))
+(= camera-ex-2 ()
+  (begin
+    (which-camera := (ask-user-for-camera))
+    (if (eq? which-camera "")
+        (display "Invalid choice.")
+        (begin
+          ((with-camera (get-camera which-camera)
+            (do (SetZoom 4.0)
+                (Rotate (Right 23))
+                (image := (Shoot))
+                (image))))))))
+```
 
 The psilo philosophy is that all programs are parsers for some input language,
 be it another programming language, a language of clicks, a language of sensor
@@ -495,32 +533,38 @@ Parallelism in psilo is dead simple thanks to a fundamental type called the
 array. Arrays are ordered, homogenously-typed, fixed-length multi-sets. They
 may be created like so:
 
-    (= array-ex ()
-      (begin
-        (arr := [1 2 3])
-        (do-something-with arr)))
+```
+(= array-ex ()
+  (begin
+    (arr := [1 2 3])
+    (do-something-with arr)))
+```
 
 An interesting property of arrays is, if given to a function expecting a scalar
 (ie, non-array) value, the operation is intelligently mapped in parallel, vis:
 
-    (= square ({&:x | n}) -> n
-      (* x x))
+```
+(= square ({&:x | n}) -> n
+  (* x x))
 
-    (= square-array ({arr | [n]}) -> [n]
-      (square arr))
+(= square-array ({arr | [n]}) -> [n]
+  (square arr))
 
-    (square-array [1 2 3]) ; => [1 4 9]
+(square-array [1 2 3]) ; => [1 4 9]
+```
 
 Note how arrays are specified in type signatures. By explicitly typing the
 argument as an array, you can prevent the parallel mapping behavior.
 
 What about something more interesting?
 
-    (= array-ex-2 ()
-      (+ [1 2 3]
-         [4 5 6 7]))
+```
+(= array-ex-2 ()
+  (+ [1 2 3]
+     [4 5 6 7]))
 
-    ; => [5 6 7 8 6 7 8 9 7 8 9 10]
+; => [5 6 7 8 6 7 8 9 7 8 9 10]
+```
 
 The resulting array is the cartesian product of the inputs reduced according
 to the scalar-wise semantics of the function.
@@ -530,8 +574,10 @@ to the scalar-wise semantics of the function.
 At some point in the future, I would like for this to do the obvious correct
 thing:
 
-    (scalar-function 'gpu [1 2 3])
-    ; => Perform the parallel operation on the GPU, if applicable.
+```
+(scalar-function 'gpu [1 2 3])
+; => Perform the parallel operation on the GPU, if applicable.
+```
 
 ### 2.8 Quotes and other list miscellany
 
@@ -540,16 +586,22 @@ what that means, traditional quote operators still apply.
 
 You can quote symbols:
 
-    (foo 'x)
+```
+(foo 'x)
+```
 
 You can quote lists to indicate the expression head is not intended to be a
 function:
 
-    '(1 2 3)
+```
+'(1 2 3)
+```
 
 And, as you've seen, you can unquote quoted lists using special syntax:
 
-    `(a ,b c)
+```
+`(a ,b c)
+```
 
 The quasiquoted list is used by the `?` operator to extract pattern matches and
 control evaluation. I have not yet worked out all the implications of this
