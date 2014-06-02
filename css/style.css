@@ -1,0 +1,60 @@
+.jumbotron {
+    border: 1px solid #E5E5E5;
+}
+
+.jumbotron h1 {
+    font-size: 64pt;
+}
+
+.jumbotron p.lead {
+    font-size: 30pt;
+}
+
+div#content {
+    margin-bottom: 25px;
+}
+
+div#content h2 {
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e5e5e5;
+}
+
+div#content img {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    border: 1px solid #E5E5E5;
+    border-radius: 5px;
+}
+
+.caption {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.link-block {
+    display: block;
+    border-left: 5px solid #E5E5E5;
+    padding-left: 15px;
+}
+
+.link-block h3 {
+    font-size: 18pt;
+}
+
+.jumbotron {
+    border: 1px solid #E5E5E5;
+}
+
+.jumbotron h1 {
+    font-size: 64pt;
+}
+
+.jumbotron p.lead {
+    font-size: 30pt;
+}
+
+.section-header {
+    font-size: 24pt;
+}
