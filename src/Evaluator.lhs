@@ -3,8 +3,7 @@ The psilo Virtual Machine
 
 The virtual machine consists of two things:
 
-* a statically scoped mapping from symbols to store locations (the
-* "environment"); and
+* a statically scoped mapping from symbols to store locations (the "environment"); and
 * a persistent mapping from locations to values (the "store").
 
 Thus a `Machine` is a monad composed of `ReaderT` and `StateT` monad
