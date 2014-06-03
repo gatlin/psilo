@@ -52,9 +52,10 @@ Imports and language extensions
 The Machine
 ---
 
-Borrowing (stealing?) from Krishnamurthi's inimitable "Programming Languages:
-Application and Interpretation," the environment does not map symbols to values
-but to *locations* in the store. The store, then, maps location to values.
+Borrowing (stealing?) from Krishnamurthi's inimitable [Programming Languages:
+Application and Interpretation][plai] the environment does not map symbols to
+values but to *locations* in the store. The store, then, maps location to
+values.
 
 > type Location = Int
 > data Value = forall a . Show a => ClosV { symV  :: Symbol
@@ -331,3 +332,5 @@ this is trivial.
 
 This interpreter is flexible and powerful because we built up the appropriate
 abstractions.
+
+[plai]: http://cs.brown.edu/~sk/Publications/Books/ProgLangs/
