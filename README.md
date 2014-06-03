@@ -4,7 +4,7 @@ psilo
 a parallel, safe, inferencing list operation language for writing interesting
 programs.
 
-(c) 2014 [Gatlin Johnson](http://niltag.net) <gatlin@niltag.net>
+&copy; 2014 [Gatlin Johnson](http://niltag.net) <gatlin@niltag.net>
 
 0. What is psilo?
 ---
