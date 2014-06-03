@@ -180,15 +180,10 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
       (++ &quot;The stream has &quot;
           (show len)
           &quot; elements.&quot;))))</code></pre><h3 id="delimited-continuations-do-and-program-as-language">2.7 Delimited continuations, <code>do</code>, and program-as-language</h3><p>This is potentially the weirdest part of psilo. The diagonal code above can get pretty annoying. It would be much nicer if there were <code>begin</code> blocks like in other lisps.</p><p>Semantically, psilo does not have state or execution ordering beyond mathematical function composition (eg, <code>f(g(x))</code> first performs <code>g</code> then <code>f</code>).</p><p>However, this does not mean we cannot build it ourselves. <strong>You do not have to understand all of the following code to actually use psilo.</strong></p><pre><code>;;; Provided in standard library by yours truly
-(language I (Then I))
-
-(= imperatively ({imp | I a}) -&gt; a
-  (? imp
-    (`(Terminal ,v)   v)
-    (`(Then   ,next)  (imperatively (next)))))
-
-(= begin (exprs)
-  (imperatively (do exprs)))
+(continuation   begin   ()
+  (=    term    (v)     (v))
+  (=    then    ()
+    (call/cc (k)    (k))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; YOU WOULD WRITE THIS PART
@@ -229,7 +224,7 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 
 (continuation with-camera    ({&amp;:camera | Camera})
 
-  (=    pure    (v) ())
+  (=    term    (v) (v))    ; a terminal value. mandatory.
 
   (=    shoot       ()
     (let ((d    (tell-camera-to-shoot camera)))
@@ -249,7 +244,7 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
     (rotate     (Up 23))
     (rotate     (Left 42))
     (image  := (shoot))
-    (image))))
+    (return image))))
 
 (= camera-ex-2 ()
   (begin
@@ -261,7 +256,7 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
             (do (set-zoom 4.0)
                 (rotate (Right 23))
                 (image  := (shoot))
-                (image))))))))</code></pre><p>The psilo philosophy is that all programs are parsers for some input language, be it another programming language, a language of clicks, a language of sensor values, etc. Thus, the primitives of psilo have been carefully chosen to promote this style of development.</p><p>Typed, delimited continuations may be thought of as parsers for context-free languages.</p><p>S-expressions promote viewing a program as definitions and parsers of syntax trees. Types allow you to restrict your parsers to particular languages. And linearity allows you to do this efficiently.</p><h4 id="a-little-derring-do">2.7.2 A little derring-<code>do</code></h4><p><code>do</code> appears to be magical, but it is quite simple: it takes a list of values of the equivalent type and composes a delimited continuation out of them. What psilo calls continuations is called a monad in other languages; however, the author finds their usage is more readily obvious if they are called continuations.</p><p>The result of <code>do</code> is an unevaluated, composite expression. In the camera example, we wrote a <code>with-camera</code> function which accepted a <code>CameraInst</code> value, peeled it apart, and performed side-effects.</p><p>At no point have we violated referential transparency. Rather, we have built an impure, effects-driven language out of a pure one which gives us the ability to reason about it and ensure its safety.</p><h3 id="arrays">2.7.3 Arrays</h3><p>Parallelism in psilo is dead simple thanks to a fundamental type called the array. Arrays are ordered, homogenously-typed, fixed-length multi-sets. They may be created like so:</p><pre><code>(= array-ex ()
+                (return image))))))))</code></pre><p>The psilo philosophy is that all programs are parsers for some input language, be it another programming language, a language of clicks, a language of sensor values, etc. Thus, the primitives of psilo have been carefully chosen to promote this style of development.</p><p>Typed, delimited continuations may be thought of as parsers for context-free languages.</p><p>S-expressions promote viewing a program as definitions and parsers of syntax trees. Types allow you to restrict your parsers to particular languages. And linearity allows you to do this efficiently.</p><h4 id="a-little-derring-do">2.7.2 A little derring-<code>do</code></h4><p><code>do</code> appears to be magical, but it is quite simple: it takes a list of values of the equivalent type and composes a delimited continuation out of them. What psilo calls continuations is called a monad in other languages; however, the author finds their usage is more readily obvious if they are called continuations.</p><p>The result of <code>do</code> is an unevaluated, composite expression. In the camera example, we wrote a <code>with-camera</code> function which accepted a <code>CameraInst</code> value, peeled it apart, and performed side-effects.</p><p>At no point have we violated referential transparency. Rather, we have built an impure, effects-driven language out of a pure one which gives us the ability to reason about it and ensure its safety.</p><h3 id="arrays">2.7.3 Arrays</h3><p>Parallelism in psilo is dead simple thanks to a fundamental type called the array. Arrays are ordered, homogenously-typed, fixed-length multi-sets. They may be created like so:</p><pre><code>(= array-ex ()
   (begin
     (arr := [1 2 3])
     (do-something-with arr)))</code></pre><p>An interesting property of arrays is, if given to a function expecting a scalar (ie, non-array) value, the operation is intelligently mapped in parallel, vis:</p><pre><code>(= square ({&amp;:x | n}) -&gt; n
