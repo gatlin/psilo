@@ -353,10 +353,12 @@ However, this does not mean we cannot build it ourselves. **You do not have to
 understand all of the following code to actually use psilo.**
 
     ;;; Provided in standard library by yours truly
-    (continuation   begin   ()
+    (continuation   imperatively   ()
       (=    term    (v)     (v))
       (=    then    ()
         (call/cc (k)    (k))))
+
+    (= begin (exprs) (imperatively (do exprs)))
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;; YOU WOULD WRITE THIS PART
