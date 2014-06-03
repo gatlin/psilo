@@ -16,9 +16,10 @@ if hash pandoc 2>/dev/null; then
     # readme
     pandoc -s -t latex -f markdown -o ./tex/readme.tex ../README.md
     pandoc -s -t html5 -f markdown \
-    --template=templates/main.tmpl.html --toc \
+    --template=templates/main.tmpl.html \
+    --toc --toc-depth=4 \
     --normalize \
-    --no-wrap \
+    --number-sections \
     -o ./html/index.html ../README.md
 
     ###

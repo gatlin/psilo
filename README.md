@@ -6,8 +6,8 @@ programs. [View it on GitHub.](https://github.com/gatlin/psilo)
 
 &copy; 2014 [Gatlin Johnson](http://niltag.net) <gatlin@niltag.net>
 
-0. What is psilo?
----
+What is psilo?
+===
 
 psilo will be a programming language created with the philosophy that *all*
 programs essentially define (restricted) languages.
@@ -33,7 +33,8 @@ Philosophical Features:
 - Advanced computer science ideas should be exposed, but not mandatory for
   writing high quality programs.
 
-### Status
+Status
+===
 
 **29 May 2014** A nascent evaluator is now committed. By no means is it
 complete, but I can successfully run computations in a rough subset of the
@@ -45,8 +46,8 @@ I can continue with it as planned.
 Also the source code is now Literate Haskell as I want the psilo compiler to
 also be a human-language guide to the language's structure and implementation.
 
-1. Synopsis
----
+Synopsis
+===
 
 The grammar is a work in progress. At the moment, psilo code looks like this:
 
@@ -73,10 +74,11 @@ The grammar is a work in progress. At the moment, psilo code looks like this:
           (`(Next h ,t) (stream-length-helper t (+ 1 acc)))))
       (stream-length-helper strm 0))
 
-2. Detail
----
+Detail
+===
 
-### 2.1 Lists
+Lists
+---
 
 A list is an ordered, heterogenously typed multiset delimited by parentheses.
 They are akin to *tuples* in Python and other languages. Operationally a list
@@ -89,7 +91,8 @@ grouping values; lists do not exist at runtime.
 Strictly speaking, all psilo functions accept exactly one argument: a list of a
 particular type (hence why argument lists use parentheses: they are lists).
 
-### 2.2 Evaluation semantics
+Evaluation semantics
+---
 
 psilo is non-strict. In the basic case values are reduced only when and as much
 as necessary. The upside to this is that, unless otherwise specified, functions
@@ -102,7 +105,8 @@ utility of this will be made plain soon.
 It is possible to force evaluation, though the proper syntax has not been
 decided yet.
 
-### 2.3 Linear values and borrowing (it's simple!)
+Linear values and borrowing (it's simple!)
+---
 
 By default, closures and non-function values are *linear*: they must be used
 exactly once in an expression.
@@ -120,7 +124,8 @@ value to be *borrowed* for the duration of its scope like so:
 Borrowed values are immutable; you may think of them as equivalent to `const`
 references in C++.
 
-### 2.4 Mutation
+Mutation
+---
 
 Linearity is adopted in psilo so that programmers may mutate values
 efficiently. In the core syntax of psilo:
@@ -141,9 +146,10 @@ Thus psilo supports mutation. As this is clumsy and difficult to think about,
 the standard library defines constructs which more closely resemble a
 traditional imperative language; we will get to that shortly.
 
-### 2.5 Functions and Closures
+Functions and Closures
+---
 
-#### 2.5.1 Function Basics
+### Function Basics
 
 Functions are created with the `\` operator:
 
@@ -166,7 +172,7 @@ In the example I
 
 with no problems.
 
-#### 2.5.2 Type signatures
+### Type signatures
 
 So far we have not used any explicit type signatures because they can almost
 always be inferred. However, if the need arises, one may type functions like
@@ -191,7 +197,7 @@ To type variables in `let` bindings:
           ({y | String } "huh"))
       (make-foo x y))
 
-#### 2.5.3 `=` notation
+### `=` notation
 
 Strictly speaking, all psilo programs are a single `let` expression being
 evaluated:
@@ -213,7 +219,7 @@ This, however, is less than ideal syntactically. The following is equivalent:
 (Actually, they're not *quite* equivalent: symbols bound via `=` form a
 recursive `let`.)
 
-#### 2.5.4 Closures
+### Closures
 
 If a function returns an anonymous function, and that anonymous function
 consumes any values from its environment, it is a closure. A closure contains
@@ -254,7 +260,7 @@ Example:
 In the above code, `person-example` creates a person, mutates that person, and
 then performs an effectful computation with it (him?).
 
-#### 2.5.5 Macros (?)
+### Macros (?)
 
 Metaprogramming is awesome and you should do it. However, the author is not
 satisfied with the various warts on existing macro / syntax extension systems.
@@ -283,7 +289,8 @@ problems, we defensively evaluate `then` and `else` in their respective cases.
 Wasn't that simple? We blur the lines between code and data even further. The
 author humbly accepts alternate syntax suggestions.
 
-### 2.6 Data types
+Data types
+---
 
 The above pattern is so useful that psilo provides its logical successor: the
 algebraic data type. Examples are the most illuminating definition:
@@ -340,7 +347,8 @@ ADTs may also accept type parameters to do useful things:
               (show len)
               " elements."))))
 
-### 2.7 Delimited continuations, `do`, and program-as-language
+Delimited continuations, `do`, and program-as-language
+---
 
 This is potentially the weirdest part of psilo. The diagonal code above can get
 pretty annoying. It would be much nicer if there were `begin` blocks like in
@@ -379,7 +387,7 @@ one position in an expression.
 Thus, using only native psilo code, we have created imperative programming. But
 how?
 
-#### 2.7.1 Languages
+### Languages
 
 Follow me for a moment. Languages are often specified in Backus-Naur Form
 (BNF), eg:
@@ -467,7 +475,7 @@ S-expressions promote viewing a program as definitions and parsers of syntax
 trees. Types allow you to restrict your parsers to particular languages. And
 linearity allows you to do this efficiently.
 
-#### 2.7.2 A little derring-`do`
+### A little derring-`do`
 
 `do` appears to be magical, but it is quite simple: it takes a list of values
 of the equivalent type and composes a delimited continuation out of them. What
@@ -483,7 +491,8 @@ At no point have we violated referential transparency. Rather, we have built an
 impure, effects-driven language out of a pure one which gives us the ability to
 reason about it and ensure its safety.
 
-### 2.8 Arrays
+Arrays
+---
 
 Parallelism in psilo is dead simple thanks to a fundamental type called the
 array. Arrays are ordered, homogenously-typed, fixed-length multi-sets. They
@@ -519,7 +528,7 @@ What about something more interesting?
 The resulting array is the cartesian product of the inputs reduced according
 to the scalar-wise semantics of the function.
 
-#### 2.8.1 GPUs
+### GPUs
 
 At some point in the future, I would like for this to do the obvious correct
 thing:
@@ -527,7 +536,8 @@ thing:
     (scalar-function 'gpu [1 2 3])
     ; => Perform the parallel operation on the GPU, if applicable.
 
-### 2.9 Quotes and other list miscellany
+Quotes and other list miscellany
+---
 
 Lisp means **Lis**t **P**rocessor. While psilo has an unconventional take on
 what that means, traditional quote operators still apply.
@@ -549,8 +559,8 @@ The quasiquoted list is used by the `?` operator to extract pattern matches and
 control evaluation. I have not yet worked out all the implications of this
 construct; more to come.
 
-3. How to build
----
+How to build
+===
 
 You need the Glasgow Haskell Compiler and a number of libraries; I suggest
 starting off with [the Haskell platform][haskellplatform].
@@ -573,8 +583,8 @@ And return to the Edenic, pre-build post-checkout status of the code with
 
     make clean
 
-4. Questions / comments / hate mail
----
+Questions / comments / hate mail
+===
 
 Use the Issues feature of GitHub or email me: <gatlin@niltag.net>.
 
