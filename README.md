@@ -2,7 +2,7 @@ psilo
 =====
 
 a parallel, safe, inferencing list operation language for writing interesting
-programs.
+programs. [View it on GitHub.](https://github.com/gatlin/psilo)
 
 &copy; 2014 [Gatlin Johnson](http://niltag.net) <gatlin@niltag.net>
 
