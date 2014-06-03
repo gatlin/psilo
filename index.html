@@ -180,10 +180,12 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
       (++ &quot;The stream has &quot;
           (show len)
           &quot; elements.&quot;))))</code></pre><h3 id="delimited-continuations-do-and-program-as-language">2.7 Delimited continuations, <code>do</code>, and program-as-language</h3><p>This is potentially the weirdest part of psilo. The diagonal code above can get pretty annoying. It would be much nicer if there were <code>begin</code> blocks like in other lisps.</p><p>Semantically, psilo does not have state or execution ordering beyond mathematical function composition (eg, <code>f(g(x))</code> first performs <code>g</code> then <code>f</code>).</p><p>However, this does not mean we cannot build it ourselves. <strong>You do not have to understand all of the following code to actually use psilo.</strong></p><pre><code>;;; Provided in standard library by yours truly
-(continuation   begin   ()
+(continuation   imperatively   ()
   (=    term    (v)     (v))
   (=    then    ()
     (call/cc (k)    (k))))
+
+(= begin (exprs) (imperatively (do exprs)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; YOU WOULD WRITE THIS PART
