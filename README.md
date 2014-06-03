@@ -422,52 +422,49 @@ What if you wanted an imperative control language, say, for a robotic camera?
     (adt Rotation ()
       (Up Degree) (Down Degree) (Left Degree) (Right Degree))
 
-    (language CameraInst k
-      (Shoot    (ImageData -> k))
-      (Rotate   Rotation k)
-      (SetZoom  Float  k))
+    (continuation with-camera    ({&:camera | Camera})
 
-    (= with-camera ({&:camera    | Camera    }
-                    {instruction | CameraInst}) -> ()
-      (? instruction
-        (`(Term v)      ())
+      (=    pure    (v) ())
 
-        (`(Shoot ,next)
-          (let ((d  (tell-camera-shoot camera)))
-            (with-camera camera (next d))))
+      (=    shoot       ()
+        (let ((d    (tell-camera-to-shoot camera)))
+          (call/cc (k) (k d))))
 
-        (`(Rotate ,rot ,next)
-          (let ((_ (tell-camera-rotate camera rot)))
-            (with-camera camera (next))))
+      (=    rotate      (rot)
+        (let ((_ (tell-camera-rotate    camera rot)))
+          (call/cc (k) (k))))
 
-        (`(SetZoom ,amt ,next)
-          (let ((_ (set-camera-zoom camera amt)))
-            (with-camera camera (next))))))
+      (=    set-zoom    (amt)
+        (let ((_ (set-camera-zoom   camera amt)))
+          (call/cc (k) (k)))))
 
-    (= camera-ex ()
+    (= camera-ex-1 ()
       (with-camera (new-camera) (do
-        (SetZoom 14.0)
-        (Rotate (Up 23))
-        (Rotate (Left 42))
-        (image := (Shoot))
+        (set-zoom   14.0)
+        (rotate     (Up 23))
+        (rotate     (Left 42))
+        (image  := (shoot))
         (image))))
 
     (= camera-ex-2 ()
       (begin
-        (which-camera := (ask-user-for-camera))
-        (if (eq? which-camera "")
-            (display "Invalid choice.")
+        (which-camera   := (ask-user-for-camera))
+        (if (eq? which-camera   "")
+            (display    "Invalid choice.")
             (begin
               ((with-camera (get-camera which-camera)
-                (do (SetZoom 4.0)
-                    (Rotate (Right 23))
-                    (image := (Shoot))
+                (do (set-zoom 4.0)
+                    (rotate (Right 23))
+                    (image  := (shoot))
                     (image))))))))
 
 The psilo philosophy is that all programs are parsers for some input language,
 be it another programming language, a language of clicks, a language of sensor
 values, etc. Thus, the primitives of psilo have been carefully chosen to
 promote this style of development.
+
+Typed, delimited continuations may be thought of as parsers for context-free
+languages.
 
 S-expressions promote viewing a program as definitions and parsers of syntax
 trees. Types allow you to restrict your parsers to particular languages. And
