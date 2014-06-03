@@ -227,47 +227,41 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 (adt Rotation ()
   (Up Degree) (Down Degree) (Left Degree) (Right Degree))
 
-(language CameraInst k
-  (Shoot    (ImageData -&gt; k))
-  (Rotate   Rotation k)
-  (SetZoom  Float  k))
+(continuation with-camera    ({&amp;:camera | Camera})
 
-(= with-camera ({&amp;:camera    | Camera    }
-                {instruction | CameraInst}) -&gt; ()
-  (? instruction
-    (`(Term v)      ())
+  (=    pure    (v) ())
 
-    (`(Shoot ,next)
-      (let ((d  (tell-camera-shoot camera)))
-        (with-camera camera (next d))))
+  (=    shoot       ()
+    (let ((d    (tell-camera-to-shoot camera)))
+      (call/cc (k) (k d))))
 
-    (`(Rotate ,rot ,next)
-      (let ((_ (tell-camera-rotate camera rot)))
-        (with-camera camera (next))))
+  (=    rotate      (rot)
+    (let ((_ (tell-camera-rotate    camera rot)))
+      (call/cc (k) (k))))
 
-    (`(SetZoom ,amt ,next)
-      (let ((_ (set-camera-zoom camera amt)))
-        (with-camera camera (next))))))
+  (=    set-zoom    (amt)
+    (let ((_ (set-camera-zoom   camera amt)))
+      (call/cc (k) (k)))))
 
-(= camera-ex ()
+(= camera-ex-1 ()
   (with-camera (new-camera) (do
-    (SetZoom 14.0)
-    (Rotate (Up 23))
-    (Rotate (Left 42))
-    (image := (Shoot))
+    (set-zoom   14.0)
+    (rotate     (Up 23))
+    (rotate     (Left 42))
+    (image  := (shoot))
     (image))))
 
 (= camera-ex-2 ()
   (begin
-    (which-camera := (ask-user-for-camera))
-    (if (eq? which-camera &quot;&quot;)
-        (display &quot;Invalid choice.&quot;)
+    (which-camera   := (ask-user-for-camera))
+    (if (eq? which-camera   &quot;&quot;)
+        (display    &quot;Invalid choice.&quot;)
         (begin
           ((with-camera (get-camera which-camera)
-            (do (SetZoom 4.0)
-                (Rotate (Right 23))
-                (image := (Shoot))
-                (image))))))))</code></pre><p>The psilo philosophy is that all programs are parsers for some input language, be it another programming language, a language of clicks, a language of sensor values, etc. Thus, the primitives of psilo have been carefully chosen to promote this style of development.</p><p>S-expressions promote viewing a program as definitions and parsers of syntax trees. Types allow you to restrict your parsers to particular languages. And linearity allows you to do this efficiently.</p><h4 id="a-little-derring-do">2.7.2 A little derring-<code>do</code></h4><p><code>do</code> appears to be magical, but it is quite simple: it takes a list of values of the equivalent type and composes a delimited continuation out of them. What psilo calls continuations is called a monad in other languages; however, the author finds their usage is more readily obvious if they are called continuations.</p><p>The result of <code>do</code> is an unevaluated, composite expression. In the camera example, we wrote a <code>with-camera</code> function which accepted a <code>CameraInst</code> value, peeled it apart, and performed side-effects.</p><p>At no point have we violated referential transparency. Rather, we have built an impure, effects-driven language out of a pure one which gives us the ability to reason about it and ensure its safety.</p><h3 id="arrays">2.7.3 Arrays</h3><p>Parallelism in psilo is dead simple thanks to a fundamental type called the array. Arrays are ordered, homogenously-typed, fixed-length multi-sets. They may be created like so:</p><pre><code>(= array-ex ()
+            (do (set-zoom 4.0)
+                (rotate (Right 23))
+                (image  := (shoot))
+                (image))))))))</code></pre><p>The psilo philosophy is that all programs are parsers for some input language, be it another programming language, a language of clicks, a language of sensor values, etc. Thus, the primitives of psilo have been carefully chosen to promote this style of development.</p><p>Typed, delimited continuations may be thought of as parsers for context-free languages.</p><p>S-expressions promote viewing a program as definitions and parsers of syntax trees. Types allow you to restrict your parsers to particular languages. And linearity allows you to do this efficiently.</p><h4 id="a-little-derring-do">2.7.2 A little derring-<code>do</code></h4><p><code>do</code> appears to be magical, but it is quite simple: it takes a list of values of the equivalent type and composes a delimited continuation out of them. What psilo calls continuations is called a monad in other languages; however, the author finds their usage is more readily obvious if they are called continuations.</p><p>The result of <code>do</code> is an unevaluated, composite expression. In the camera example, we wrote a <code>with-camera</code> function which accepted a <code>CameraInst</code> value, peeled it apart, and performed side-effects.</p><p>At no point have we violated referential transparency. Rather, we have built an impure, effects-driven language out of a pure one which gives us the ability to reason about it and ensure its safety.</p><h3 id="arrays">2.7.3 Arrays</h3><p>Parallelism in psilo is dead simple thanks to a fundamental type called the array. Arrays are ordered, homogenously-typed, fixed-length multi-sets. They may be created like so:</p><pre><code>(= array-ex ()
   (begin
     (arr := [1 2 3])
     (do-something-with arr)))</code></pre><p>An interesting property of arrays is, if given to a function expecting a scalar (ie, non-array) value, the operation is intelligently mapped in parallel, vis:</p><pre><code>(= square ({&amp;:x | n}) -&gt; n
