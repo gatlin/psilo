@@ -483,7 +483,7 @@ At no point have we violated referential transparency. Rather, we have built an
 impure, effects-driven language out of a pure one which gives us the ability to
 reason about it and ensure its safety.
 
-### 2.7.3 Arrays
+### 2.8 Arrays
 
 Parallelism in psilo is dead simple thanks to a fundamental type called the
 array. Arrays are ordered, homogenously-typed, fixed-length multi-sets. They
@@ -519,7 +519,7 @@ What about something more interesting?
 The resulting array is the cartesian product of the inputs reduced according
 to the scalar-wise semantics of the function.
 
-#### 2.7.3.1 GPUs
+#### 2.8.1 GPUs
 
 At some point in the future, I would like for this to do the obvious correct
 thing:
@@ -527,7 +527,7 @@ thing:
     (scalar-function 'gpu [1 2 3])
     ; => Perform the parallel operation on the GPU, if applicable.
 
-### 2.8 Quotes and other list miscellany
+### 2.9 Quotes and other list miscellany
 
 Lisp means **Lis**t **P**rocessor. While psilo has an unconventional take on
 what that means, traditional quote operators still apply.
