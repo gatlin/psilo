@@ -353,15 +353,10 @@ However, this does not mean we cannot build it ourselves. **You do not have to
 understand all of the following code to actually use psilo.**
 
     ;;; Provided in standard library by yours truly
-    (language I (Then I))
-
-    (= imperatively ({imp | I a}) -> a
-      (? imp
-        (`(Terminal ,v)   v)
-        (`(Then   ,next)  (imperatively (next)))))
-
-    (= begin (exprs)
-      (imperatively (do exprs)))
+    (continuation   begin   ()
+      (=    term    (v)     (v))
+      (=    then    ()
+        (call/cc (k)    (k))))
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;;; YOU WOULD WRITE THIS PART
@@ -424,7 +419,7 @@ What if you wanted an imperative control language, say, for a robotic camera?
 
     (continuation with-camera    ({&:camera | Camera})
 
-      (=    pure    (v) ())
+      (=    term    (v) (v))    ; a terminal value. mandatory.
 
       (=    shoot       ()
         (let ((d    (tell-camera-to-shoot camera)))
@@ -444,7 +439,7 @@ What if you wanted an imperative control language, say, for a robotic camera?
         (rotate     (Up 23))
         (rotate     (Left 42))
         (image  := (shoot))
-        (image))))
+        (return image))))
 
     (= camera-ex-2 ()
       (begin
@@ -456,7 +451,7 @@ What if you wanted an imperative control language, say, for a robotic camera?
                 (do (set-zoom 4.0)
                     (rotate (Right 23))
                     (image  := (shoot))
-                    (image))))))))
+                    (return image))))))))
 
 The psilo philosophy is that all programs are parsers for some input language,
 be it another programming language, a language of clicks, a language of sensor
