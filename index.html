@@ -30,7 +30,7 @@
             font-size: 30pt;
         }
 
-        span#toc-wrapper ul, span#toc-wrapper ol {
+        div#toc-wrapper ul, div#toc-wrapper ol {
             list-style: none;
         }
 
@@ -47,70 +47,273 @@
             background-color: #e5e5e5;
         }
 
+        div#annotations ul li {
+            font-weight: bold;
+            font-size: 28px;
+            font-family: "Raleway","Helvetica",sans-serif;
+            padding: 5px 10px;
+            width: 100%;
+        }
+
+        div#annotations ul li:hover {
+            border-radius: 5px;
+            background-color: #e5e5e5;
+        }
+
     </style>
   </head>
 
   <body>
 
     <div class="container">
-      <div class="header">
-        <ul class="nav nav-pills pull-right clearfix hidden-xs">
-          <li>
-          <a href="mailto:gatlin@niltag.net">
-              <span class="glyphicon glyphicon-envelope"></span>
-              Send me an email!</a></li>
-          <li>
-            <a href="gatlin.gpg">PGP</a>
-          </li>
-          <li>
-              <a href="/">Home</a>
-          </li>
-        </ul>
-        <h3 class="text-muted">
-            <em>Veni veni veni</em>
-        </h3>
-      </div>
-      <div class="jumbotron">
-        <h1>psilo</h1>
-        <p class="lead">
-        a parallel, safe, inferencing list operation language for writing
-        interesting programs. <em>Coming soon.</em>
-        </p>
-        <p class="small">
-&copy; 2014 <a href="http://niltag.net">Gatlin Johnson</a> <script type="text/javascript">
-<!--
-h='&#110;&#x69;&#108;&#116;&#x61;&#x67;&#46;&#110;&#x65;&#116;';a='&#64;';n='&#x67;&#x61;&#116;&#108;&#x69;&#110;';e=n+a+h;
-document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+'<code>'+e+'</code>'+'<\/'+'a'+'>');
-// -->
-</script><noscript>&#x67;&#x61;&#116;&#108;&#x69;&#110;&#32;&#x61;&#116;&#32;&#110;&#x69;&#108;&#116;&#x61;&#x67;&#32;&#100;&#x6f;&#116;&#32;&#110;&#x65;&#116;</noscript>
-        </p>
-        <ul class="list-group visible-xs">
-          <li class="list-group-item">
-          <a href="mailto:gatlin@niltag.net?subject=psilo">Send me an email!</a>
-          </li>
-          <li class="list-group-item">
-          <a href="gatlin.gpg">
-              PGP
-          </a>
-          </li>
-      </ul>
-      </div>
-      <div class="row">
-          <div class="col-md-6">
-              <div class="lead-button"><a href="https://github.com/gatlin/psilo">View on
-                      GitHub</a>
-              </div>
-          </div>
-          <div class="col-md-6">
-              <div class="lead-button"><a href="src">Documentation</a></div>
-          </div>
-      </div><!-- row -->
+      <ol class="breadcrumb">
+          <li><a href="/">home</a></li>
+          <li><a href="/psilo/">psilo</a></li>
+      </ol>
+        <div class="row">
+            <div class="col-sm-12 col-md-4 pull-right">
+                <h2>Table of Contents</h2>
+                <div id="toc-wrapper">
+                    <ul><li><a href="#psilo">psilo</a><ul><li><a href="#what-is-psilo">0. What is psilo?</a><ul><li><a href="#status">Status</a></li></ul></li><li><a href="#synopsis">1. Synopsis</a></li><li><a href="#detail">2. Detail</a><ul><li><a href="#lists">2.1 Lists</a></li><li><a href="#evaluation-semantics">2.2 Evaluation semantics</a></li><li><a href="#linear-values-and-borrowing-its-simple">2.3 Linear values and borrowing (it's simple!)</a></li><li><a href="#mutation">2.4 Mutation</a></li><li><a href="#functions-and-closures">2.5 Functions and Closures</a></li><li><a href="#data-types">2.6 Data types</a></li><li><a href="#delimited-continuations-do-and-program-as-language">2.7 Delimited continuations, <code>do</code>, and program-as-language</a></li><li><a href="#arrays">2.7.3 Arrays</a></li><li><a href="#quotes-and-other-list-miscellany">2.8 Quotes and other list miscellany</a></li></ul></li><li><a href="#how-to-build">3. How to build</a></li><li><a href="#questions-comments-hate-mail">4. Questions / comments / hate mail</a></li></ul></li></ul>
+                </div>
+                <div id="annotations">
+                    <h2>Annotated source code</h2>
+                      <ul class="list-unstyled">
+                          <li><a href="src/syntax.html">Syntax module</a></li>
+                          <li><a href="src/parser.html">Parser module</a></li>
+                          <li><a href="src/evaluator.html">Evaluator module</a></li>
+                          <li><a href="src/lexer.html">Lexer module</a></li>
+                      </ul>
+                </div>
+            </div><!-- toc column -->
+            <div class="col-md-12 col-lg-8 pull-left">
 
+                <h1 id="psilo">psilo</h1><p>a parallel, safe, inferencing list operation language for writing interesting programs.</p><ol start="3" type="a"><li>2014 <a href="http://niltag.net">Gatlin Johnson</a> <script type="text/javascript">
+                <!--
+                h='&#110;&#x69;&#108;&#116;&#x61;&#x67;&#46;&#110;&#x65;&#116;';a='&#64;';n='&#x67;&#x61;&#116;&#108;&#x69;&#110;';e=n+a+h;
+                document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
+                // -->
+                </script><noscript>&#x67;&#x61;&#116;&#108;&#x69;&#110;&#32;&#x61;&#116;&#32;&#110;&#x69;&#108;&#116;&#x61;&#x67;&#32;&#100;&#x6f;&#116;&#32;&#110;&#x65;&#116;</noscript></li></ol><h2 id="what-is-psilo">0. What is psilo?</h2><p>psilo will be a programming language created with the philosophy that <em>all</em> programs essentially define (restricted) languages.</p><p>Technical Features (planned):</p><ul><li>No run-time garbage collection necessary owing to uniqueness types</li><li>Static typing for compile-time verification and optimization</li><li>Malleable syntax with fexpr-esque macros</li><li>Dead-simple parallelism with special array types</li><li>Orthogonal core syntax and semantics for your performance and my sanity</li></ul><p>Philosophical Features:</p><ul><li><p>All programs are parsers of some input language. psilo is carefully designed to promote this way of thinking and make it performant.</p></li><li><p>That which is required should be elegant; that which is optional should be pragmatic.</p></li><li><p>If it can be determined at compile time, it should be.</p></li><li><p>Advanced computer science ideas should be exposed, but not mandatory for writing high quality programs.</p></li></ul><h3 id="status">Status</h3><p><strong>29 May 2014</strong> A nascent evaluator is now committed. By no means is it complete, but I can successfully run computations in a rough subset of the language, so that's something!</p><p>The parser is not done but I am now on much better footing than I was before so I can continue with it as planned.</p><p>Also the source code is now Literate Haskell as I want the psilo compiler to also be a human-language guide to the language's structure and implementation.</p><h2 id="synopsis">1. Synopsis</h2><p>The grammar is a work in progress. At the moment, psilo code looks like this:</p><pre><code>(let ((square (\ (&amp;:x) (* x x)))
+                      (add1   (\ (&amp;:x) (+ 1 x))))
+                  (add1 (square 5)))
+                
+                ; =&gt; 26
+                
+                (let ((square (\ (&amp;:x) (* x x)))
+                      (a      [ 1 2 3 4 5 ] ))
+                  (square a))
+                
+                ; =&gt; [ 1 4 9 16 25 ]
+                
+                (adt Stream (a)
+                  (Nil)
+                  (Next a (Stream a)))
+                
+                (= stream-length (&amp;:strm)
+                  (= stream-length-helper (&amp;:strm acc)
+                    (? strm
+                      (`(Nil)       0)
+                      (`(Next h ,t) (stream-length-helper t (+ 1 acc)))))
+                  (stream-length-helper strm 0))</code></pre><h2 id="detail">2. Detail</h2><h3 id="lists">2.1 Lists</h3><p>A list is an ordered, heterogenously typed multiset delimited by parentheses. They are akin to <em>tuples</em> in Python and other languages. Operationally a list is simply several adjacent values in memory.</p><p>A list's type is the product of its constituent types, and it is equivalent only to itself. Really, there is no list. It's a syntactic mechanism for grouping values; lists do not exist at runtime.</p><p>Strictly speaking, all psilo functions accept exactly one argument: a list of a particular type (hence why argument lists use parentheses: they are lists).</p><h3 id="evaluation-semantics">2.2 Evaluation semantics</h3><p>psilo is non-strict. In the basic case values are reduced only when and as much as necessary. The upside to this is that, unless otherwise specified, functions receive the expressions passed to them in the form of lists.</p><p>Since functions receive the expressions passed to them, you can use the <code>?</code> operator to pattern match on the lists to grab pieces that you need. The utility of this will be made plain soon.</p><p>It is possible to force evaluation, though the proper syntax has not been decided yet.</p><h3 id="linear-values-and-borrowing-its-simple">2.3 Linear values and borrowing (it's simple!)</h3><p>By default, closures and non-function values are <em>linear</em>: they must be used exactly once in an expression.</p><p>This makes writing certain kinds of programs very annoying; eg</p><pre><code>(= square (x) (* x x))</code></pre><p>is illegal on the face of it. However, since a function receiving a linear value is provably the only owner of that value, a function can declare a linear value to be <em>borrowed</em> for the duration of its scope like so:</p><pre><code>(= square (&amp;:x) (* x x))</code></pre><p>Borrowed values are immutable; you may think of them as equivalent to <code>const</code> references in C++.</p><h3 id="mutation">2.4 Mutation</h3><p>Linearity is adopted in psilo so that programmers may mutate values efficiently. In the core syntax of psilo:</p><pre><code>(let ((x (foo))           ; 1
+                      (y (bar)))          ; 2
+                  (let ((x (baz x y)))    ; 3
+                    (qux x)))             ; 4</code></pre><p>The code above:</p><ul><li>Assigns values to the variables <code>x</code> and <code>y</code> (1 &amp; 2);</li><li>Consumes their values, permitting no further use (3);</li><li>Replaces the value of <code>x</code> with the result (3 again); and</li><li>Consumes <code>x</code> again (4).</li></ul><p>Thus psilo supports mutation. As this is clumsy and difficult to think about, the standard library defines constructs which more closely resemble a traditional imperative language; we will get to that shortly.</p><h3 id="functions-and-closures">2.5 Functions and Closures</h3><h4 id="function-basics">2.5.1 Function Basics</h4><p>Functions are created with the <code>\</code> operator:</p><pre><code>(\ (x) (foo x))</code></pre><p>Functions are referentially transparent: given some input value <em>x</em> a function must always return <em>y</em>. No exceptions. Much of the rest of the language is designed to get around this restriction without violating it. If one wishes to perform side effects, one is going to <em>earn</em> them.</p><p>It is harmless to apply a non-function to an empty argument list, eg</p><pre><code>(let ((x (5)))
+                  (foo (x)))</code></pre><p>In the example I</p><ul><li>evaluate the constant <code>5</code>; and</li><li>evaluate the non-function variable <code>x</code></li></ul><p>with no problems.</p><h4 id="type-signatures">2.5.2 Type signatures</h4><p>So far we have not used any explicit type signatures because they can almost always be inferred. However, if the need arises, one may type functions like so:</p><pre><code>(\ ({x | Integer}
+                    {y | String }) -&gt; Foo
+                  (make-foo x y))</code></pre><p>Braces (<code>{</code> and <code>}</code>) delimit argument types. From the <code>|</code> until the closing brace, you may write your type signature. psilo, like other languages with expressive type systems, allows type variables as well:</p><pre><code>(\ ({x | a}) -&gt; (Bar a)
+                  (bar-something x))</code></pre><p>Also note the <code>-&gt;</code> symbol to indicate the function's return type.</p><p>To type variables in <code>let</code> bindings:</p><pre><code>(let (({x | Integer} 5)
+                      ({y | String } &quot;huh&quot;))
+                  (make-foo x y))</code></pre><h4 id="notation">2.5.3 <code>=</code> notation</h4><p>Strictly speaking, all psilo programs are a single <code>let</code> expression being evaluated:</p><pre><code>(let ((square (\ (&amp;:x) (\* x x)))
+                      (add-1  (\ (&amp;:x) (+ 1 x))))
+                  (square
+                    (add-1 5)))</code></pre><p>This, however, is less than ideal syntactically. The following is equivalent:</p><pre><code>(= square (&amp;:x) (\* x x))
+                (= add-1  (&amp;:x) (+ 1 x))
+                
+                (= main ()
+                  (square
+                    (add-1 5)))</code></pre><p>(Actually, they're not <em>quite</em> equivalent: symbols bound via <code>=</code> form a recursive <code>let</code>.)</p><h4 id="closures">2.5.4 Closures</h4><p>If a function returns an anonymous function, and that anonymous function consumes any values from its environment, it is a closure. A closure contains its own copy of its lexical environment; in fact, this is psilo's only native copying mechanism at the moment.</p><p>Since closures are linear, if they are executed they cease to exist. However, if the return value of a closure is another such closure, it may be reassigned to the same symbol. Thus psilo provides a means of encapsulated mutation.</p><p>Note that the author is aware that this is a bit clumsy and not very friendly to the programmer. Be patient; a web is being woven.</p><p>Example:</p><pre><code>; a simple model of a person
+                (= make-person (name-arg age-arg)
+                  (let ((name name-arg)
+                        (age  age-arg))
+                    (\ (msg)
+                      (? msg
+                        (&#39;birthday    (let ((age (+ 1 age)))
+                                        (make-person name age)))
+                        (&#39;say-hello   (let ((_ (display (++ &quot;Hello, my name is &quot;
+                                                            &amp;:name
+                                                            &quot; and I am &quot;
+                                                            (show &amp;:age)
+                                                            &quot; years old.&quot;))))
+                                        (make-person name age)))))))
+                
+                (= person-example ()
+                  (let ((p (make-person &quot;gatlin&quot; 24)))
+                    (let ((p (p &#39;birthday)))
+                      (p &#39;say-hello&#39;))))
+                
+                ; output: &quot;Hello, my name is gatlin and I am 25 years old.&quot;</code></pre><p>In the above code, <code>person-example</code> creates a person, mutates that person, and then performs an effectful computation with it (him?).</p><h4 id="macros">2.5.5 Macros (?)</h4><p>Metaprogramming is awesome and you should do it. However, the author is not satisfied with the various warts on existing macro / syntax extension systems.</p><p>As mentioned elsewhere, in psilo expressions are not evaluated until necessary. Using the backquote operator (<code>\``) you can quote expressions and use the unquote (</code>,`) operator to unquote values of interest. Thus, functions are a kind of first-class macro (or <em>fexpr</em> in some parlances).</p><p>Just for kicks, let's add lisp-style <code>if</code> statements to psilo:</p><pre><code>  (= if (&amp;:cond &amp;:then &amp;:else)
+                    (? (cond)
+                      (`(True)    (then))
+                      (`(False)   (else))))
+                
+                  (= if-example ()
+                    (if (&lt; 2 4)
+                        &quot;2 is less than 4!&quot;
+                        &quot;2 is NOT less than 4! Everything is wrong RUN&quot;))</code></pre><p>Note that the first argument to <code>?</code> has parentheses, because we want to evaluate it. Since you can evaluate non functions all day long with no problems, we defensively evaluate <code>then</code> and <code>else</code> in their respective cases.</p><p>Wasn't that simple? We blur the lines between code and data even further. The author humbly accepts alternate syntax suggestions.</p><h3 id="data-types">2.6 Data types</h3><p>The above pattern is so useful that psilo provides its logical successor: the algebraic data type. Examples are the most illuminating definition:</p><pre><code>(adt Person ()
+                  (Person String Integer))
+                
+                (= birthday (person)
+                  (? (person)
+                    (`(Person ,name ,age)     (Person name (+ 1 age)))))
+                
+                (= say-hello (&amp;:person)
+                  (? (person)
+                    (`(Person ,name ,age)
+                      (let ((_ (display (++ &quot;Hello my name is &quot;
+                                             name
+                                             &quot; and I am &quot; (show age) &quot; years old.&quot;))))
+                        (Person name age)))))
+                
+                (= person-example ()
+                  (let ((p (Person &quot;gatlin&quot; 24)))
+                    (let ((p (birthday p)))
+                      (say-hello p))))</code></pre><p>Of course, ADTs may have multiple value constructors, eg:</p><pre><code>(adt Person ()
+                  (Human String Integer)         ; name age
+                  (Corp  String Integer String)) ; name age tax-id
+                
+                (= birthday (person)
+                  (? (person)
+                    (`(Human ,name ,age)  (Human name (+ 1 age)))
+                    (`(Corp  ,name ,age ,tax-id) (Corp name (+ 1 age) tax-id))))</code></pre><p>ADTs may also accept type parameters to do useful things:</p><pre><code>(adt Stream (a)
+                  (Nil)
+                  (Next a (Stream a)))
+                
+                (= stream-length-helper (&amp;:strm acc)
+                  (? (strm)
+                    (`(Nil)       0)
+                    (`(Next h ,t) (stream-length-helper t (+ 1 acc)))))
+                
+                (= stream-length (&amp;:strm)
+                  (stream-length-helper strm 0))
+                
+                (= stream-example ()
+                  (let ((s (Next 1 (Next 2 (Next 3 (Nil))))))
+                    (let ((len (stream-length s)))
+                      (++ &quot;The stream has &quot;
+                          (show len)
+                          &quot; elements.&quot;))))</code></pre><h3 id="delimited-continuations-do-and-program-as-language">2.7 Delimited continuations, <code>do</code>, and program-as-language</h3><p>This is potentially the weirdest part of psilo. The diagonal code above can get pretty annoying. It would be much nicer if there were <code>begin</code> blocks like in other lisps.</p><p>Semantically, psilo does not have state or execution ordering beyond mathematical function composition (eg, <code>f(g(x))</code> first performs <code>g</code> then <code>f</code>).</p><p>However, this does not mean we cannot build it ourselves. <strong>You do not have to understand all of the following code to actually use psilo.</strong></p><pre><code>;;; Provided in standard library by yours truly
+                (language I (Then I))
+                
+                (= imperatively ({imp | I a}) -&gt; a
+                  (? imp
+                    (`(Terminal ,v)   v)
+                    (`(Then   ,next)  (imperatively (next)))))
+                
+                (= begin (exprs)
+                  (imperatively (do exprs)))
+                
+                ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                ;;; YOU WOULD WRITE THIS PART
+                
+                (= square-imperative (&amp;:x)
+                  (return (* x x)))
+                
+                (= imperative-example ()
+                  (begin
+                    (x := 5)
+                    (x := (do (square-imperative x)))
+                    (display (show x))))</code></pre><p>Yes, the one exception to psilo's prefix notation is the <code>:=</code> operator. In fact this is not an exception: any operator may be moved one place to the right one position in an expression.</p><p>Thus, using only native psilo code, we have created imperative programming. But how?</p><h4 id="languages">2.7.1 Languages</h4><p>Follow me for a moment. Languages are often specified in Backus-Naur Form (BNF), eg:</p><pre><code>arithmetic ::= &lt;number&gt;
+                             | + &lt;arithmetic&gt; &lt;arithmetic&gt;
+                             | * &lt;arithmetic&gt; &lt;arithmetic&gt;
+                             | - &lt;arithmetic&gt;
+                             | ( &lt;arithmetic&gt; )
+                ... etc</code></pre><p>In psilo, you can create a language similarly with ADTs:</p><pre><code>(adt Arithmetic ()
+                  (K    Integer)
+                  (Add  Arithmetic Arithmetic)
+                  (Mult Arithmetic Arithmetic)
+                  (Neg  Arithmetic))
+                
+                (= calc ({arith | Arithmetic}) -&gt; Integer
+                  (? arith
+                    (`(K ,n)    (n))
+                    (`(Add ,l ,r)  (+ (calc l)
+                                      (calc r)))
+                    (`(Mult ,l ,r) (* (calc l)
+                                      (calc r)))
+                    (`(Neg  ,n)    (* n -1))))
+                
+                (= calc-ex () -&gt; Integer
+                  (Add (K 1)
+                       (Mult (K 2)
+                             (K 3))))</code></pre><p>What if you wanted an imperative control language, say, for a robotic camera?</p><pre><code>; assume types for Degree, ImageData, etc
+                (adt Rotation ()
+                  (Up Degree) (Down Degree) (Left Degree) (Right Degree))
+                
+                (language CameraInst k
+                  (Shoot    (ImageData -&gt; k))
+                  (Rotate   Rotation k)
+                  (SetZoom  Float  k))
+                
+                (= with-camera ({&amp;:camera    | Camera    }
+                                {instruction | CameraInst}) -&gt; ()
+                  (? instruction
+                    (`(Term v)      ())
+                
+                    (`(Shoot ,next)
+                      (let ((d  (tell-camera-shoot camera)))
+                        (with-camera camera (next d))))
+                
+                    (`(Rotate ,rot ,next)
+                      (let ((_ (tell-camera-rotate camera rot)))
+                        (with-camera camera (next))))
+                
+                    (`(SetZoom ,amt ,next)
+                      (let ((_ (set-camera-zoom camera amt)))
+                        (with-camera camera (next))))))
+                
+                (= camera-ex ()
+                  (with-camera (new-camera) (do
+                    (SetZoom 14.0)
+                    (Rotate (Up 23))
+                    (Rotate (Left 42))
+                    (image := (Shoot))
+                    (image))))
+                
+                (= camera-ex-2 ()
+                  (begin
+                    (which-camera := (ask-user-for-camera))
+                    (if (eq? which-camera &quot;&quot;)
+                        (display &quot;Invalid choice.&quot;)
+                        (begin
+                          ((with-camera (get-camera which-camera)
+                            (do (SetZoom 4.0)
+                                (Rotate (Right 23))
+                                (image := (Shoot))
+                                (image))))))))</code></pre><p>The psilo philosophy is that all programs are parsers for some input language, be it another programming language, a language of clicks, a language of sensor values, etc. Thus, the primitives of psilo have been carefully chosen to promote this style of development.</p><p>S-expressions promote viewing a program as definitions and parsers of syntax trees. Types allow you to restrict your parsers to particular languages. And linearity allows you to do this efficiently.</p><h4 id="a-little-derring-do">2.7.2 A little derring-<code>do</code></h4><p><code>do</code> appears to be magical, but it is quite simple: it takes a list of values of the equivalent type and composes a delimited continuation out of them. What psilo calls continuations is called a monad in other languages; however, the author finds their usage is more readily obvious if they are called continuations.</p><p>The result of <code>do</code> is an unevaluated, composite expression. In the camera example, we wrote a <code>with-camera</code> function which accepted a <code>CameraInst</code> value, peeled it apart, and performed side-effects.</p><p>At no point have we violated referential transparency. Rather, we have built an impure, effects-driven language out of a pure one which gives us the ability to reason about it and ensure its safety.</p><h3 id="arrays">2.7.3 Arrays</h3><p>Parallelism in psilo is dead simple thanks to a fundamental type called the array. Arrays are ordered, homogenously-typed, fixed-length multi-sets. They may be created like so:</p><pre><code>(= array-ex ()
+                  (begin
+                    (arr := [1 2 3])
+                    (do-something-with arr)))</code></pre><p>An interesting property of arrays is, if given to a function expecting a scalar (ie, non-array) value, the operation is intelligently mapped in parallel, vis:</p><pre><code>(= square ({&amp;:x | n}) -&gt; n
+                  (* x x))
+                
+                (= square-array ({arr | [n]}) -&gt; [n]
+                  (square arr))
+                
+                (square-array [1 2 3]) ; =&gt; [1 4 9]</code></pre><p>Note how arrays are specified in type signatures. By explicitly typing the argument as an array, you can prevent the parallel mapping behavior.</p><p>What about something more interesting?</p><pre><code>(= array-ex-2 ()
+                  (+ [1 2 3]
+                     [4 5 6 7]))
+                
+                ; =&gt; [5 6 7 8 6 7 8 9 7 8 9 10]</code></pre><p>The resulting array is the cartesian product of the inputs reduced according to the scalar-wise semantics of the function.</p><h4 id="gpus">2.7.3.1 GPUs</h4><p>At some point in the future, I would like for this to do the obvious correct thing:</p><pre><code>(scalar-function &#39;gpu [1 2 3])
+                ; =&gt; Perform the parallel operation on the GPU, if applicable.</code></pre><h3 id="quotes-and-other-list-miscellany">2.8 Quotes and other list miscellany</h3><p>Lisp means <strong>Lis</strong>t <strong>P</strong>rocessor. While psilo has an unconventional take on what that means, traditional quote operators still apply.</p><p>You can quote symbols:</p><pre><code>(foo &#39;x)</code></pre><p>You can quote lists to indicate the expression head is not intended to be a function:</p><pre><code>&#39;(1 2 3)</code></pre><p>And, as you've seen, you can unquote quoted lists using special syntax:</p><pre><code>`(a ,b c)</code></pre><p>The quasiquoted list is used by the <code>?</code> operator to extract pattern matches and control evaluation. I have not yet worked out all the implications of this construct; more to come.</p><h2 id="how-to-build">3. How to build</h2><p>You need the Glasgow Haskell Compiler and a number of libraries; I suggest starting off with <a href="http://haskell.org/platform">the Haskell platform</a>.</p><p>Clone the repository:</p><pre><code>git clone https://github.com/gatlin/psilo</code></pre><p>Set up a cabal sandbox:</p><pre><code>cabal sandbox init
+                cabal configure
+                cabal install --only-dependencies</code></pre><p>Then make with:</p><pre><code>make</code></pre><p>And return to the Edenic, pre-build post-checkout status of the code with</p><pre><code>make clean</code></pre><h2 id="questions-comments-hate-mail">4. Questions / comments / hate mail</h2><p>Use the Issues feature of GitHub or email me: <script type="text/javascript">
+                <!--
+                h='&#110;&#x69;&#108;&#116;&#x61;&#x67;&#46;&#110;&#x65;&#116;';a='&#64;';n='&#x67;&#x61;&#116;&#108;&#x69;&#110;';e=n+a+h;
+                document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
+                // -->
+                </script><noscript>&#x67;&#x61;&#116;&#108;&#x69;&#110;&#32;&#x61;&#116;&#32;&#110;&#x69;&#108;&#116;&#x61;&#x67;&#32;&#100;&#x6f;&#116;&#32;&#110;&#x65;&#116;</noscript>.</p>
 
-      <div class="footer">
-        <p>&copy; 2013-2014. Theme lovingly stolen from other people.</p>
-      </div>
-
+            </div><!-- column -->
+        </div><!-- row -->
     </div> <!-- /container -->
 
   </body>
