@@ -15,9 +15,11 @@ if hash pandoc 2>/dev/null; then
     ###
     # readme
     pandoc -s -t latex -f markdown -o ./tex/readme.tex ../README.md
-    pandoc -s -S -t html5 -f markdown_github \
+    pandoc -s -t html5 -f markdown \
     --template=templates/main.tmpl.html --toc \
-    -o ./html/src/index.html ../README.md
+    --normalize \
+    --no-wrap \
+    -o ./html/index.html ../README.md
 
     ###
     # src dir
@@ -29,6 +31,7 @@ if hash pandoc 2>/dev/null; then
         pandoc -s -t latex -f markdown+lhs -o ./tex/$out.tex $f
         pandoc -s -t html5 -f markdown+lhs+yaml_metadata_block \
         --template=templates/src.tmpl.html \
+        --normalize \
         -o ./html/src/$out.html $f
     done
 else

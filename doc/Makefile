@@ -10,4 +10,5 @@ clean:
 	then \
 		rm -r pdf; \
 	fi;
+	rm html/index.html
 	rm -r html/src/*
