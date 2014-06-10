@@ -39,7 +39,8 @@ Status
 **10 June 2014**  The syntax and semantics for lists and types have been
 dramatically changed and simplified. Essentially, structs are quoted lists
 which takes advantage of a number of other features to make ADTs and
-continuations much simpler.
+continuations much simpler. I have also discarded the syntax for type
+annotations and will revisit it.
 
 **29 May 2014** A nascent evaluator is now committed. By no means is it
 complete, but I can successfully run computations in a rough subset of the
@@ -602,12 +603,12 @@ continuation (pronounced with a hard "k" sound).
 Having specified our language, we must write an interpreter function, which I
 will call `imperatively`:
 
-    (continuation   imperatively    (expr)
-
-      (`(Term   ,v) (v))
-      (`(Cont   ,k)
-        (? k
-          (`(Then   ,next)  (imperatively (k))))))
+    (continuation   imperatively (Then)   (expr)
+      (? expr
+        (`(Term   ,v) (v))
+        (`(Cont   ,k)
+          (? k
+            (`(Then   ,next)  (imperatively (k))))))
 
 A **lot** is going on under the hood here. Suffice it to say, the
 `continuation` operator consumes programs written in our language but how do we
