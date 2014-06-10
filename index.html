@@ -93,6 +93,7 @@
 <li><a href="#but-abstract-math-does-have-a-way-to-order-things"><span class="toc-section-number">5.5.3</span> But abstract math <em>does</em> have a way to order things</a></li>
 <li><a href="#example-creating-begin"><span class="toc-section-number">5.5.4</span> Example: creating <code>begin</code></a></li>
 </ul></li>
+<li><a href="#vectors"><span class="toc-section-number">5.6</span> Vectors</a></li>
 </ul></li>
 <li><a href="#how-to-build"><span class="toc-section-number">6</span> How to build</a></li>
 <li><a href="#questions-comments-hate-mail"><span class="toc-section-number">7</span> Questions / comments / hate mail</a></li>
@@ -447,6 +448,21 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
     (display x)))</code></pre>
 <p>Note the addition of a few new operators. Any function may be “lifted” into the continuation provided its return value is passed through <code>yield</code>, in the case of <code>square</code>. <code>add-1</code>, however, invokes the continuation internally. The advantage is, it may decide to escape into a different continuation temporarily.</p>
 <p>Since the continuations are delimited in extent, they are called <em>delimited continuations.</em></p>
+<h2 id="vectors"><span class="header-section-number">5.6</span> Vectors</h2>
+<p>Lastly, I will discuss vectors. Vectors are delimited by <code>[</code> and <code>]</code>. All the elements must have some unifying type.</p>
+<p>Vectors greatly simplify parallelism in psilo. If a vector of values of type <em>a</em> are passed to a function accepting a single <em>a</em> then the function is automatically mapped in parallel over the vector. Example:</p>
+<pre><code>(=  square  (x:&amp;)
+  (* x x))
+
+(= vector-example ()
+  (begin
+    (set v  [1 2 3])
+    (set v  (square v))
+    (v)))
+
+; yields [ 1 4 9 ]</code></pre>
+<p>Depending on the types and other annotations which I am still designing, this will allow either automatic threading or automatic GPGPU computation.</p>
+<p>This will definitely receive more elaboration in the future.</p>
 <h1 id="how-to-build"><span class="header-section-number">6</span> How to build</h1>
 <p>You need the Glasgow Haskell Compiler and a number of libraries; I suggest starting off with <a href="http://haskell.org/platform">the Haskell platform</a>.</p>
 <p>Clone the repository:</p>
