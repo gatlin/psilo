@@ -118,12 +118,12 @@ both operators and operands in expressions.
 
 You may create functions in two ways:
 
-1. Anonymously:
+Anonymously:
 
     (\  (argument1 argument2)
       (operator ...))
 
-2. Named:
+Named:
 
     (= foo  (argument1 argument2 ...)
       (operator ...))
