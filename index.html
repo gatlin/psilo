@@ -59,26 +59,40 @@
 <li><a href="#status"><span class="toc-section-number">3</span> Status</a></li>
 <li><a href="#synopsis"><span class="toc-section-number">4</span> Synopsis</a></li>
 <li><a href="#detail"><span class="toc-section-number">5</span> Detail</a><ul>
-<li><a href="#lists"><span class="toc-section-number">5.1</span> Lists</a></li>
-<li><a href="#evaluation-semantics"><span class="toc-section-number">5.2</span> Evaluation semantics</a></li>
-<li><a href="#linear-values-and-borrowing-its-simple"><span class="toc-section-number">5.3</span> Linear values and borrowing (it’s simple!)</a></li>
-<li><a href="#mutation"><span class="toc-section-number">5.4</span> Mutation</a></li>
-<li><a href="#functions-and-closures"><span class="toc-section-number">5.5</span> Functions and Closures</a><ul>
-<li><a href="#function-basics"><span class="toc-section-number">5.5.1</span> Function Basics</a></li>
-<li><a href="#type-signatures"><span class="toc-section-number">5.5.2</span> Type signatures</a></li>
-<li><a href="#notation"><span class="toc-section-number">5.5.3</span> <code>=</code> notation</a></li>
-<li><a href="#closures"><span class="toc-section-number">5.5.4</span> Closures</a></li>
-<li><a href="#macros"><span class="toc-section-number">5.5.5</span> Macros (?)</a></li>
+<li><a href="#basics-expressions-primitive-types-and-functions"><span class="toc-section-number">5.1</span> Basics: Expressions, primitive types, and functions</a><ul>
+<li><a href="#expressions"><span class="toc-section-number">5.1.1</span> Expressions</a></li>
+<li><a href="#primitive-types"><span class="toc-section-number">5.1.2</span> Primitive types</a></li>
+<li><a href="#functions"><span class="toc-section-number">5.1.3</span> Functions</a></li>
+<li><a href="#binding-values-to-symbols"><span class="toc-section-number">5.1.4</span> Binding values to symbols</a></li>
+<li><a href="#scope"><span class="toc-section-number">5.1.5</span> Scope</a></li>
+<li><a href="#functions-are-values"><span class="toc-section-number">5.1.6</span> Functions are values</a></li>
+<li><a href="#linear-types"><span class="toc-section-number">5.1.7</span> Linear types</a></li>
+<li><a href="#sharing"><span class="toc-section-number">5.1.8</span> Sharing</a></li>
+<li><a href="#let-syntax-and-mutation"><span class="toc-section-number">5.1.9</span> <code>let</code> syntax and mutation</a></li>
 </ul></li>
-<li><a href="#data-types"><span class="toc-section-number">5.6</span> Data types</a></li>
-<li><a href="#delimited-continuations-do-and-program-as-language"><span class="toc-section-number">5.7</span> Delimited continuations, <code>do</code>, and program-as-language</a><ul>
-<li><a href="#languages"><span class="toc-section-number">5.7.1</span> Languages</a></li>
-<li><a href="#a-little-derring-do"><span class="toc-section-number">5.7.2</span> A little derring-<code>do</code></a></li>
+<li><a href="#lists"><span class="toc-section-number">5.2</span> Lists</a><ul>
+<li><a href="#motivation"><span class="toc-section-number">5.2.1</span> Motivation</a></li>
+<li><a href="#lists-are-not-actually-real"><span class="toc-section-number">5.2.2</span> Lists are not actually real</a></li>
+<li><a href="#create-lists-by-quoting"><span class="toc-section-number">5.2.3</span> Create lists by quoting</a></li>
+<li><a href="#manipulating-lists"><span class="toc-section-number">5.2.4</span> Manipulating lists</a></li>
+<li><a href="#the-empty-list"><span class="toc-section-number">5.2.5</span> The empty list</a></li>
+<li><a href="#quoting-from-the-other-direction"><span class="toc-section-number">5.2.6</span> Quoting from the other direction</a></li>
+<li><a href="#quoting-references"><span class="toc-section-number">5.2.7</span> Quoting references</a></li>
 </ul></li>
-<li><a href="#arrays"><span class="toc-section-number">5.8</span> Arrays</a><ul>
-<li><a href="#gpus"><span class="toc-section-number">5.8.1</span> GPUs</a></li>
+<li><a href="#closures"><span class="toc-section-number">5.3</span> Closures</a><ul>
+<li><a href="#basics"><span class="toc-section-number">5.3.1</span> Basics</a></li>
+<li><a href="#subverting-linearity"><span class="toc-section-number">5.3.2</span> Subverting linearity</a></li>
 </ul></li>
-<li><a href="#quotes-and-other-list-miscellany"><span class="toc-section-number">5.9</span> Quotes and other list miscellany</a></li>
+<li><a href="#algebraic-data-types"><span class="toc-section-number">5.4</span> Algebraic Data Types</a><ul>
+<li><a href="#introduction"><span class="toc-section-number">5.4.1</span> Introduction</a></li>
+<li><a href="#operator-and-quasi-quoting"><span class="toc-section-number">5.4.2</span> <code>?</code> operator and quasi-quoting</a></li>
+</ul></li>
+<li><a href="#continuations"><span class="toc-section-number">5.5</span> Continuations</a><ul>
+<li><a href="#introduction-1"><span class="toc-section-number">5.5.1</span> Introduction</a></li>
+<li><a href="#what-are-continuations"><span class="toc-section-number">5.5.2</span> What are continuations?</a></li>
+<li><a href="#but-abstract-math-does-have-a-way-to-order-things"><span class="toc-section-number">5.5.3</span> But abstract math <em>does</em> have a way to order things</a></li>
+<li><a href="#example-creating-begin"><span class="toc-section-number">5.5.4</span> Example: creating <code>begin</code></a></li>
+</ul></li>
 </ul></li>
 <li><a href="#how-to-build"><span class="toc-section-number">6</span> How to build</a></li>
 <li><a href="#questions-comments-hate-mail"><span class="toc-section-number">7</span> Questions / comments / hate mail</a></li>
@@ -122,330 +136,317 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 <li><p>Advanced computer science ideas should be exposed, but not mandatory for writing high quality programs.</p></li>
 </ul>
 <h1 id="status"><span class="header-section-number">3</span> Status</h1>
+<p><strong>10 June 2014</strong> The syntax and semantics for lists and types have been dramatically changed and simplified. Essentially, structs are quoted lists which takes advantage of a number of other features to make ADTs and continuations much simpler.</p>
 <p><strong>29 May 2014</strong> A nascent evaluator is now committed. By no means is it complete, but I can successfully run computations in a rough subset of the language, so that’s something!</p>
 <p>The parser is not done but I am now on much better footing than I was before so I can continue with it as planned.</p>
 <p>Also the source code is now Literate Haskell as I want the psilo compiler to also be a human-language guide to the language’s structure and implementation.</p>
 <h1 id="synopsis"><span class="header-section-number">4</span> Synopsis</h1>
 <p>The grammar is a work in progress. At the moment, psilo code looks like this:</p>
-<pre><code>(let ((square (\ (&amp;:x) (* x x)))
-      (add1   (\ (&amp;:x) (+ 1 x))))
+<pre><code>(let ((square (\ (x:&amp;) (* x x)))
+      (add1   (\ (x:&amp;) (+ 1 x))))
   (add1 (square 5)))
 
 ; =&gt; 26
 
-(let ((square (\ (&amp;:x) (* x x)))
+(let ((square (\ (x:&amp;) (* x x)))
       (a      [ 1 2 3 4 5 ] ))
   (square a))
 
 ; =&gt; [ 1 4 9 16 25 ]
 
-(adt Stream (a)
-  (Nil)
-  (Next a (Stream a)))
+(: Stream (a)
+  (: Empty)
+  (: Cons a (Stream a)))
 
-(= stream-length (&amp;:strm)
-  (= stream-length-helper (&amp;:strm acc)
+(= stream-length (strm:&amp;)
+  (= stream-length-helper (strm:&amp; acc)
     (? strm
       (`(Nil)       0)
-      (`(Next h ,t) (stream-length-helper t (+ 1 acc)))))
+      (`(Cons h ,t) (stream-length-helper t (+ 1 acc)))))
   (stream-length-helper strm 0))</code></pre>
 <h1 id="detail"><span class="header-section-number">5</span> Detail</h1>
-<h2 id="lists"><span class="header-section-number">5.1</span> Lists</h2>
-<p>A list is an ordered, heterogenously typed multiset delimited by parentheses. They are akin to <em>tuples</em> in Python and other languages. Operationally a list is simply several adjacent values in memory.</p>
-<p>A list’s type is the product of its constituent types, and it is equivalent only to itself. Really, there is no list. It’s a syntactic mechanism for grouping values; lists do not exist at runtime.</p>
-<p>Strictly speaking, all psilo functions accept exactly one argument: a list of a particular type (hence why argument lists use parentheses: they are lists).</p>
-<h2 id="evaluation-semantics"><span class="header-section-number">5.2</span> Evaluation semantics</h2>
-<p>psilo is non-strict. In the basic case values are reduced only when and as much as necessary. The upside to this is that, unless otherwise specified, functions receive the expressions passed to them in the form of lists.</p>
-<p>Since functions receive the expressions passed to them, you can use the <code>?</code> operator to pattern match on the lists to grab pieces that you need. The utility of this will be made plain soon.</p>
-<p>It is possible to force evaluation, though the proper syntax has not been decided yet.</p>
-<h2 id="linear-values-and-borrowing-its-simple"><span class="header-section-number">5.3</span> Linear values and borrowing (it’s simple!)</h2>
-<p>By default, closures and non-function values are <em>linear</em>: they must be used exactly once in an expression.</p>
-<p>This makes writing certain kinds of programs very annoying; eg</p>
-<pre><code>(= square (x) (* x x))</code></pre>
-<p>is illegal on the face of it. However, since a function receiving a linear value is provably the only owner of that value, a function can declare a linear value to be <em>borrowed</em> for the duration of its scope like so:</p>
-<pre><code>(= square (&amp;:x) (* x x))</code></pre>
-<p>Borrowed values are immutable; you may think of them as equivalent to <code>const</code> references in C++.</p>
-<h2 id="mutation"><span class="header-section-number">5.4</span> Mutation</h2>
-<p>Linearity is adopted in psilo so that programmers may mutate values efficiently. In the core syntax of psilo:</p>
-<pre><code>(let ((x (foo))           ; 1
-      (y (bar)))          ; 2
-  (let ((x (baz x y)))    ; 3
-    (qux x)))             ; 4</code></pre>
-<p>The code above:</p>
-<ul>
-<li>Assigns values to the variables <code>x</code> and <code>y</code> (1 &amp; 2);</li>
-<li>Consumes their values, permitting no further use (3);</li>
-<li>Replaces the value of <code>x</code> with the result (3 again); and</li>
-<li>Consumes <code>x</code> again (4).</li>
-</ul>
-<p>Thus psilo supports mutation. As this is clumsy and difficult to think about, the standard library defines constructs which more closely resemble a traditional imperative language; we will get to that shortly.</p>
-<h2 id="functions-and-closures"><span class="header-section-number">5.5</span> Functions and Closures</h2>
-<h3 id="function-basics"><span class="header-section-number">5.5.1</span> Function Basics</h3>
-<p>Functions are created with the <code>\</code> operator:</p>
-<pre><code>(\ (x) (foo x))</code></pre>
-<p>Functions are referentially transparent: given some input value <em>x</em> a function must always return <em>y</em>. No exceptions. Much of the rest of the language is designed to get around this restriction without violating it. If one wishes to perform side effects, one is going to <em>earn</em> them.</p>
-<p>It is harmless to apply a non-function to an empty argument list, eg</p>
-<pre><code>(let ((x (5)))
+<h2 id="basics-expressions-primitive-types-and-functions"><span class="header-section-number">5.1</span> Basics: Expressions, primitive types, and functions</h2>
+<h3 id="expressions"><span class="header-section-number">5.1.1</span> Expressions</h3>
+<p>All psilo programs are contained within at least one <em>expression</em>. An expression is a list of values delimited by parentheses, eg:</p>
+<pre><code>(1)
+
+(some-function 2 3)</code></pre>
+<p>When a psilo program is evaluated, the first element of the list is taken to be an <em>operator</em> and the remaining elements are its <em>operands</em>. However, this default behavior may be changed; see the section on lists.</p>
+<h3 id="primitive-types"><span class="header-section-number">5.1.2</span> Primitive types</h3>
+<p>psilo has pretty standard primitive data types: integers, floating point numbers, long integers, short integers ascii characters, unicode characters, and of course strings (though we’ll get back to that).</p>
+<p>Another type found mostly in the lisp family of languages is the <em>symbol</em>. A symbol is a string of alphanumeric and selected punctuation characters. Symbols evaluate to themselves and themselves alone unless they are <em>bound</em> to some other value (see the section on functions).</p>
+<p>Values of these types may be used as operands in psilo expressions.</p>
+<h3 id="functions"><span class="header-section-number">5.1.3</span> Functions</h3>
+<p>Functions transform lists of psilo values into some result value. They may be both operators and operands in expressions.</p>
+<p>You may create functions in two ways:</p>
+<ol type="1">
+<li><p>Anonymously:</p>
+<p>(  (argument1 argument2) (operator …))</p></li>
+<li><p>Named:</p>
+<p>(= foo (argument1 argument2 …) (operator …))</p></li>
+</ol>
+<p>Really, the second form is a syntactical convenience for the first one, but both have their uses. We will start by discussing anonymous functions to motivate psilo’s design decisions.</p>
+<h3 id="binding-values-to-symbols"><span class="header-section-number">5.1.4</span> Binding values to symbols</h3>
+<p>In the definition of a function you provide a list of symbols to bind to the operand values. These symbols now refer to their bound values for the duration of the function’s <em>scope</em>, defined by its enclosing parentheses.</p>
+<p>For example,</p>
+<pre><code>(\ (x) (+ 1 x))</code></pre>
+<p>This takes a value (probably a numeric one) and binds it to the symbol <code>x</code>. Then, <code>x</code> is used to compose a new expression - in this case, adding <code>1</code> to the value bound to <code>x</code>. The resulting incremented value is the <em>return value</em> of the function.</p>
+<h3 id="scope"><span class="header-section-number">5.1.5</span> Scope</h3>
+<p>psilo is <em>lexically scoped</em>. This means the following function is completely disambiguous:</p>
+<pre><code>((\ (x y)
+  (y x))
+
+ (\ (x)
+   (foo x)))</code></pre>
+<p>The function at the bottom binds some value to <code>x</code> in order to generate a result value that will then be bound to <code>x</code> in the top function. <code>x</code> means two different things here. When a function is applied all the symbols in its scope become unbound, and if they were bound to values in the outer scope they revert accordingly.</p>
+<h3 id="functions-are-values"><span class="header-section-number">5.1.6</span> Functions are values</h3>
+<p>Functions may also be used as the operands of expressions. For example:</p>
+<pre><code>(\  (f  x)
+  (f (foo x)))</code></pre>
+<p><code>f</code> is used as an operator in the body of the function, which means <code>f</code> must be a function. But <code>f</code> was passed in as an <em>operand</em> argument. This demonstrates the distinction between operators and operands: a function may be either one in context.</p>
+<p>You don’t have to use bound functions as operators, though: it is perfectly legal to write a function literal as an operator, like so:</p>
+<pre><code>(   (\ (f x)
+      (f (foo x)))
+  (\ (y)
+    (bar y))
+
+  2)</code></pre>
+<p>This is an unreadable mess and <strong>I do not recommend writing code in this style</strong> but nonetheless it demonstrates the full implications of functions being values and bound symbols.</p>
+<h3 id="linear-types"><span class="header-section-number">5.1.7</span> Linear types</h3>
+<p>psilo has a quirk that affords the programmer both incredible power and incredible frustration: linearly typed values.</p>
+<p>Unless otherwise demarcated, values in psilo are <em>linear</em>. This means they must be used exactly once in an expression. Examples will make this clearer:</p>
+<pre><code>; legal
+(\ (x) (+ 1 x))
+
+; illegal
+(\ (x) (* x x))
+
+; legal
+(\ (x)
+  (\ (y)
+    (foo x y)))
+
+; illegal
+(\ (x)
+  ((\ (y)
+     (foo x y))
+   x))</code></pre>
+<p>Thus, when a function consumes a linear value, that value is no longer available outside the function. As we will see later, though, there are some very clever tricks to get around this and as a result psilo code is much easier to verify and requires no manual memory management <em>or</em> run time garbage collection.</p>
+<p>The exception to this rule is that functions, <strong>unless they are closures</strong>, may be referenced more than once in their enclosing scope. See the section on closures for more information.</p>
+<h3 id="sharing"><span class="header-section-number">5.1.8</span> Sharing</h3>
+<p>The inability to write a simple squaring function would be a devastating oversight in the language’s design; fortunately, there is a way to get around this.</p>
+<p>If a symbol has the suffix <code>:&amp;</code> (eg, <code>x:&amp;</code>), then it is a <em>reference</em>. For the duration of the enclosing scope the symbol may be referenced as much as desired, but it may <strong>not</strong> be mutated.</p>
+<p>You can think of the <code>:&amp;</code> as a request to borrow an item: a good neighbor might borrow a tool, but great care must be taken not to damage or radically alter the tool lest it cause confusion to its owner.</p>
+<p>When the scope is discarded, all references are destroyed.</p>
+<h3 id="let-syntax-and-mutation"><span class="header-section-number">5.1.9</span> <code>let</code> syntax and mutation</h3>
+<p>At this point it may not be clear how one can mutate linear values. This is a great segue into a very commonly used syntactic form: <code>let</code> bindings. Examples:</p>
+<pre><code>(let    ((x 5)
+         (y 6))
+  (* x y))
+
+(\  (id:&amp;)
+  (let ((name:&amp;  (get-name id))         ; name is shared
+        (balance (get-balance id)))     ; balance is linear
+    (close-account? name balance id)))</code></pre>
+<p>To mutate a value, it’s this simple:</p>
+<pre><code>(let ((x (initial-value)))
+  (let ((x (foo x)))
+    (bar x)))</code></pre>
+<p>Shadowing a linear value mutates it. This is psilo’s core mutation construct, though there are others built on top of it as you will see.</p>
+<h2 id="lists"><span class="header-section-number">5.2</span> Lists</h2>
+<h3 id="motivation"><span class="header-section-number">5.2.1</span> Motivation</h3>
+<p>Strictly speaking, all functions in psilo are <em>unary</em>: that is, they accept one argument value. This affords a number of advantages you will see later.</p>
+<p>However, for flexibility, that one argument is actually a compound value called a <em>list</em>. A list may contain any psilo expression. Its type is the <em>product</em> of the types of its members.</p>
+<p>So the following function’s argument list has a type similar to <code>(Integer Integer)</code>:</p>
+<pre><code>(\ (x   y)
+  (* x y))</code></pre>
+<p>Lists are psilo’s core compound data type, akin to structs or product types in other languages.</p>
+<h3 id="lists-are-not-actually-real"><span class="header-section-number">5.2.2</span> Lists are not actually real</h3>
+<p>Under the hood a list is really just a way of grouping related values on the computer’s function call stack (real or simulated). However this makes lists very powerful: they only exist at compile time and <strong>thus do not incur any sort of run time penalty.</strong></p>
+<h3 id="create-lists-by-quoting"><span class="header-section-number">5.2.3</span> Create lists by quoting</h3>
+<p>Every function has an anonymous list containing its arguments, and that list is broke up into its constituent parts so they may be evaluated and reduced to some return value.</p>
+<p>But what if I want to pass a list as an argument without it being a nested expression? I can <em>quote</em> it.</p>
+<p>Quoting a list prevents it from being evaluated as a list. Example:</p>
+<pre><code>(foo 1 (* 2 3))  ; (1)
+
+(foo 1 &#39;(* 2 3)) ; (2)</code></pre>
+<p>In (1), the number <code>6</code> is passed as the second argument to <code>foo</code>. In (2), the list <code>(* 2 3)</code> is passed as the second argument.</p>
+<p>We get the value of a quoted list by evaluating it, eg:</p>
+<pre><code>(\  (&#39;(v1 v2))
+  (foo (v1) (v2)))
+
+(\  (&#39;x)
   (foo (x)))</code></pre>
-<p>In the example I</p>
-<ul>
-<li>evaluate the constant <code>5</code>; and</li>
-<li>evaluate the non-function variable <code>x</code></li>
-</ul>
-<p>with no problems.</p>
-<h3 id="type-signatures"><span class="header-section-number">5.5.2</span> Type signatures</h3>
-<p>So far we have not used any explicit type signatures because they can almost always be inferred. However, if the need arises, one may type functions like so:</p>
-<pre><code>(\ ({x | Integer}
-    {y | String }) -&gt; Foo
-  (make-foo x y))</code></pre>
-<p>Braces (<code>{</code> and <code>}</code>) delimit argument types. From the <code>|</code> until the closing brace, you may write your type signature. psilo, like other languages with expressive type systems, allows type variables as well:</p>
-<pre><code>(\ ({x | a}) -&gt; (Bar a)
-  (bar-something x))</code></pre>
-<p>Also note the <code>-&gt;</code> symbol to indicate the function’s return type.</p>
-<p>To type variables in <code>let</code> bindings:</p>
-<pre><code>(let (({x | Integer} 5)
-      ({y | String } &quot;huh&quot;))
-  (make-foo x y))</code></pre>
-<h3 id="notation"><span class="header-section-number">5.5.3</span> <code>=</code> notation</h3>
-<p>Strictly speaking, all psilo programs are a single <code>let</code> expression being evaluated:</p>
-<pre><code>(let ((square (\ (&amp;:x) (\* x x)))
-      (add-1  (\ (&amp;:x) (+ 1 x))))
-  (square
-    (add-1 5)))</code></pre>
-<p>This, however, is less than ideal syntactically. The following is equivalent:</p>
-<pre><code>(= square (&amp;:x) (\* x x))
-(= add-1  (&amp;:x) (+ 1 x))
+<h3 id="manipulating-lists"><span class="header-section-number">5.2.4</span> Manipulating lists</h3>
+<p>If we halt evaluation we must want to do something with the contents of the list, no? There are two core functions which can manipulate lists: <code>head</code> and <code>tail</code>.</p>
+<p><code>head</code> returns the item at the beginning of the list, and <code>tail</code> returns the remaining elements.</p>
+<p>A simple use case might be passing in a slate of three functions to run on an initial argument value.</p>
+<h3 id="the-empty-list"><span class="header-section-number">5.2.5</span> The empty list</h3>
+<p><code>()</code> is called the <em>empty list</em>. It is the last element of every list and is equivalent only to itself. Its sole purpose is to denote the end of a list so that recursive functions may be written on lists without fear of memory issues.</p>
+<h3 id="quoting-from-the-other-direction"><span class="header-section-number">5.2.6</span> Quoting from the other direction</h3>
+<p>The other way to quote a list is in the callee’s argument list. To motivate this syntax, I will write a short-circuiting <code>and</code> function:</p>
+<pre><code>(=  and/s (left   &#39;right)
+  (if (left)    ; evaluate the left side
+      (and  left (right))
+      (True)))</code></pre>
+<p>We have not spoken about Boolean types yet, but the example should make sense regardless: there is no need to evaluate the right hand side if the left hand side is true.</p>
+<p>Our function may be used like so:</p>
+<pre><code>(and/s  (and/s x y)    (and/s y z))</code></pre>
+<p>This is much cleaner looking for the caller.</p>
+<h3 id="quoting-references"><span class="header-section-number">5.2.7</span> Quoting references</h3>
+<p>The quote syntax and the reference syntax each go on different sides of argument symbols for a reason. This is perfectly valid:</p>
+<pre><code>(\ (&#39;x:&amp;)
+  (foo x))</code></pre>
+<h2 id="closures"><span class="header-section-number">5.3</span> Closures</h2>
+<h3 id="basics"><span class="header-section-number">5.3.1</span> Basics</h3>
+<p>Closures are functions which <em>close over</em> their surrounding environment. An example:</p>
+<pre><code>(=  make-person (name:&amp;     age:&amp;)
+  (\ ()
+    (++ &quot;Hello, my name is &quot;
+        name
+        &quot; and I am &quot;
+        (show age)
+        &quot; years old.&quot;)))</code></pre>
+<p>The inner anonymous function does not bind any symbols, so <code>name</code> and <code>age</code> are <em>free</em> in the body of the inner function. However, the function is not immediately evaluated: it is passed back as a value. In order for this to work, it closes over the symbols <code>name</code> and <code>age</code>, which are immutable anyway.</p>
+<p>If a function closes over a linear value like so, a deep copy is made:</p>
+<pre><code>(= make-thing   (x)
+  (\ ()
+    (foo x)))</code></pre>
+<p><code>make-thing</code> is not a closure and may be called as many times as necessary. The resulting closure values, however, have copies of the relevant slices of their environment.</p>
+<h3 id="subverting-linearity"><span class="header-section-number">5.3.2</span> Subverting linearity</h3>
+<p>The thing about closures, though, is that they have memory allocated to them. For a variety of reasons this means they must be linear, and linear values must be evaluated exactly once.</p>
+<p>So a closure can only be used once. This sounds incredibly stupid, sure, but it is the price we pay.</p>
+<p>However, a little cleverness can get around that problem:</p>
+<pre><code>(=  make-person (name     age)
+  (\    (what)
+    (what   name    age)))
 
-(= main ()
-  (square
-    (add-1 5)))</code></pre>
-<p>(Actually, they’re not <em>quite</em> equivalent: symbols bound via <code>=</code> form a recursive <code>let</code>.)</p>
-<h3 id="closures"><span class="header-section-number">5.5.4</span> Closures</h3>
-<p>If a function returns an anonymous function, and that anonymous function consumes any values from its environment, it is a closure. A closure contains its own copy of its lexical environment; in fact, this is psilo’s only native copying mechanism at the moment.</p>
-<p>Since closures are linear, if they are executed they cease to exist. However, if the return value of a closure is another such closure, it may be reassigned to the same symbol. Thus psilo provides a means of encapsulated mutation.</p>
-<p>Note that the author is aware that this is a bit clumsy and not very friendly to the programmer. Be patient; a web is being woven.</p>
-<p>Example:</p>
-<pre><code>; a simple model of a person
-(= make-person (name-arg age-arg)
-  (let ((name name-arg)
-        (age  age-arg))
-    (\ (msg)
-      (? msg
-        (&#39;birthday    (let ((age (+ 1 age)))
-                        (make-person name age)))
-        (&#39;say-hello   (let ((_ (display (++ &quot;Hello, my name is &quot;
-                                            &amp;:name
-                                            &quot; and I am &quot;
-                                            (show &amp;:age)
-                                            &quot; years old.&quot;))))
-                        (make-person name age)))))))
+(=  use-person  ()
+  (let  ((p (make-person &quot;gatlin&quot; 25))
+         (birthday  (\  (name     age)
+                      (make-person name (+ 1 age)))))
+    (let ((p    (p birthday)))
+      (foo p))))</code></pre>
+<p><code>p</code> is a closure, so it, <code>name</code>, and <code>age</code> are all linear. However in this example I create a value representing a person and pass it a function which calls <code>make-person</code> with modified values. This resulting closure is used to shadow <code>p</code>.</p>
+<p>Shadowing a linear value mutates the value. Thus we have safely mutated encapsulated data.</p>
+<p>This is a bit like the original notion of an object described by Alan Kay: the object listens for messages and dispatches based on the message. Because of the linearity restrictions, the mutated value are encapsulated inside the closure; we can only actually retrieve them when we are ready to destroy the closure.</p>
+<h2 id="algebraic-data-types"><span class="header-section-number">5.4</span> Algebraic Data Types</h2>
+<h3 id="introduction"><span class="header-section-number">5.4.1</span> Introduction</h3>
+<p>An algebraic data type is a <em>sum</em> of <em>product</em> types. More plainly, it is a type which can be one of several different list types. They are essentially a generalization of the technique shown in the “Subverting linearity” section.</p>
+<p>At the moment, the syntax for specifying an ADT is:</p>
+<pre><code>(: MyADT    (a1 aN)
+  (: Constructor1   (v1 vI))
+  (: ConstructorK   (w1 wJ)))</code></pre>
+<p>The list of symbols after <code>MyADT</code> is the list of type parameters: these have a constraining effect if present in any of the <em>constructors</em>. Constructors are are functions; the above pseudo-code would produce more or less the equivalent code:</p>
+<pre><code>(= Constructor1 (v1 vI)
+  (\    (x1 ... _) (x1 v1 vI)))
 
-(= person-example ()
-  (let ((p (make-person &quot;gatlin&quot; 24)))
-    (let ((p (p &#39;birthday)))
-      (p &#39;say-hello&#39;))))
+(= ConstructorK (w1 wJ)
+  (\    (_ ... xK) (xK w1 wJ)))
 
-; output: &quot;Hello, my name is gatlin and I am 25 years old.&quot;</code></pre>
-<p>In the above code, <code>person-example</code> creates a person, mutates that person, and then performs an effectful computation with it (him?).</p>
-<h3 id="macros"><span class="header-section-number">5.5.5</span> Macros (?)</h3>
-<p>Metaprogramming is awesome and you should do it. However, the author is not satisfied with the various warts on existing macro / syntax extension systems.</p>
-<p>As mentioned elsewhere, in psilo expressions are not evaluated until necessary. Using the backquote operator (<code>\``) you can quote expressions and use the unquote (</code>,`) operator to unquote values of interest. Thus, functions are a kind of first-class macro (or <em>fexpr</em> in some parlances).</p>
-<p>Just for kicks, let’s add lisp-style <code>if</code> statements to psilo:</p>
-<pre><code>  (= if (&amp;:cond &amp;:then &amp;:else)
-    (? (cond)
-      (`(True)    (then))
-      (`(False)   (else))))
+(: MyADT (a1 aN) (U Constructor1 ... ConstructorK))</code></pre>
+<p>where <code>U</code> is an operator which computes some minimally general union of the types of its arguments.</p>
+<p>As an example, let’s create a Boolean data type and some convenient utilities for it:</p>
+<pre><code>(: Boolean  ()
+  (:    True)
+  (:    False))
 
-  (= if-example ()
-    (if (&lt; 2 4)
-        &quot;2 is less than 4!&quot;
-        &quot;2 is NOT less than 4! Everything is wrong RUN&quot;))</code></pre>
-<p>Note that the first argument to <code>?</code> has parentheses, because we want to evaluate it. Since you can evaluate non functions all day long with no problems, we defensively evaluate <code>then</code> and <code>else</code> in their respective cases.</p>
-<p>Wasn’t that simple? We blur the lines between code and data even further. The author humbly accepts alternate syntax suggestions.</p>
-<h2 id="data-types"><span class="header-section-number">5.6</span> Data types</h2>
-<p>The above pattern is so useful that psilo provides its logical successor: the algebraic data type. Examples are the most illuminating definition:</p>
-<pre><code>(adt Person ()
-  (Person String Integer))
+(= if   (condition &#39;then &#39;else)
+  (condition    (\  ()  (then))
+                (\  ()  (else))))
 
-(= birthday (person)
-  (? (person)
-    (`(Person ,name ,age)     (Person name (+ 1 age)))))
+; example usage
+(let ((x (get-some-value)))
+  (if (=? x 2)      ; this returns True or False
+      (foo x)
+      (error &quot;x is not 2&quot;)))</code></pre>
+<p>The <code>if</code> expression we just created does what you would expect: it defers evaluation of either branch until it knows which to take.</p>
+<h3 id="operator-and-quasi-quoting"><span class="header-section-number">5.4.2</span> <code>?</code> operator and quasi-quoting</h3>
+<p><em>Note: while all of psilo is a work in progress, quasi-quoting is possibly the least developed of my ideas. As is I could make it work but I admit I don’t have a rock solid theoretical foundation quite yet. Just accept it for now.</em></p>
+<p>The <code>?</code> operator provides some syntactic convenience for writing case-wise evaluation functions of algebraic data types. The above code could be rewritten thusly:</p>
+<pre><code>(= if   (condition &#39;then &#39;else)
+  (? condition
+    (&#39;(True)    (then))
+    (&#39;(False)   (else))))</code></pre>
+<p>Or for another example:</p>
+<pre><code>(: Stream   (a)
+  (:    End)
+  (:    Cons a (Stream a)))
 
-(= say-hello (&amp;:person)
-  (? (person)
-    (`(Person ,name ,age)
-      (let ((_ (display (++ &quot;Hello my name is &quot;
-                             name
-                             &quot; and I am &quot; (show age) &quot; years old.&quot;))))
-        (Person name age)))))
-
-(= person-example ()
-  (let ((p (Person &quot;gatlin&quot; 24)))
-    (let ((p (birthday p)))
-      (say-hello p))))</code></pre>
-<p>Of course, ADTs may have multiple value constructors, eg:</p>
-<pre><code>(adt Person ()
-  (Human String Integer)         ; name age
-  (Corp  String Integer String)) ; name age tax-id
-
-(= birthday (person)
-  (? (person)
-    (`(Human ,name ,age)  (Human name (+ 1 age)))
-    (`(Corp  ,name ,age ,tax-id) (Corp name (+ 1 age) tax-id))))</code></pre>
-<p>ADTs may also accept type parameters to do useful things:</p>
-<pre><code>(adt Stream (a)
-  (Nil)
-  (Next a (Stream a)))
-
-(= stream-length-helper (&amp;:strm acc)
-  (? (strm)
-    (`(Nil)       0)
-    (`(Next h ,t) (stream-length-helper t (+ 1 acc)))))
-
-(= stream-length (&amp;:strm)
-  (stream-length-helper strm 0))
-
-(= stream-example ()
-  (let ((s (Next 1 (Next 2 (Next 3 (Nil))))))
-    (let ((len (stream-length s)))
-      (++ &quot;The stream has &quot;
-          (show len)
-          &quot; elements.&quot;))))</code></pre>
-<h2 id="delimited-continuations-do-and-program-as-language"><span class="header-section-number">5.7</span> Delimited continuations, <code>do</code>, and program-as-language</h2>
-<p>This is potentially the weirdest part of psilo. The diagonal code above can get pretty annoying. It would be much nicer if there were <code>begin</code> blocks like in other lisps.</p>
-<p>Semantically, psilo does not have state or execution ordering beyond mathematical function composition (eg, <code>f(g(x))</code> first performs <code>g</code> then <code>f</code>).</p>
-<p>However, this does not mean we cannot build it ourselves. <strong>You do not have to understand all of the following code to actually use psilo.</strong></p>
-<pre><code>;;; Provided in standard library by yours truly
-(continuation   imperatively   ()
-  (=    term    (v)     (v))
-  (=    then    ()
-    (call/cc (k)    (k))))
-
-(= begin (exprs) (imperatively (do exprs)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; YOU WOULD WRITE THIS PART
-
-(= square-imperative (&amp;:x)
-  (return (* x x)))
-
-(= imperative-example ()
+(= stream-length    (strm:&amp;)
+  (? strm
+    (`(End)         0)
+    (`(Cons h ,t)   (+ 1 (stream-length t)))))</code></pre>
+<p>The <code>\`` is a *quasi-quote*. Similar to a normal quote, it allows values to be extracted from a list while the rest are discarded. So if we call</code>’(ConstructorN v1 … vM)`, we are essentially delaying the creation of its closure until later. Thus we can inspect the expression.</p>
+<h2 id="continuations"><span class="header-section-number">5.5</span> Continuations</h2>
+<h3 id="introduction-1"><span class="header-section-number">5.5.1</span> Introduction</h3>
+<p>We still have a problem: there is no way to write imperative programs. The following would be nice to have sometimes, though:</p>
+<pre><code>(= f1   ()
   (begin
-    (x := 5)
-    (x := (do (square-imperative x)))
-    (display (show x))))</code></pre>
-<p>Yes, the one exception to psilo’s prefix notation is the <code>:=</code> operator. In fact this is not an exception: any operator may be moved one place to the right one position in an expression.</p>
-<p>Thus, using only native psilo code, we have created imperative programming. But how?</p>
-<h3 id="languages"><span class="header-section-number">5.7.1</span> Languages</h3>
-<p>Follow me for a moment. Languages are often specified in Backus-Naur Form (BNF), eg:</p>
-<pre><code>arithmetic ::= &lt;number&gt;
-             | + &lt;arithmetic&gt; &lt;arithmetic&gt;
-             | * &lt;arithmetic&gt; &lt;arithmetic&gt;
-             | - &lt;arithmetic&gt;
-             | ( &lt;arithmetic&gt; )
-... etc</code></pre>
-<p>In psilo, you can create a language similarly with ADTs:</p>
-<pre><code>(adt Arithmetic ()
-  (K    Integer)
-  (Add  Arithmetic Arithmetic)
-  (Mult Arithmetic Arithmetic)
-  (Neg  Arithmetic))
+    (foo x)
+    (bar y)
+    ...))</code></pre>
+<p>For that matter, it would be cool also if you could supply your own semantics; perhaps, given some <code>Optional</code> type, you want to be able to write code that immediately exits on first failure:</p>
+<pre><code>(= f2   ()
+  (optionally (do
+    (set v1 (potentially-works-1))
+    (set v2 (potentially-works-2))
+    (foo v1 v2))))</code></pre>
+<p>If either <code>v1</code> or <code>v2</code> have a null value, then the computation is aborted and returns a null value; otherwise, the computation proceeds normally.</p>
+<p>Between the statelessness, the linear values, and the strong type system, this sounds about impossible. If there is no state, how can you order commands? The answer lies in continuations.</p>
+<h3 id="what-are-continuations"><span class="header-section-number">5.5.2</span> What are continuations?</h3>
+<p>So in traditional continuation-based programming, the continuation is some (explicit or implicit) argument at the end of a function list, to which the result value is passed:</p>
+<pre><code>(=  f1  (a1 a2 k)
+  (k (foo a1 a2)))</code></pre>
+<p>Think of continuation-based programming as having your “return” function passed to you as a parameter:</p>
+<pre><code>(= f1   (a1 a2 return)
+  (return (foo a1 a2)))</code></pre>
+<p>This might elucidate its purpose.</p>
+<p>In many languages, like Scheme, <code>k</code> is not present in the argument list but it may be captured like so:</p>
+<pre><code>(define (f1 a1 a2)
+  (call/cc (lambda (k)
+    (k (foo a1 a2)))))</code></pre>
+<p><code>call/cc</code> stands for “call with current continuation.”</p>
+<p>Counterintuitively, despite psilo’s emphasis on continuations they are not hidden-but-present in all functions. Instead, you must define and use them.</p>
+<h3 id="but-abstract-math-does-have-a-way-to-order-things"><span class="header-section-number">5.5.3</span> But abstract math <em>does</em> have a way to order things</h3>
+<p>In algebra, the following expression does in fact have an order of evaluation:</p>
+<pre><code>f(g(x))</code></pre>
+<p><code>g</code> must be evaluated first, and then <code>f</code> is evaluated with its result. As long as the output of <code>g</code> is compatible with the input of <code>f</code> then we have sequential execution.</p>
+<p>If you can ensure that your functions meet certain type restrictions, then you can create continuations and compose arbitrary functions together, which will be executed however you like.</p>
+<h3 id="example-creating-begin"><span class="header-section-number">5.5.4</span> Example: creating <code>begin</code></h3>
+<p>A continuation is like defining an embedded language, and this language must specify commands. As a motivating example, I will create a continuation with one simple command: <code>Then</code>.</p>
+<pre><code>(:  Then    (k)
+  (:    Then k))</code></pre>
+<p>The language is a simple algebraic data type, and it has one production rule: sentences are composed of nested <code>Then</code>s. The <code>k</code> is a placeholder for the continuation (pronounced with a hard “k” sound).</p>
+<p>Having specified our language, we must write an interpreter function, which I will call <code>imperatively</code>:</p>
+<pre><code>(continuation   imperatively    (expr)
 
-(= calc ({arith | Arithmetic}) -&gt; Integer
-  (? arith
-    (`(K ,n)    (n))
-    (`(Add ,l ,r)  (+ (calc l)
-                      (calc r)))
-    (`(Mult ,l ,r) (* (calc l)
-                      (calc r)))
-    (`(Neg  ,n)    (* n -1))))
-
-(= calc-ex () -&gt; Integer
-  (Add (K 1)
-       (Mult (K 2)
-             (K 3))))</code></pre>
-<p>What if you wanted an imperative control language, say, for a robotic camera?</p>
-<pre><code>; assume types for Degree, ImageData, etc
-(adt Rotation ()
-  (Up Degree) (Down Degree) (Left Degree) (Right Degree))
-
-(continuation with-camera    ({&amp;:camera | Camera})
-
-  (=    term    (v) (v))    ; a terminal value. mandatory.
-
-  (=    shoot       ()
-    (let ((d    (tell-camera-to-shoot camera)))
-      (call/cc (k) (k d))))
-
-  (=    rotate      (rot)
-    (let ((_ (tell-camera-rotate    camera rot)))
-      (call/cc (k) (k))))
-
-  (=    set-zoom    (amt)
-    (let ((_ (set-camera-zoom   camera amt)))
-      (call/cc (k) (k)))))
-
-(= camera-ex-1 ()
-  (with-camera (new-camera) (do
-    (set-zoom   14.0)
-    (rotate     (Up 23))
-    (rotate     (Left 42))
-    (image  := (shoot))
-    (return image))))
-
-(= camera-ex-2 ()
-  (begin
-    (which-camera   := (ask-user-for-camera))
-    (if (eq? which-camera   &quot;&quot;)
-        (display    &quot;Invalid choice.&quot;)
-        (begin
-          ((with-camera (get-camera which-camera)
-            (do (set-zoom 4.0)
-                (rotate (Right 23))
-                (image  := (shoot))
-                (return image))))))))</code></pre>
-<p>The psilo philosophy is that all programs are parsers for some input language, be it another programming language, a language of clicks, a language of sensor values, etc. Thus, the primitives of psilo have been carefully chosen to promote this style of development.</p>
-<p>Typed, delimited continuations may be thought of as parsers for context-free languages.</p>
-<p>S-expressions promote viewing a program as definitions and parsers of syntax trees. Types allow you to restrict your parsers to particular languages. And linearity allows you to do this efficiently.</p>
-<h3 id="a-little-derring-do"><span class="header-section-number">5.7.2</span> A little derring-<code>do</code></h3>
-<p><code>do</code> appears to be magical, but it is quite simple: it takes a list of values of the equivalent type and composes a delimited continuation out of them. What psilo calls continuations is called a monad in other languages; however, the author finds their usage is more readily obvious if they are called continuations.</p>
-<p>The result of <code>do</code> is an unevaluated, composite expression. In the camera example, we wrote a <code>with-camera</code> function which accepted a <code>CameraInst</code> value, peeled it apart, and performed side-effects.</p>
-<p>At no point have we violated referential transparency. Rather, we have built an impure, effects-driven language out of a pure one which gives us the ability to reason about it and ensure its safety.</p>
-<h2 id="arrays"><span class="header-section-number">5.8</span> Arrays</h2>
-<p>Parallelism in psilo is dead simple thanks to a fundamental type called the array. Arrays are ordered, homogenously-typed, fixed-length multi-sets. They may be created like so:</p>
-<pre><code>(= array-ex ()
-  (begin
-    (arr := [1 2 3])
-    (do-something-with arr)))</code></pre>
-<p>An interesting property of arrays is, if given to a function expecting a scalar (ie, non-array) value, the operation is intelligently mapped in parallel, vis:</p>
-<pre><code>(= square ({&amp;:x | n}) -&gt; n
+  (`(Term   ,v) (v))
+  (`(Cont   ,k)
+    (? k
+      (`(Then   ,next)  (imperatively (k))))))</code></pre>
+<p>A <strong>lot</strong> is going on under the hood here. Suffice it to say, the <code>continuation</code> operator consumes programs written in our language but how do we write them?</p>
+<p>Continuations are constructed using <code>do</code>. <code>do</code> takes lists of compatibly-typed expressions and constructs the continuation. To evaluate your embedded program, you call the continuation function you wrote.</p>
+<p>So the definition of <code>begin</code> is actually quite simple:</p>
+<pre><code>(= begin    (exprs)
+  (imperatively (do exprs)))</code></pre>
+<p>And to use it:</p>
+<pre><code>(=  square  (x:&amp;)
   (* x x))
 
-(= square-array ({arr | [n]}) -&gt; [n]
-  (square arr))
+(=  add-1   (x)
+  (call/cc (k)
+    (k (+ 1 x))))
 
-(square-array [1 2 3]) ; =&gt; [1 4 9]</code></pre>
-<p>Note how arrays are specified in type signatures. By explicitly typing the argument as an array, you can prevent the parallel mapping behavior.</p>
-<p>What about something more interesting?</p>
-<pre><code>(= array-ex-2 ()
-  (+ [1 2 3]
-     [4 5 6 7]))
-
-; =&gt; [5 6 7 8 6 7 8 9 7 8 9 10]</code></pre>
-<p>The resulting array is the cartesian product of the inputs reduced according to the scalar-wise semantics of the function.</p>
-<h3 id="gpus"><span class="header-section-number">5.8.1</span> GPUs</h3>
-<p>At some point in the future, I would like for this to do the obvious correct thing:</p>
-<pre><code>(scalar-function &#39;gpu [1 2 3])
-; =&gt; Perform the parallel operation on the GPU, if applicable.</code></pre>
-<h2 id="quotes-and-other-list-miscellany"><span class="header-section-number">5.9</span> Quotes and other list miscellany</h2>
-<p>Lisp means <strong>Lis</strong>t <strong>P</strong>rocessor. While psilo has an unconventional take on what that means, traditional quote operators still apply.</p>
-<p>You can quote symbols:</p>
-<pre><code>(foo &#39;x)</code></pre>
-<p>You can quote lists to indicate the expression head is not intended to be a function:</p>
-<pre><code>&#39;(1 2 3)</code></pre>
-<p>And, as you’ve seen, you can unquote quoted lists using special syntax:</p>
-<pre><code>`(a ,b c)</code></pre>
-<p>The quasiquoted list is used by the <code>?</code> operator to extract pattern matches and control evaluation. I have not yet worked out all the implications of this construct; more to come.</p>
+(=  example ()
+  (begin
+    (set x 5)
+    (set x (add-1 x))
+    (set x (yield
+             (square x)))
+    (display x)))</code></pre>
+<p>Note the addition of a few new operators. Any function may be “lifted” into the continuation provided its return value is passed through <code>yield</code>, in the case of <code>square</code>. <code>add-1</code>, however, invokes the continuation internally. The advantage is, it may decide to escape into a different continuation temporarily.</p>
+<p>Since the continuations are delimited in extent, they are called <em>delimited continuations.</em></p>
 <h1 id="how-to-build"><span class="header-section-number">6</span> How to build</h1>
 <p>You need the Glasgow Haskell Compiler and a number of libraries; I suggest starting off with <a href="http://haskell.org/platform">the Haskell platform</a>.</p>
 <p>Clone the repository:</p>
