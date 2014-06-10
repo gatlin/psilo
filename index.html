@@ -179,12 +179,12 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 <h3 id="functions"><span class="header-section-number">5.1.3</span> Functions</h3>
 <p>Functions transform lists of psilo values into some result value. They may be both operators and operands in expressions.</p>
 <p>You may create functions in two ways:</p>
-<ol type="1">
-<li><p>Anonymously:</p>
-<p>(  (argument1 argument2) (operator …))</p></li>
-<li><p>Named:</p>
-<p>(= foo (argument1 argument2 …) (operator …))</p></li>
-</ol>
+<p>Anonymously:</p>
+<pre><code>(\  (argument1 argument2)
+  (operator ...))</code></pre>
+<p>Named:</p>
+<pre><code>(= foo  (argument1 argument2 ...)
+  (operator ...))</code></pre>
 <p>Really, the second form is a syntactical convenience for the first one, but both have their uses. We will start by discussing anonymous functions to motivate psilo’s design decisions.</p>
 <h3 id="binding-values-to-symbols"><span class="header-section-number">5.1.4</span> Binding values to symbols</h3>
 <p>In the definition of a function you provide a list of symbols to bind to the operand values. These symbols now refer to their bound values for the duration of the function’s <em>scope</em>, defined by its enclosing parentheses.</p>
