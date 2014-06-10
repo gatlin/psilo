@@ -378,7 +378,7 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
   (? strm
     (`(End)         0)
     (`(Cons h ,t)   (+ 1 (stream-length t)))))</code></pre>
-<p>The <code>\`` is a *quasi-quote*. Similar to a normal quote, it allows values to be extracted from a list while the rest are discarded. So if we call</code>’(ConstructorN v1 … vM)`, we are essentially delaying the creation of its closure until later. Thus we can inspect the expression.</p>
+<p>The ` is a <em>quasi-quote</em>. Similar to a normal quote, it allows values to be extracted from a list while the rest are discarded. So if we call <code>'(ConstructorN v1 ... vM)</code>, we are essentially delaying the creation of its closure until later. Thus we can inspect the expression.</p>
 <h2 id="continuations"><span class="header-section-number">5.5</span> Continuations</h2>
 <h3 id="introduction-1"><span class="header-section-number">5.5.1</span> Introduction</h3>
 <p>We still have a problem: there is no way to write imperative programs. The following would be nice to have sometimes, though:</p>
