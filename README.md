@@ -648,6 +648,32 @@ temporarily.
 Since the continuations are delimited in extent, they are called *delimited
 continuations.*
 
+Vectors
+---
+
+Lastly, I will discuss vectors. Vectors are delimited by `[` and `]`. All the
+elements must have some unifying type.
+
+Vectors greatly simplify parallelism in psilo. If a vector of values of type
+*a* are passed to a function accepting a single *a* then the function is
+automatically mapped in parallel over the vector. Example:
+
+    (=  square  (x:&)
+      (* x x))
+
+    (= vector-example ()
+      (begin
+        (set v  [1 2 3])
+        (set v  (square v))
+        (v)))
+
+    ; yields [ 1 4 9 ]
+
+Depending on the types and other annotations which I am still designing, this
+will allow either automatic threading or automatic GPGPU computation.
+
+This will definitely receive more elaboration in the future.
+
 How to build
 ===
 
