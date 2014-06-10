@@ -508,7 +508,7 @@ Or for another example:
         (`(End)         0)
         (`(Cons h ,t)   (+ 1 (stream-length t)))))
 
-The `\`` is a *quasi-quote*. Similar to a normal quote, it allows values to be
+The \` is a *quasi-quote*. Similar to a normal quote, it allows values to be
 extracted from a list while the rest are discarded. So if we call
 `'(ConstructorN v1 ... vM)`, we are essentially delaying the creation of its
 closure until later. Thus we can inspect the expression.
