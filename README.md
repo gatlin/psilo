@@ -76,9 +76,13 @@ The grammar is a work in progress. At the moment, psilo code looks like this:
     (= stream-length (strm:&)
       (= stream-length-helper (strm:& acc)
         (? strm
-          (`(Nil)       0)
-          (`(Cons h ,t) (stream-length-helper t (+ 1 acc)))))
+          ('(Nil)      0)
+          ('(Cons h t) (stream-length-helper t (+ 1 acc)))))
       (stream-length-helper strm 0))
+
+    (let ((s    '(Cons 1 (Cons 2 (Cons 3 (Nil))))))
+      (stream-length s))
+    ; => 3
 
 Detail
 ===
@@ -313,11 +317,13 @@ list `(* 2 3)` is passed as the second argument.
 
 We get the value of a quoted list by evaluating it, eg:
 
-    (\  ('(v1 v2))
-      (foo (v1) (v2)))
+    (= produce ()
+      (consume '(foo 1)))
 
-    (\  ('x)
-      (foo (x)))
+    (= consume (expr)
+      (expr))
+
+    ; => computes `(foo 1)`
 
 ### Manipulating lists
 
@@ -355,7 +361,8 @@ Our function may be used like so:
 
     (and/s  (and/s x y)    (and/s y z))
 
-This is much cleaner looking for the caller.
+This is much cleaner looking for the caller. This form of quoting may be
+thought of as automatically wrapping the value in an anonymous function.
 
 ### Quoting references
 
@@ -364,6 +371,29 @@ argument symbols for a reason. This is perfectly valid:
 
     (\ ('x:&)
       (foo x))
+
+### Quasi-quoting.
+
+What if you want to construct a list which captures values from its surrounding
+environment? Eg,
+
+    (= say-hi (to from)
+      (++   "Hello, "
+            to
+            ", it is I: "
+            from
+            "!"))
+
+    (= make-say-hi    (name who-you-are)
+      `(say-hi  ,name ,age))
+
+So now the following is possible:
+
+    (let ((greeting     (make-say-hi "Alice"    "Bob")))
+      (do-something-with greeting))
+
+    (= do-something-with (g)
+      (display (greeting)))
 
 Closures
 ---
@@ -408,8 +438,8 @@ is the price we pay.
 However, a little cleverness can get around that problem:
 
     (=  make-person (name     age)
-      (\    (what)
-        (what   name    age)))
+      (\ (what)
+        `(,what ,name ,age)))
 
     (=  use-person  ()
       (let  ((p (make-person "gatlin" 25))
@@ -430,6 +460,32 @@ This is a bit like the original notion of an object described by Alan Kay: the
 object listens for messages and dispatches based on the message. Because of the
 linearity restrictions, the mutated value are encapsulated inside the closure;
 we can only actually retrieve them when we are ready to destroy the closure.
+
+### Quotes and closures
+
+The quote operators are actually just nice ways to construct ad-hoc closures.
+
+    (\  ()
+      (foo x y))
+
+and
+
+    '(foo x y)
+
+Are essentially the same. Similarly,
+
+    ((\ (x y)
+       (\ ()
+         (foo x y)))
+     value-1 value-2)
+
+and
+
+    `(foo ,x ,y)
+
+do basically the same thing. The point, though, is that the quote operators
+allow you to more easily manipulate these expressions before evaluating them,
+giving you a lot of control and expressivity.
 
 Algebraic Data Types
 ---
@@ -462,8 +518,48 @@ code:
 where `U` is an operator which computes some minimally general union of the
 types of its arguments.
 
-As an example, let's create a Boolean data type and some convenient utilities
-for it:
+### Example 1
+
+Let's make more people!
+
+    (: Person
+      (:    Human (String Integer))
+      (:    Corp  (String Integer String)))
+
+    (= birthday (p)
+      (? p
+        ('(Human name age)       '(Human name (+ 1 age)))
+        ('(Corp name age tax-id) '(Corp name (+ 1 age) tax-id)))))
+
+    (= show-yourself (p)
+      (? p
+        ('(Human name age) (display
+                             (++ "Name: "
+                                 name
+                                 ", age: "
+                                 (show age))))
+        ('(Corp name age tax-id)
+          (display
+            (++ "Corp Name: "
+                name
+                ", founded "
+                (show age)
+                " years ago. ("
+                tax-id
+                ").")))))
+
+    (let ((h    '(Human "gatlin" 25))
+          (c    '(Corp  "Buy-N-Large" 100 "123456789")))
+      (let ((h (birthday h))
+            (c (birthday c)))
+        (show-yourself h)))
+
+This will display a human with an incremented age.
+
+### Example 2
+
+As another example, let's create a Boolean data type and some convenient
+utilities for it:
 
     (: Boolean  ()
       (:    True)
@@ -482,7 +578,7 @@ for it:
 The `if` expression we just created does what you would expect: it defers
 evaluation of either branch until it knows which to take.
 
-### `?` operator and quasi-quoting
+### `?` operator and quoting
 
 *Note: while all of psilo is a work in progress, quasi-quoting is possibly the
 least developed of my ideas. As is I could make it work but I admit I don't
@@ -505,13 +601,15 @@ Or for another example:
 
     (= stream-length    (strm:&)
       (? strm
-        (`(End)         0)
-        (`(Cons h ,t)   (+ 1 (stream-length t)))))
+        ('(End)      0)
+        ('(Cons h t) (+ 1 (stream-length t)))))
 
-The \` is a *quasi-quote*. Similar to a normal quote, it allows values to be
-extracted from a list while the rest are discarded. So if we call
-`'(ConstructorN v1 ... vM)`, we are essentially delaying the creation of its
-closure until later. Thus we can inspect the expression.
+`?` checks to see if there is some set of substitutions which makes the target
+(here, `strm`) equivalent to any of the cases. Since symbol equality is rather
+narrow, we essentially get a nice pattern matching syntax.
+
+At the moment, `?` is a bit magic. I'm trying to think of how I might make it
+less so.
 
 Continuations
 ---
@@ -605,10 +703,10 @@ will call `imperatively`:
 
     (continuation   imperatively (Then)   (expr)
       (? expr
-        (`(Term   ,v) (v))
-        (`(Cont   ,k)
+        ('(Term v) (v))
+        ('(Cont k)
           (? k
-            (`(Then   ,next)  (imperatively (k))))))
+            ('(Then next)  (imperatively (next))))))
 
 A **lot** is going on under the hood here. Suffice it to say, the
 `continuation` operator consumes programs written in our language but how do we
