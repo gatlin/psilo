@@ -78,14 +78,18 @@
 <li><a href="#the-empty-list"><span class="toc-section-number">5.2.5</span> The empty list</a></li>
 <li><a href="#quoting-from-the-other-direction"><span class="toc-section-number">5.2.6</span> Quoting from the other direction</a></li>
 <li><a href="#quoting-references"><span class="toc-section-number">5.2.7</span> Quoting references</a></li>
+<li><a href="#quasi-quoting."><span class="toc-section-number">5.2.8</span> Quasi-quoting.</a></li>
 </ul></li>
 <li><a href="#closures"><span class="toc-section-number">5.3</span> Closures</a><ul>
 <li><a href="#basics"><span class="toc-section-number">5.3.1</span> Basics</a></li>
 <li><a href="#subverting-linearity"><span class="toc-section-number">5.3.2</span> Subverting linearity</a></li>
+<li><a href="#quotes-and-closures"><span class="toc-section-number">5.3.3</span> Quotes and closures</a></li>
 </ul></li>
 <li><a href="#algebraic-data-types"><span class="toc-section-number">5.4</span> Algebraic Data Types</a><ul>
 <li><a href="#introduction"><span class="toc-section-number">5.4.1</span> Introduction</a></li>
-<li><a href="#operator-and-quasi-quoting"><span class="toc-section-number">5.4.2</span> <code>?</code> operator and quasi-quoting</a></li>
+<li><a href="#example-1"><span class="toc-section-number">5.4.2</span> Example 1</a></li>
+<li><a href="#example-2"><span class="toc-section-number">5.4.3</span> Example 2</a></li>
+<li><a href="#operator-and-quoting"><span class="toc-section-number">5.4.4</span> <code>?</code> operator and quoting</a></li>
 </ul></li>
 <li><a href="#continuations"><span class="toc-section-number">5.5</span> Continuations</a><ul>
 <li><a href="#introduction-1"><span class="toc-section-number">5.5.1</span> Introduction</a></li>
@@ -162,9 +166,13 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 (= stream-length (strm:&amp;)
   (= stream-length-helper (strm:&amp; acc)
     (? strm
-      (`(Nil)       0)
-      (`(Cons h ,t) (stream-length-helper t (+ 1 acc)))))
-  (stream-length-helper strm 0))</code></pre>
+      (&#39;(Nil)      0)
+      (&#39;(Cons h t) (stream-length-helper t (+ 1 acc)))))
+  (stream-length-helper strm 0))
+
+(let ((s    &#39;(Cons 1 (Cons 2 (Cons 3 (Nil))))))
+  (stream-length s))
+; =&gt; 3</code></pre>
 <h1 id="detail"><span class="header-section-number">5</span> Detail</h1>
 <h2 id="basics-expressions-primitive-types-and-functions"><span class="header-section-number">5.1</span> Basics: Expressions, primitive types, and functions</h2>
 <h3 id="expressions"><span class="header-section-number">5.1.1</span> Expressions</h3>
@@ -273,11 +281,13 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 (foo 1 &#39;(* 2 3)) ; (2)</code></pre>
 <p>In (1), the number <code>6</code> is passed as the second argument to <code>foo</code>. In (2), the list <code>(* 2 3)</code> is passed as the second argument.</p>
 <p>We get the value of a quoted list by evaluating it, eg:</p>
-<pre><code>(\  (&#39;(v1 v2))
-  (foo (v1) (v2)))
+<pre><code>(= produce ()
+  (consume &#39;(foo 1)))
 
-(\  (&#39;x)
-  (foo (x)))</code></pre>
+(= consume (expr)
+  (expr))
+
+; =&gt; computes `(foo 1)`</code></pre>
 <h3 id="manipulating-lists"><span class="header-section-number">5.2.4</span> Manipulating lists</h3>
 <p>If we halt evaluation we must want to do something with the contents of the list, no? There are two core functions which can manipulate lists: <code>head</code> and <code>tail</code>.</p>
 <p><code>head</code> returns the item at the beginning of the list, and <code>tail</code> returns the remaining elements.</p>
@@ -293,11 +303,28 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 <p>We have not spoken about Boolean types yet, but the example should make sense regardless: there is no need to evaluate the right hand side if the left hand side is true.</p>
 <p>Our function may be used like so:</p>
 <pre><code>(and/s  (and/s x y)    (and/s y z))</code></pre>
-<p>This is much cleaner looking for the caller.</p>
+<p>This is much cleaner looking for the caller. This form of quoting may be thought of as automatically wrapping the value in an anonymous function.</p>
 <h3 id="quoting-references"><span class="header-section-number">5.2.7</span> Quoting references</h3>
 <p>The quote syntax and the reference syntax each go on different sides of argument symbols for a reason. This is perfectly valid:</p>
 <pre><code>(\ (&#39;x:&amp;)
   (foo x))</code></pre>
+<h3 id="quasi-quoting."><span class="header-section-number">5.2.8</span> Quasi-quoting.</h3>
+<p>What if you want to construct a list which captures values from its surrounding environment? Eg,</p>
+<pre><code>(= say-hi (to from)
+  (++   &quot;Hello, &quot;
+        to
+        &quot;, it is I: &quot;
+        from
+        &quot;!&quot;))
+
+(= make-say-hi    (name who-you-are)
+  `(say-hi  ,name ,age))</code></pre>
+<p>So now the following is possible:</p>
+<pre><code>(let ((greeting     (make-say-hi &quot;Alice&quot;    &quot;Bob&quot;)))
+  (do-something-with greeting))
+
+(= do-something-with (g)
+  (display (greeting)))</code></pre>
 <h2 id="closures"><span class="header-section-number">5.3</span> Closures</h2>
 <h3 id="basics"><span class="header-section-number">5.3.1</span> Basics</h3>
 <p>Closures are functions which <em>close over</em> their surrounding environment. An example:</p>
@@ -319,8 +346,8 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 <p>So a closure can only be used once. This sounds incredibly stupid, sure, but it is the price we pay.</p>
 <p>However, a little cleverness can get around that problem:</p>
 <pre><code>(=  make-person (name     age)
-  (\    (what)
-    (what   name    age)))
+  (\ (what)
+    `(,what ,name ,age)))
 
 (=  use-person  ()
   (let  ((p (make-person &quot;gatlin&quot; 25))
@@ -331,6 +358,20 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 <p><code>p</code> is a closure, so it, <code>name</code>, and <code>age</code> are all linear. However in this example I create a value representing a person and pass it a function which calls <code>make-person</code> with modified values. This resulting closure is used to shadow <code>p</code>.</p>
 <p>Shadowing a linear value mutates the value. Thus we have safely mutated encapsulated data.</p>
 <p>This is a bit like the original notion of an object described by Alan Kay: the object listens for messages and dispatches based on the message. Because of the linearity restrictions, the mutated value are encapsulated inside the closure; we can only actually retrieve them when we are ready to destroy the closure.</p>
+<h3 id="quotes-and-closures"><span class="header-section-number">5.3.3</span> Quotes and closures</h3>
+<p>The quote operators are actually just nice ways to construct ad-hoc closures.</p>
+<pre><code>(\  ()
+  (foo x y))</code></pre>
+<p>and</p>
+<pre><code>&#39;(foo x y)</code></pre>
+<p>Are essentially the same. Similarly,</p>
+<pre><code>((\ (x y)
+   (\ ()
+     (foo x y)))
+ value-1 value-2)</code></pre>
+<p>and</p>
+<pre><code>`(foo ,x ,y)</code></pre>
+<p>do basically the same thing. The point, though, is that the quote operators allow you to more easily manipulate these expressions before evaluating them, giving you a lot of control and expressivity.</p>
 <h2 id="algebraic-data-types"><span class="header-section-number">5.4</span> Algebraic Data Types</h2>
 <h3 id="introduction"><span class="header-section-number">5.4.1</span> Introduction</h3>
 <p>An algebraic data type is a <em>sum</em> of <em>product</em> types. More plainly, it is a type which can be one of several different list types. They are essentially a generalization of the technique shown in the “Subverting linearity” section.</p>
@@ -347,7 +388,42 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 
 (: MyADT (a1 aN) (U Constructor1 ... ConstructorK))</code></pre>
 <p>where <code>U</code> is an operator which computes some minimally general union of the types of its arguments.</p>
-<p>As an example, let’s create a Boolean data type and some convenient utilities for it:</p>
+<h3 id="example-1"><span class="header-section-number">5.4.2</span> Example 1</h3>
+<p>Let’s make more people!</p>
+<pre><code>(: Person
+  (:    Human (String Integer))
+  (:    Corp  (String Integer String)))
+
+(= birthday (p)
+  (? p
+    (&#39;(Human name age)       &#39;(Human name (+ 1 age)))
+    (&#39;(Corp name age tax-id) &#39;(Corp name (+ 1 age) tax-id)))))
+
+(= show-yourself (p)
+  (? p
+    (&#39;(Human name age) (display
+                         (++ &quot;Name: &quot;
+                             name
+                             &quot;, age: &quot;
+                             (show age))))
+    (&#39;(Corp name age tax-id)
+      (display
+        (++ &quot;Corp Name: &quot;
+            name
+            &quot;, founded &quot;
+            (show age)
+            &quot; years ago. (&quot;
+            tax-id
+            &quot;).&quot;)))))
+
+(let ((h    &#39;(Human &quot;gatlin&quot; 25))
+      (c    &#39;(Corp  &quot;Buy-N-Large&quot; 100 &quot;123456789&quot;)))
+  (let ((h (birthday h))
+        (c (birthday c)))
+    (show-yourself h)))</code></pre>
+<p>This will display a human with an incremented age.</p>
+<h3 id="example-2"><span class="header-section-number">5.4.3</span> Example 2</h3>
+<p>As another example, let’s create a Boolean data type and some convenient utilities for it:</p>
 <pre><code>(: Boolean  ()
   (:    True)
   (:    False))
@@ -362,7 +438,7 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
       (foo x)
       (error &quot;x is not 2&quot;)))</code></pre>
 <p>The <code>if</code> expression we just created does what you would expect: it defers evaluation of either branch until it knows which to take.</p>
-<h3 id="operator-and-quasi-quoting"><span class="header-section-number">5.4.2</span> <code>?</code> operator and quasi-quoting</h3>
+<h3 id="operator-and-quoting"><span class="header-section-number">5.4.4</span> <code>?</code> operator and quoting</h3>
 <p><em>Note: while all of psilo is a work in progress, quasi-quoting is possibly the least developed of my ideas. As is I could make it work but I admit I don’t have a rock solid theoretical foundation quite yet. Just accept it for now.</em></p>
 <p>The <code>?</code> operator provides some syntactic convenience for writing case-wise evaluation functions of algebraic data types. The above code could be rewritten thusly:</p>
 <pre><code>(= if   (condition &#39;then &#39;else)
@@ -376,9 +452,10 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 
 (= stream-length    (strm:&amp;)
   (? strm
-    (`(End)         0)
-    (`(Cons h ,t)   (+ 1 (stream-length t)))))</code></pre>
-<p>The ` is a <em>quasi-quote</em>. Similar to a normal quote, it allows values to be extracted from a list while the rest are discarded. So if we call <code>'(ConstructorN v1 ... vM)</code>, we are essentially delaying the creation of its closure until later. Thus we can inspect the expression.</p>
+    (&#39;(End)      0)
+    (&#39;(Cons h t) (+ 1 (stream-length t)))))</code></pre>
+<p><code>?</code> checks to see if there is some set of substitutions which makes the target (here, <code>strm</code>) equivalent to any of the cases. Since symbol equality is rather narrow, we essentially get a nice pattern matching syntax.</p>
+<p>At the moment, <code>?</code> is a bit magic. I’m trying to think of how I might make it less so.</p>
 <h2 id="continuations"><span class="header-section-number">5.5</span> Continuations</h2>
 <h3 id="introduction-1"><span class="header-section-number">5.5.1</span> Introduction</h3>
 <p>We still have a problem: there is no way to write imperative programs. The following would be nice to have sometimes, though:</p>
@@ -422,10 +499,10 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 <p>Having specified our language, we must write an interpreter function, which I will call <code>imperatively</code>:</p>
 <pre><code>(continuation   imperatively (Then)   (expr)
   (? expr
-    (`(Term   ,v) (v))
-    (`(Cont   ,k)
+    (&#39;(Term v) (v))
+    (&#39;(Cont k)
       (? k
-        (`(Then   ,next)  (imperatively (k))))))</code></pre>
+        (&#39;(Then next)  (imperatively (next))))))</code></pre>
 <p>A <strong>lot</strong> is going on under the hood here. Suffice it to say, the <code>continuation</code> operator consumes programs written in our language but how do we write them?</p>
 <p>Continuations are constructed using <code>do</code>. <code>do</code> takes lists of compatibly-typed expressions and constructs the continuation. To evaluate your embedded program, you call the continuation function you wrote.</p>
 <p>So the definition of <code>begin</code> is actually quite simple:</p>
