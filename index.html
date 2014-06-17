@@ -86,13 +86,14 @@
 <li><a href="#quotes-and-closures"><span class="toc-section-number">5.3.3</span> Quotes and closures</a></li>
 </ul></li>
 <li><a href="#algebraic-data-types"><span class="toc-section-number">5.4</span> Algebraic Data Types</a><ul>
-<li><a href="#introduction"><span class="toc-section-number">5.4.1</span> Introduction</a></li>
-<li><a href="#example-1"><span class="toc-section-number">5.4.2</span> Example 1</a></li>
-<li><a href="#example-2"><span class="toc-section-number">5.4.3</span> Example 2</a></li>
-<li><a href="#operator-and-quoting"><span class="toc-section-number">5.4.4</span> <code>?</code> operator and quoting</a></li>
+<li><a href="#prelude-structures"><span class="toc-section-number">5.4.1</span> Prelude: structures</a></li>
+<li><a href="#introduction-to-adts"><span class="toc-section-number">5.4.2</span> Introduction to ADTs</a></li>
+<li><a href="#example-1"><span class="toc-section-number">5.4.3</span> Example 1</a></li>
+<li><a href="#example-2"><span class="toc-section-number">5.4.4</span> Example 2</a></li>
+<li><a href="#operator-and-quoting"><span class="toc-section-number">5.4.5</span> <code>?</code> operator and quoting</a></li>
 </ul></li>
 <li><a href="#continuations"><span class="toc-section-number">5.5</span> Continuations</a><ul>
-<li><a href="#introduction-1"><span class="toc-section-number">5.5.1</span> Introduction</a></li>
+<li><a href="#introduction"><span class="toc-section-number">5.5.1</span> Introduction</a></li>
 <li><a href="#what-are-continuations"><span class="toc-section-number">5.5.2</span> What are continuations?</a></li>
 <li><a href="#but-abstract-math-does-have-a-way-to-order-things"><span class="toc-section-number">5.5.3</span> But abstract math <em>does</em> have a way to order things</a></li>
 <li><a href="#example-creating-begin"><span class="toc-section-number">5.5.4</span> Example: creating <code>begin</code></a></li>
@@ -141,6 +142,7 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 <li><p>Advanced computer science ideas should be exposed, but not mandatory for writing high quality programs.</p></li>
 </ul>
 <h1 id="status"><span class="header-section-number">3</span> Status</h1>
+<p><strong>17 June 2014</strong> Algebraic Data Types are going to be more like GADTs in Haskell and the syntax reflects this. The symbol for creating ADTs is reminiscent of EBNF as well.</p>
 <p><strong>10 June 2014</strong> The syntax and semantics for lists and types have been dramatically changed and simplified. Essentially, structs are quoted lists which takes advantage of a number of other features to make ADTs and continuations much simpler. I have also discarded the syntax for type annotations and will revisit it.</p>
 <p><strong>29 May 2014</strong> A nascent evaluator is now committed. By no means is it complete, but I can successfully run computations in a rough subset of the language, so that’s something!</p>
 <p>The parser is not done but I am now on much better footing than I was before so I can continue with it as planned.</p>
@@ -159,9 +161,9 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 
 ; =&gt; [ 1 4 9 16 25 ]
 
-(: Stream (a)
-  (: Empty)
-  (: Cons a (Stream a)))
+(::= Stream (a)
+  (: Empty (Stream a))
+  (: Cons (-&gt; a (Stream a) (Stream a))))
 
 (= stream-length (strm:&amp;)
   (= stream-length-helper (strm:&amp; acc)
@@ -373,26 +375,34 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 <pre><code>`(foo ,x ,y)</code></pre>
 <p>do basically the same thing. The point, though, is that the quote operators allow you to more easily manipulate these expressions before evaluating them, giving you a lot of control and expressivity.</p>
 <h2 id="algebraic-data-types"><span class="header-section-number">5.4</span> Algebraic Data Types</h2>
-<h3 id="introduction"><span class="header-section-number">5.4.1</span> Introduction</h3>
+<h3 id="prelude-structures"><span class="header-section-number">5.4.1</span> Prelude: structures</h3>
+<p>If you just want some tagged structure of data, the quote operators are sufficient:</p>
+<pre><code>&#39;(&quot;gatlin&quot; 25)
+
+&#39;(&quot;washington&quot; 282)</code></pre>
+<p>And you can always break them apart:</p>
+<pre><code>(head &#39;(&quot;gatlin&quot; 25)) ;      =&gt; &quot;gatlin&quot;
+(tail &#39;(&quot;washington&quot; 282)) ; =&gt; &#39;(282)</code></pre>
+<p>Or even:</p>
+<pre><code>(let ((name (read-from-stdin)))
+  `(name ,name))</code></pre>
+<p>to build a linear structure which captures its environment.</p>
+<h3 id="introduction-to-adts"><span class="header-section-number">5.4.2</span> Introduction to ADTs</h3>
 <p>An algebraic data type is a <em>sum</em> of <em>product</em> types. More plainly, it is a type which can be one of several different list types. They are essentially a generalization of the technique shown in the “Subverting linearity” section.</p>
-<p>At the moment, the syntax for specifying an ADT is:</p>
-<pre><code>(: MyADT    (a1 aN)
-  (: Constructor1   (v1 vI))
-  (: ConstructorK   (w1 wJ)))</code></pre>
-<p>The list of symbols after <code>MyADT</code> is the list of type parameters: these have a constraining effect if present in any of the <em>constructors</em>. Constructors are are functions; the above pseudo-code would produce more or less the equivalent code:</p>
-<pre><code>(= Constructor1 (v1 vI)
-  (\    (x1 ... _) (x1 v1 vI)))
-
-(= ConstructorK (w1 wJ)
-  (\    (_ ... xK) (xK w1 wJ)))
-
-(: MyADT (a1 aN) (U Constructor1 ... ConstructorK))</code></pre>
-<p>where <code>U</code> is an operator which computes some minimally general union of the types of its arguments.</p>
-<h3 id="example-1"><span class="header-section-number">5.4.2</span> Example 1</h3>
+<p>To give a simple idea of how to create ADTs, we will create an Optional type. An <code>Optional</code> value will be one which either has a value, or is explicitly devoid of value. This is useful for catching and managing failure, among others. Here is the code:</p>
+<pre><code>(::= Optional (a)
+  (: Nil    (Optional a))
+  (: Some   (-&gt; a (Optional a))))</code></pre>
+<p>Here, we name our type <code>Optional</code> and give it a <em>type variable</em>, here called <code>a</code>. It could have been any legal symbol starting with a lower case letter, though.</p>
+<p>We then defined two <em>value constructors</em> for our type: <code>Nil</code> and <code>Some</code>. <code>Nil</code> always produces an <code>Optional a</code> value, whereas <code>Some</code> is a function which takes a value of type <code>a</code> and returns a value of <code>Optional a</code>.</p>
+<p>Yes, you guessed correctly: value constructors are just functions automatically generated for you. Let’s use our new type:</p>
+<p>(= optional-example () (let ((name (read-from-stdin))) (if ((length? name) &gt; 0) `(Some ,name) ’(Nil))))</p>
+<p>Here, we read some data from stdin. If the data did not meet our requirements, we return <code>Nil</code> so that the caller can receive explicit notice. Otherwise, we return <code>Some</code> name. Note the uses of the two kinds of quotes: we quasiquote an expression to capture values from the environment, and use a normal quote to create a value which doesn’t have an environment.</p>
+<h3 id="example-1"><span class="header-section-number">5.4.3</span> Example 1</h3>
 <p>Let’s make more people!</p>
-<pre><code>(: Person
-  (:    Human (String Integer))
-  (:    Corp  (String Integer String)))
+<pre><code>(::= Person
+  (: Human (-&gt; String -&gt; Integer -&gt; Person))
+  (: Corp  (-&gt; String -&gt; Integer -&gt; String -&gt; Person)))
 
 (= birthday (p)
   (? p
@@ -422,33 +432,34 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
         (c (birthday c)))
     (show-yourself h)))</code></pre>
 <p>This will display a human with an incremented age.</p>
-<h3 id="example-2"><span class="header-section-number">5.4.3</span> Example 2</h3>
+<h3 id="example-2"><span class="header-section-number">5.4.4</span> Example 2</h3>
 <p>As another example, let’s create a Boolean data type and some convenient utilities for it:</p>
-<pre><code>(: Boolean  ()
-  (:    True)
-  (:    False))
+<pre><code>(::= Boolean  ()
+  (: True  (Boolean))
+  (: False (Boolean)))
 
-(= if   (condition &#39;then &#39;else)
+; there is a builtin though
+(= if/new   (condition &#39;then &#39;else)
   (condition    (\  ()  (then))
                 (\  ()  (else))))
 
 ; example usage
 (let ((x (get-some-value)))
-  (if (=? x 2)      ; this returns True or False
+  (if/new (=? x 2)      ; this returns True or False
       (foo x)
       (error &quot;x is not 2&quot;)))</code></pre>
 <p>The <code>if</code> expression we just created does what you would expect: it defers evaluation of either branch until it knows which to take.</p>
-<h3 id="operator-and-quoting"><span class="header-section-number">5.4.4</span> <code>?</code> operator and quoting</h3>
+<h3 id="operator-and-quoting"><span class="header-section-number">5.4.5</span> <code>?</code> operator and quoting</h3>
 <p><em>Note: while all of psilo is a work in progress, quasi-quoting is possibly the least developed of my ideas. As is I could make it work but I admit I don’t have a rock solid theoretical foundation quite yet. Just accept it for now.</em></p>
 <p>The <code>?</code> operator provides some syntactic convenience for writing case-wise evaluation functions of algebraic data types. The above code could be rewritten thusly:</p>
-<pre><code>(= if   (condition &#39;then &#39;else)
+<pre><code>(= if/new   (condition &#39;then &#39;else)
   (? condition
     (&#39;(True)    (then))
     (&#39;(False)   (else))))</code></pre>
 <p>Or for another example:</p>
-<pre><code>(: Stream   (a)
-  (:    End)
-  (:    Cons a (Stream a)))
+<pre><code>(::= Stream   (a)
+  (:    End (Stream a))
+  (:    Cons (-&gt; a (Stream a) (Stream a))))
 
 (= stream-length    (strm:&amp;)
   (? strm
@@ -457,7 +468,7 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 <p><code>?</code> checks to see if there is some set of substitutions which makes the target (here, <code>strm</code>) equivalent to any of the cases. Since symbol equality is rather narrow, we essentially get a nice pattern matching syntax.</p>
 <p>At the moment, <code>?</code> is a bit magic. I’m trying to think of how I might make it less so.</p>
 <h2 id="continuations"><span class="header-section-number">5.5</span> Continuations</h2>
-<h3 id="introduction-1"><span class="header-section-number">5.5.1</span> Introduction</h3>
+<h3 id="introduction"><span class="header-section-number">5.5.1</span> Introduction</h3>
 <p>We still have a problem: there is no way to write imperative programs. The following would be nice to have sometimes, though:</p>
 <pre><code>(= f1   ()
   (begin
@@ -493,8 +504,8 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 <p>If you can ensure that your functions meet certain type restrictions, then you can create continuations and compose arbitrary functions together, which will be executed however you like.</p>
 <h3 id="example-creating-begin"><span class="header-section-number">5.5.4</span> Example: creating <code>begin</code></h3>
 <p>A continuation is like defining an embedded language, and this language must specify commands. As a motivating example, I will create a continuation with one simple command: <code>Then</code>.</p>
-<pre><code>(:  Then    (k)
-  (:    Then k))</code></pre>
+<pre><code>(::=  Then    (k)
+  (:    Then (-&gt; k (Then k))))</code></pre>
 <p>The language is a simple algebraic data type, and it has one production rule: sentences are composed of nested <code>Then</code>s. The <code>k</code> is a placeholder for the continuation (pronounced with a hard “k” sound).</p>
 <p>Having specified our language, we must write an interpreter function, which I will call <code>imperatively</code>:</p>
 <pre><code>(continuation   imperatively (Then)   (expr)
