@@ -36,6 +36,10 @@ Philosophical Features:
 Status
 ===
 
+**17 June 2014** Algebraic Data Types are going to be more like GADTs in
+Haskell and the syntax reflects this. The symbol for creating ADTs is
+reminiscent of EBNF as well.
+
 **10 June 2014**  The syntax and semantics for lists and types have been
 dramatically changed and simplified. Essentially, structs are quoted lists
 which takes advantage of a number of other features to make ADTs and
@@ -69,9 +73,9 @@ The grammar is a work in progress. At the moment, psilo code looks like this:
 
     ; => [ 1 4 9 16 25 ]
 
-    (: Stream (a)
-      (: Empty)
-      (: Cons a (Stream a)))
+    (::= Stream (a)
+      (: Empty (Stream a))
+      (: Cons (-> a (Stream a) (Stream a))))
 
     (= stream-length (strm:&)
       (= stream-length-helper (strm:& acc)
@@ -490,41 +494,72 @@ giving you a lot of control and expressivity.
 Algebraic Data Types
 ---
 
-### Introduction
+### Prelude: structures
+
+If you just want some tagged structure of data, the quote operators are
+sufficient:
+
+    '("gatlin" 25)
+
+    '("washington" 282)
+
+And you can always break them apart:
+
+    (head '("gatlin" 25)) ;      => "gatlin"
+    (tail '("washington" 282)) ; => '(282)
+
+Or even:
+
+    (let ((name (read-from-stdin)))
+      `(name ,name))
+
+to build a linear structure which captures its environment.
+
+### Introduction to ADTs
 
 An algebraic data type is a *sum* of *product* types. More plainly, it is a
 type which can be one of several different list types. They are essentially a
 generalization of the technique shown in the "Subverting linearity" section.
 
-At the moment, the syntax for specifying an ADT is:
+To give a simple idea of how to create ADTs, we will create an Optional type.
+An `Optional` value will be one which either has a value, or is explicitly
+devoid of value. This is useful for catching and managing failure, among
+others. Here is the code:
 
-    (: MyADT    (a1 aN)
-      (: Constructor1   (v1 vI))
-      (: ConstructorK   (w1 wJ)))
+    (::= Optional (a)
+      (: Nil    (Optional a))
+      (: Some   (-> a (Optional a))))
 
-The list of symbols after `MyADT` is the list of type parameters: these have a
-constraining effect if present in any of the *constructors*. Constructors are
-are functions; the above pseudo-code would produce more or less the equivalent
-code:
+Here, we name our type `Optional` and give it a *type variable*, here called
+`a`. It could have been any legal symbol starting with a lower case letter,
+though.
 
-    (= Constructor1 (v1 vI)
-      (\    (x1 ... _) (x1 v1 vI)))
+We then defined two *value constructors* for our type: `Nil` and `Some`. `Nil`
+always produces an `Optional a` value, whereas `Some` is a function which takes
+a value of type `a` and returns a value of `Optional a`.
 
-    (= ConstructorK (w1 wJ)
-      (\    (_ ... xK) (xK w1 wJ)))
+Yes, you guessed correctly: value constructors are just functions automatically
+generated for you. Let's use our new type:
 
-    (: MyADT (a1 aN) (U Constructor1 ... ConstructorK))
+(= optional-example ()
+  (let ((name   (read-from-stdin)))
+    (if ((length? name) > 0)
+      `(Some ,name)
+      '(Nil))))
 
-where `U` is an operator which computes some minimally general union of the
-types of its arguments.
+Here, we read some data from stdin. If the data did not meet our requirements,
+we return `Nil` so that the caller can receive explicit notice. Otherwise, we
+return `Some` name. Note the uses of the two kinds of quotes: we quasiquote an
+expression to capture values from the environment, and use a normal quote to
+create a value which doesn't have an environment.
 
 ### Example 1
 
 Let's make more people!
 
-    (: Person
-      (:    Human (String Integer))
-      (:    Corp  (String Integer String)))
+    (::= Person
+      (: Human (-> String -> Integer -> Person))
+      (: Corp  (-> String -> Integer -> String -> Person)))
 
     (= birthday (p)
       (? p
@@ -561,17 +596,18 @@ This will display a human with an incremented age.
 As another example, let's create a Boolean data type and some convenient
 utilities for it:
 
-    (: Boolean  ()
-      (:    True)
-      (:    False))
+    (::= Boolean  ()
+      (: True  (Boolean))
+      (: False (Boolean)))
 
-    (= if   (condition 'then 'else)
+    ; there is a builtin though
+    (= if/new   (condition 'then 'else)
       (condition    (\  ()  (then))
                     (\  ()  (else))))
 
     ; example usage
     (let ((x (get-some-value)))
-      (if (=? x 2)      ; this returns True or False
+      (if/new (=? x 2)      ; this returns True or False
           (foo x)
           (error "x is not 2")))
 
@@ -588,16 +624,16 @@ The `?` operator provides some syntactic convenience for writing case-wise
 evaluation functions of algebraic data types. The above code could be rewritten
 thusly:
 
-    (= if   (condition 'then 'else)
+    (= if/new   (condition 'then 'else)
       (? condition
         ('(True)    (then))
         ('(False)   (else))))
 
 Or for another example:
 
-    (: Stream   (a)
-      (:    End)
-      (:    Cons a (Stream a)))
+    (::= Stream   (a)
+      (:    End (Stream a))
+      (:    Cons (-> a (Stream a) (Stream a))))
 
     (= stream-length    (strm:&)
       (? strm
@@ -691,8 +727,8 @@ A continuation is like defining an embedded language, and this language must
 specify commands. As a motivating example, I will create a continuation with
 one simple command: `Then`.
 
-    (:  Then    (k)
-      (:    Then k))
+    (::=  Then    (k)
+      (:    Then (-> k (Then k))))
 
 The language is a simple algebraic data type, and it has one production rule:
 sentences are composed of nested `Then`s. The `k` is a placeholder for the
