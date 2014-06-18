@@ -37,7 +37,7 @@ bind values in lambda abstractions.
 
 > parseSymbol :: Parser (Expr a)
 > parseSymbol = do
->     sym <- identifier
+>     sym <- operator <|> identifier
 >     return $ Free $ ASymbol sym
 >
 
@@ -132,18 +132,6 @@ utility.
 >     x <- parseSymbol <|> parseExpr
 >     return $ (Free . AList) [(Free . ASymbol) "comma", x]
 
-> parseAdd :: Parser (Expr a)
-> parseAdd = do
->     reservedOp "+"
->     args <- parseQuotedList
->     return $ Free $ AAdd args
-
-> parseMult :: Parser (Expr a)
-> parseMult = do
->     reservedOp "*"
->     args <- parseQuotedList
->     return $ Free $ AMult args
-
 Top level expression parser
 
 > parseExpr :: Parser (Expr a)
@@ -151,7 +139,7 @@ Top level expression parser
 >         <|> parseNumber
 >         <|> (try (char '\'') >> parseQuote)
 >         <|> (try (char '`')  >> parseQuasi)
->         <|> parens ( parseMult <|> parseAdd <|> parseFn <|> parseLet <|> parseApp )
+>         <|> parens ( parseFn <|> parseLet <|> parseApp )
 
 Expression parser inside a quoted list
 
@@ -159,7 +147,7 @@ Expression parser inside a quoted list
 > parseExprInQuote = parseSymbol
 >                <|> parseNumber
 >                <|> (try (char '\'') >> parseQuote)
->                <|> parens ( parseMult <|> parseAdd <|> parseQuotedList )
+>                <|> parens ( parseQuotedList )
 
 Expression parser inside a quasiquoted list
 

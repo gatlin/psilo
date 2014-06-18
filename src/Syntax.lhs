@@ -52,8 +52,6 @@ Not bad, huh?
 >     = AInteger Integer
 >     | ASymbol Symbol
 >     | ALambda Symbol a
->     | AAdd    a
->     | AMult   a
 >     | AApply a a
 >     | AList [a]
 >

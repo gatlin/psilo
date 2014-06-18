@@ -285,18 +285,6 @@ branch in our `AST` definition.
 >         v
 >     return $ ListV vals
 
-> interpret (Free (AAdd args)) = do
->     (ListV args')    <- interpret args
->     (NumV l) <- return $ args' !! 0
->     (NumV r) <- return $ args' !! 1
->     return $ NumV $ l + r
-
-> interpret (Free (AMult args)) = do
->     (ListV args')    <- interpret args
->     (NumV l) <- return $ args' !! 0
->     (NumV r) <- return $ args' !! 1
->     return $ NumV $ l * r
-
 The below code for lambdas, while technically correct, has a huge problem: it
 copies its *entire* environment. A much smarter trick would be to only copy
 that which is actually used.
@@ -320,17 +308,43 @@ this is trivial.
 >     (MEnv currentEnv) <- ask
 >     return $ ClosV arg body currentEnv
 
+During application, if we are given a symbol for an operator, check to see if
+it is a built-in operator and, if applicable, simply return the resulting
+`Value`.
+
 > interpret (Free (AApply fun arg)) = do
->     (ClosV sym body env) <- interpret fun
->     (MEnv currentEnv)    <- ask
->     newLoc  <- runOp $ fresh
->     (ListV argVal)  <- interpret arg
->     runOp $ store newLoc (argVal !! 0)
->     env'    <- return $ Map.insert sym newLoc env
->     local (\(MEnv e) -> MEnv (Map.union env' e)) $ do
->         interpret body
+>     (ListV argVal)       <- interpret arg
+>     case builtin fun argVal of
+>         Just mv   -> return mv
+>         Nothing   -> do
+>             (ClosV sym body env) <- interpret fun
+>             (MEnv currentEnv)    <- ask
+>             newLoc  <- runOp $ fresh
+>             runOp $ store newLoc (argVal !! 0)
+>             env'    <- return $ Map.insert sym newLoc env
+>             local (\(MEnv e) -> MEnv (Map.union env' e)) $ do
+>                 interpret body
 
 This interpreter is flexible and powerful because we built up the appropriate
 abstractions.
+
+Built-in operators
+---
+
+As a final note, some symbols denote built-in operators (mostly involving
+arithmetic). The following function attempts to evaluate a built-in, returning
+(maybe) a `Machine Value`.
+
+> builtin :: Expr a -> [Value] -> Maybe Value
+> builtin (Free (ASymbol sym)) args
+>     | sym == "+"    = Just $ binOp ((+)) args
+>     | sym == "*"    = Just $ binOp ((*)) args
+>     | sym == "-"    = Just $ binOp ((-)) args
+>     | sym == "/"    = Just $ binOp div   args
+>     | otherwise     = Nothing
+>     where binOp op xs = let (NumV l) = xs !! 0
+>                             (NumV r) = xs !! 1
+>                         in  NumV $ op l r
+> builtin _ _   = Nothing
 
 [plai]: http://cs.brown.edu/~sk/Publications/Books/ProgLangs/

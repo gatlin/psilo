@@ -17,7 +17,7 @@ The main purpose of this module is to remove some clutter from `Parser`.
 >
 > lexer :: Tok.TokenParser ()
 > lexer = Tok.makeTokenParser style
->     where ops = ["+","*","-","/","<","="]
+>     where ops = []
 >           names = ["\\","::","let","apply"]
 >           idStarts = letter <|> char '_'
 >           idLetters = letter <|> char '_' <|> digit <|> char '-' <|> char '+' <|> char '?'
@@ -56,3 +56,6 @@ The main purpose of this module is to remove some clutter from `Parser`.
 >
 > identifier :: Parser String
 > identifier = Tok.identifier lexer
+>
+> operator :: Parser String
+> operator = Tok.operator lexer
