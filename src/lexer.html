@@ -61,7 +61,7 @@ The Lexer
 
 <span class="ot">lexer ::</span> <span class="dt">Tok.TokenParser</span> ()
 lexer <span class="fu">=</span> Tok.makeTokenParser style
-    <span class="kw">where</span> ops <span class="fu">=</span> [<span class="st">&quot;+&quot;</span>,<span class="st">&quot;*&quot;</span>,<span class="st">&quot;-&quot;</span>,<span class="st">&quot;/&quot;</span>,<span class="st">&quot;&lt;&quot;</span>,<span class="st">&quot;=&quot;</span>]
+    <span class="kw">where</span> ops <span class="fu">=</span> []
           names <span class="fu">=</span> [<span class="st">&quot;\\&quot;</span>,<span class="st">&quot;::&quot;</span>,<span class="st">&quot;let&quot;</span>,<span class="st">&quot;apply&quot;</span>]
           idStarts <span class="fu">=</span> letter <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;_&#39;</span>
           idLetters <span class="fu">=</span> letter <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;_&#39;</span> <span class="fu">&lt;|&gt;</span> digit <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;-&#39;</span> <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;+&#39;</span> <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;?&#39;</span>
@@ -99,7 +99,10 @@ reserved <span class="fu">=</span> Tok.reserved lexer
 reservedOp <span class="fu">=</span> Tok.reservedOp lexer
 
 <span class="ot">identifier ::</span> <span class="dt">Parser</span> <span class="dt">String</span>
-identifier <span class="fu">=</span> Tok.identifier lexer</code></pre>
+identifier <span class="fu">=</span> Tok.identifier lexer
+
+<span class="ot">operator ::</span> <span class="dt">Parser</span> <span class="dt">String</span>
+operator <span class="fu">=</span> Tok.operator lexer</code></pre>
 
         </div><!-- content -->
     </div><!-- row -->

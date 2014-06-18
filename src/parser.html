@@ -74,7 +74,7 @@ parseNumber <span class="fu">=</span> try ( <span class="kw">do</span> { n <span
 <p>Symbols are like &quot;atoms&quot; in other lisps or Erlang. They are equivalent only to themselves and have no intrinsic value. They are mostly used to bind values in lambda abstractions.</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">parseSymbol ::</span> <span class="dt">Parser</span> (<span class="dt">Expr</span> a)
 parseSymbol <span class="fu">=</span> <span class="kw">do</span>
-    sym <span class="ot">&lt;-</span> identifier
+    sym <span class="ot">&lt;-</span> operator <span class="fu">&lt;|&gt;</span> identifier
     return <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">ASymbol</span> sym</code></pre>
 <p>Lamba abstractions, or <em>functions</em>. A function definition is a list of symbols to bind to the elements of the argument list, and a psilo expression to evaluate in the context of the arguments.</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">parseFn ::</span> <span class="dt">Parser</span> (<span class="dt">Expr</span> a)
@@ -144,29 +144,19 @@ parseQuasi <span class="fu">=</span> <span class="kw">do</span>
 parseComma <span class="fu">=</span> <span class="kw">do</span>
     x <span class="ot">&lt;-</span> parseSymbol <span class="fu">&lt;|&gt;</span> parseExpr
     return <span class="fu">$</span> (<span class="dt">Free</span> <span class="fu">.</span> <span class="dt">AList</span>) [(<span class="dt">Free</span> <span class="fu">.</span> <span class="dt">ASymbol</span>) <span class="st">&quot;comma&quot;</span>, x]</code></pre>
-<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">parseAdd ::</span> <span class="dt">Parser</span> (<span class="dt">Expr</span> a)
-parseAdd <span class="fu">=</span> <span class="kw">do</span>
-    reservedOp <span class="st">&quot;+&quot;</span>
-    args <span class="ot">&lt;-</span> parseQuotedList
-    return <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">AAdd</span> args</code></pre>
-<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">parseMult ::</span> <span class="dt">Parser</span> (<span class="dt">Expr</span> a)
-parseMult <span class="fu">=</span> <span class="kw">do</span>
-    reservedOp <span class="st">&quot;*&quot;</span>
-    args <span class="ot">&lt;-</span> parseQuotedList
-    return <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">AMult</span> args</code></pre>
 <p>Top level expression parser</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">parseExpr ::</span> <span class="dt">Parser</span> (<span class="dt">Expr</span> a)
 parseExpr <span class="fu">=</span> parseSymbol
         <span class="fu">&lt;|&gt;</span> parseNumber
         <span class="fu">&lt;|&gt;</span> (try (char <span class="ch">&#39;\&#39;&#39;</span>) <span class="fu">&gt;&gt;</span> parseQuote)
         <span class="fu">&lt;|&gt;</span> (try (char <span class="ch">&#39;`&#39;</span>)  <span class="fu">&gt;&gt;</span> parseQuasi)
-        <span class="fu">&lt;|&gt;</span> parens ( parseMult <span class="fu">&lt;|&gt;</span> parseAdd <span class="fu">&lt;|&gt;</span> parseFn <span class="fu">&lt;|&gt;</span> parseLet <span class="fu">&lt;|&gt;</span> parseApp )</code></pre>
+        <span class="fu">&lt;|&gt;</span> parens ( parseFn <span class="fu">&lt;|&gt;</span> parseLet <span class="fu">&lt;|&gt;</span> parseApp )</code></pre>
 <p>Expression parser inside a quoted list</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">parseExprInQuote ::</span> <span class="dt">Parser</span> (<span class="dt">Expr</span> a)
 parseExprInQuote <span class="fu">=</span> parseSymbol
                <span class="fu">&lt;|&gt;</span> parseNumber
                <span class="fu">&lt;|&gt;</span> (try (char <span class="ch">&#39;\&#39;&#39;</span>) <span class="fu">&gt;&gt;</span> parseQuote)
-               <span class="fu">&lt;|&gt;</span> parens ( parseMult <span class="fu">&lt;|&gt;</span> parseAdd <span class="fu">&lt;|&gt;</span> parseQuotedList )</code></pre>
+               <span class="fu">&lt;|&gt;</span> parens ( parseQuotedList )</code></pre>
 <p>Expression parser inside a quasiquoted list</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">parseExprInQuasi ::</span> <span class="dt">Parser</span> (<span class="dt">Expr</span> a)
 parseExprInQuasi <span class="fu">=</span> parseSymbol
