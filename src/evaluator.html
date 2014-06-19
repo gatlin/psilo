@@ -89,7 +89,7 @@ The psilo Virtual Machine
 <h2 id="the-machine">The Machine</h2>
 <p>Borrowing (stealing?) from Krishnamurthi's inimitable <a href="http://cs.brown.edu/~sk/Publications/Books/ProgLangs/">Programming Languages: Application and Interpretation</a> the environment does not map symbols to values but to <em>locations</em> in the store. The store, then, maps location to values.</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">type</span> <span class="dt">Location</span> <span class="fu">=</span> <span class="dt">Int</span>
-<span class="kw">data</span> <span class="dt">Value</span> <span class="fu">=</span> forall a <span class="fu">.</span> <span class="dt">Show</span> a <span class="ot">=&gt;</span> <span class="dt">ClosV</span> {<span class="ot"> symV  ::</span> <span class="dt">Symbol</span>
+<span class="kw">data</span> <span class="dt">Value</span> <span class="fu">=</span> forall a <span class="fu">.</span> <span class="dt">Show</span> a <span class="ot">=&gt;</span> <span class="dt">ClosV</span> {<span class="ot"> symV  ::</span> [<span class="dt">Symbol</span>]
                                         ,<span class="ot"> bodyV ::</span> (<span class="dt">Expr</span> a)
                                         ,<span class="ot"> envV  ::</span> <span class="dt">Environment</span>
                                         }
@@ -225,28 +225,29 @@ interpret (<span class="dt">Free</span> (<span class="dt">ASymbol</span>  s)) <s
         v
     return <span class="fu">$</span> <span class="dt">ListV</span> vals</code></pre>
 <p>The below code for lambdas, while technically correct, has a huge problem: it copies its <em>entire</em> environment. A much smarter trick would be to only copy that which is actually used.</p>
-<p>Also, function application is currently very stupid. It is intended that functions will take one argument, a list containing the actual values to be processed. At the moment this is not honored, but the process is simple:</p>
+<p>Also, function application is currently very stupid. It is intended that functions will take one argument, a list containing the actual values to be processed. The process is simple:</p>
 <ol type="1">
 <li><p>If the operand list is sufficiently long, zip it with the list of symbols in the function.</p></li>
 <li><p>Create an <code>Environment</code> out of this zipped list.</p></li>
 <li><p>Form a union between this new environment and the current, favoring the new one.</p></li>
 </ol>
-<p><code>ClosV</code> and <code>ALambda</code> will need to change to accept a list of arguments, but this is trivial.</p>
-<pre class="sourceCode literate haskell"><code class="sourceCode haskell">interpret (<span class="dt">Free</span> (<span class="dt">ALambda</span> arg body)) <span class="fu">=</span> <span class="kw">do</span>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell">interpret (<span class="dt">Free</span> (<span class="dt">ALambda</span> args body)) <span class="fu">=</span> <span class="kw">do</span>
     (<span class="dt">MEnv</span> currentEnv) <span class="ot">&lt;-</span> ask
-    return <span class="fu">$</span> <span class="dt">ClosV</span> arg body currentEnv</code></pre>
+    return <span class="fu">$</span> <span class="dt">ClosV</span> args body currentEnv</code></pre>
 <p>During application, if we are given a symbol for an operator, check to see if it is a built-in operator and, if applicable, simply return the resulting <code>Value</code>.</p>
-<pre class="sourceCode literate haskell"><code class="sourceCode haskell">interpret (<span class="dt">Free</span> (<span class="dt">AApply</span> fun arg)) <span class="fu">=</span> <span class="kw">do</span>
-    (<span class="dt">ListV</span> argVal)       <span class="ot">&lt;-</span> interpret arg
-    <span class="kw">case</span> builtin fun argVal <span class="kw">of</span>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell">interpret (<span class="dt">Free</span> (<span class="dt">AApply</span> fun args)) <span class="fu">=</span> <span class="kw">do</span>
+    (<span class="dt">ListV</span> argVals)       <span class="ot">&lt;-</span> interpret args
+    <span class="kw">case</span> builtin fun argVals <span class="kw">of</span>
         <span class="dt">Just</span> mv   <span class="ot">-&gt;</span> return mv
         <span class="dt">Nothing</span>   <span class="ot">-&gt;</span> <span class="kw">do</span>
-            (<span class="dt">ClosV</span> sym body env) <span class="ot">&lt;-</span> interpret fun
-            (<span class="dt">MEnv</span> currentEnv)    <span class="ot">&lt;-</span> ask
-            newLoc  <span class="ot">&lt;-</span> runOp <span class="fu">$</span> fresh
-            runOp <span class="fu">$</span> store newLoc (argVal <span class="fu">!!</span> <span class="dv">0</span>)
-            env&#39;    <span class="ot">&lt;-</span> return <span class="fu">$</span> Map.insert sym newLoc env
-            local (\(<span class="dt">MEnv</span> e) <span class="ot">-&gt;</span> <span class="dt">MEnv</span> (Map.union env&#39; e)) <span class="fu">$</span> <span class="kw">do</span>
+            (<span class="dt">ClosV</span> syms body env) <span class="ot">&lt;-</span> interpret fun
+            locations <span class="ot">&lt;-</span> forM argVals <span class="fu">$</span> \av <span class="ot">-&gt;</span> <span class="kw">do</span>
+                newLoc <span class="ot">&lt;-</span> runOp <span class="fu">$</span> fresh
+                runOp <span class="fu">$</span> store newLoc av
+                return newLoc
+            <span class="kw">let</span> env&#39; <span class="fu">=</span> Map.fromList <span class="fu">$</span> zip syms locations
+            newFrame <span class="ot">&lt;-</span> return <span class="fu">$</span> Map.union env&#39; env
+            local (\(<span class="dt">MEnv</span> e) <span class="ot">-&gt;</span> <span class="dt">MEnv</span> (Map.union newFrame e)) <span class="fu">$</span> <span class="kw">do</span>
                 interpret body</code></pre>
 <p>This interpreter is flexible and powerful because we built up the appropriate abstractions.</p>
 <h2 id="built-in-operators">Built-in operators</h2>

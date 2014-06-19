@@ -78,8 +78,8 @@ type Expr = Mu AST</code></pre>
 
 <span class="kw">data</span> <span class="dt">AST</span> a
     <span class="fu">=</span> <span class="dt">AInteger</span> <span class="dt">Integer</span>
-    <span class="fu">|</span> <span class="dt">ASymbol</span> <span class="dt">Symbol</span>
-    <span class="fu">|</span> <span class="dt">ALambda</span> <span class="dt">Symbol</span> a
+    <span class="fu">|</span> <span class="dt">ASymbol</span> {<span class="ot"> toSym ::</span> <span class="dt">Symbol</span> }
+    <span class="fu">|</span> <span class="dt">ALambda</span> [<span class="dt">Symbol</span>] a
     <span class="fu">|</span> <span class="dt">AApply</span> a a
     <span class="fu">|</span> <span class="dt">AList</span> [a]
 
@@ -95,6 +95,10 @@ type Expr = Mu AST</code></pre>
 <span class="kw">instance</span> <span class="dt">Show</span> a <span class="ot">=&gt;</span> <span class="dt">Show</span> (<span class="dt">Expr</span> a) <span class="kw">where</span>
     show (<span class="dt">Pure</span> _)   <span class="fu">=</span> <span class="st">&quot;&quot;</span>
     show (<span class="dt">Free</span> x) <span class="fu">=</span> <span class="st">&quot; ( &quot;</span> <span class="fu">++</span> show x <span class="fu">++</span> <span class="st">&quot; ) &quot;</span></code></pre>
+<p>The need occasionally arises to convert a list of <code>Free (ASymbol Symbol)</code> values to a list of <code>Symbol</code> values. This function serves that purpose:</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">expr2symlist ::</span> [<span class="dt">Expr</span> a] <span class="ot">-&gt;</span> [<span class="dt">Symbol</span>]
+expr2symlist ((<span class="dt">Free</span> (<span class="dt">ASymbol</span> x))<span class="fu">:</span>xs) <span class="fu">=</span> [x] <span class="fu">++</span> (expr2symlist xs)
+expr2symlist _                       <span class="fu">=</span> []</code></pre>
 
         </div><!-- content -->
     </div><!-- row -->

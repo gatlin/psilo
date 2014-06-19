@@ -81,10 +81,10 @@ parseSymbol <span class="fu">=</span> <span class="kw">do</span>
 parseFn <span class="fu">=</span> <span class="kw">do</span>
     reserved <span class="st">&quot;\\&quot;</span>
     optional whitespace
-    (<span class="dt">Free</span> (<span class="dt">ASymbol</span> arg)) <span class="ot">&lt;-</span> parens parseSymbol
+    (<span class="dt">Free</span> (<span class="dt">AList</span> arg)) <span class="ot">&lt;-</span> parens parseQuotedList
     optional whitespace
     body <span class="ot">&lt;-</span> parseExpr
-    return <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">ALambda</span> arg body</code></pre>
+    return <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">ALambda</span> (expr2symlist arg) body</code></pre>
 <p><code>let</code> bindings are formally equivalent to wrapping an expression in an outer closure and immediately evaluating it, like so:</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">parseLetBinding ::</span> <span class="dt">Parser</span> (<span class="dt">Expr</span> a)
 parseLetBinding <span class="fu">=</span> <span class="kw">do</span>
@@ -104,10 +104,8 @@ parseLet <span class="fu">=</span> <span class="kw">do</span>
     (<span class="dt">Free</span> (<span class="dt">AList</span> assns)) <span class="ot">&lt;-</span> parens parseLetBindings
     body  <span class="ot">&lt;-</span> parseExpr <span class="fu">&lt;|&gt;</span> return (<span class="dt">Free</span> (<span class="dt">AList</span> []))
     (args,operands) <span class="ot">&lt;-</span> (flip mapAndUnzipM) assns <span class="fu">$</span> \(<span class="dt">Free</span> (<span class="dt">AList</span> (x<span class="fu">:</span>y<span class="fu">:</span>_))) <span class="ot">-&gt;</span> return (x,y)
-    <span class="co">--args&#39; &lt;- return $ Free $ AList args</span>
     operands&#39; <span class="ot">&lt;-</span> return <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">AList</span> operands
-    (<span class="dt">Free</span> (<span class="dt">ASymbol</span> arg1)) <span class="ot">&lt;-</span> return <span class="fu">$</span> args <span class="fu">!!</span> <span class="dv">0</span>
-    fun <span class="ot">&lt;-</span> return <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">ALambda</span> arg1 body
+    fun <span class="ot">&lt;-</span> return <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">ALambda</span> (expr2symlist args) body
     return <span class="fu">$</span> <span class="dt">Free</span> (<span class="dt">AApply</span> fun operands&#39;)</code></pre>
 <p>The application of a function to a list of arguments, a single symbol, or an arbitrary expression value.</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">parseApp ::</span> <span class="dt">Parser</span> (<span class="dt">Expr</span> a)
