@@ -49,10 +49,10 @@ evaluate in the context of the arguments.
 > parseFn = do
 >     reserved "\\"
 >     optional whitespace
->     (Free (ASymbol arg)) <- parens parseSymbol
+>     (Free (AList arg)) <- parens parseQuotedList
 >     optional whitespace
 >     body <- parseExpr
->     return $ Free $ ALambda arg body
+>     return $ Free $ ALambda (expr2symlist arg) body
 
 `let` bindings are formally equivalent to wrapping an expression in an outer
 closure and immediately evaluating it, like so:
@@ -75,12 +75,9 @@ closure and immediately evaluating it, like so:
 >     (Free (AList assns)) <- parens parseLetBindings
 >     body  <- parseExpr <|> return (Free (AList []))
 >     (args,operands) <- (flip mapAndUnzipM) assns $ \(Free (AList (x:y:_))) -> return (x,y)
->     --args' <- return $ Free $ AList args
 >     operands' <- return $ Free $ AList operands
->     (Free (ASymbol arg1)) <- return $ args !! 0
->     fun <- return $ Free $ ALambda arg1 body
+>     fun <- return $ Free $ ALambda (expr2symlist args) body
 >     return $ Free (AApply fun operands')
->
 
 The application of a function to a list of arguments, a single symbol, or
 an arbitrary expression value.

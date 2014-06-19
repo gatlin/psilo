@@ -50,8 +50,8 @@ Not bad, huh?
 >
 > data AST a
 >     = AInteger Integer
->     | ASymbol Symbol
->     | ALambda Symbol a
+>     | ASymbol { toSym :: Symbol }
+>     | ALambda [Symbol] a
 >     | AApply a a
 >     | AList [a]
 >
@@ -67,3 +67,10 @@ Not bad, huh?
 > instance Show a => Show (Expr a) where
 >     show (Pure _)   = ""
 >     show (Free x) = " ( " ++ show x ++ " ) "
+
+The need occasionally arises to convert a list of `Free (ASymbol Symbol)`
+values to a list of `Symbol` values. This function serves that purpose:
+
+> expr2symlist :: [Expr a] -> [Symbol]
+> expr2symlist ((Free (ASymbol x)):xs) = [x] ++ (expr2symlist xs)
+> expr2symlist _                       = []

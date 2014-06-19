@@ -58,7 +58,7 @@ values but to *locations* in the store. The store, then, maps location to
 values.
 
 > type Location = Int
-> data Value = forall a . Show a => ClosV { symV  :: Symbol
+> data Value = forall a . Show a => ClosV { symV  :: [Symbol]
 >                                         , bodyV :: (Expr a)
 >                                         , envV  :: Environment
 >                                         }
@@ -291,7 +291,7 @@ that which is actually used.
 
 Also, function application is currently very stupid. It is intended that
 functions will take one argument, a list containing the actual values to be
-processed. At the moment this is not honored, but the process is simple:
+processed. The process is simple:
 
 1. If the operand list is sufficiently long, zip it with the list of symbols in
 the function.
@@ -301,28 +301,27 @@ the function.
 3. Form a union between this new environment and the current, favoring the new
 one.
 
-`ClosV` and `ALambda` will need to change to accept a list of arguments, but
-this is trivial.
-
-> interpret (Free (ALambda arg body)) = do
+> interpret (Free (ALambda args body)) = do
 >     (MEnv currentEnv) <- ask
->     return $ ClosV arg body currentEnv
+>     return $ ClosV args body currentEnv
 
 During application, if we are given a symbol for an operator, check to see if
 it is a built-in operator and, if applicable, simply return the resulting
 `Value`.
 
-> interpret (Free (AApply fun arg)) = do
->     (ListV argVal)       <- interpret arg
->     case builtin fun argVal of
+> interpret (Free (AApply fun args)) = do
+>     (ListV argVals)       <- interpret args
+>     case builtin fun argVals of
 >         Just mv   -> return mv
 >         Nothing   -> do
->             (ClosV sym body env) <- interpret fun
->             (MEnv currentEnv)    <- ask
->             newLoc  <- runOp $ fresh
->             runOp $ store newLoc (argVal !! 0)
->             env'    <- return $ Map.insert sym newLoc env
->             local (\(MEnv e) -> MEnv (Map.union env' e)) $ do
+>             (ClosV syms body env) <- interpret fun
+>             locations <- forM argVals $ \av -> do
+>                 newLoc <- runOp $ fresh
+>                 runOp $ store newLoc av
+>                 return newLoc
+>             let env' = Map.fromList $ zip syms locations
+>             newFrame <- return $ Map.union env' env
+>             local (\(MEnv e) -> MEnv (Map.union newFrame e)) $ do
 >                 interpret body
 
 This interpreter is flexible and powerful because we built up the appropriate
