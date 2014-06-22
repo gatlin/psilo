@@ -6,6 +6,7 @@ import Prelude hiding (sequence)
 import Syntax
 import Control.Comonad
 import Control.Comonad.Cofree
+import Control.Monad.Free
 import Control.Monad.State hiding (sequence)
 import Data.Foldable (Foldable, fold)
 import Data.Maybe (fromMaybe)
@@ -14,30 +15,23 @@ import Data.Traversable (Traversable, sequence)
 import qualified Data.Map as M
 
 
-{-
- - Type language
- -}
-
--- this tree is now correct;
--- the typechecking code needs to be suitably modified
+-- | The language of types
 data Type
     = [Type] :-> Type
-    | TVar Integer
+    | TVar Int
     | TInteger
-    | TFloat
     | TSymbol
-    | TBoolean
     | TList [Type]
 
 deriving instance Show Type
 
-{-
- - Type inference
+{- | There will end up being many of these constraints, most likely, but at the
+ - moment we are only concerned with equality constraints.
  -}
-
 data Constraint = EqualityConstraint Type Type
 deriving instance Show Constraint
 
+-- | Constraints are propagated to the top, assumptions are per-node.
 data TypeResult = TypeResult {
     constraints :: [Constraint],
     assumptions :: M.Map String [Type]
@@ -60,8 +54,10 @@ data TypeState t m = TypeState {
     memo  :: M.Map t m
 }
 
+-- | To keep track of what we have figured out so far
 type TypeCheck t = State (TypeState t (Type, TypeResult)) (Type, TypeResult)
 
+-- | Each time we encounter some new symbol or list, give it a new type id.
 freshVarId :: State (TypeState t m) Type
 freshVarId = do
     v <- gets varId
@@ -75,8 +71,8 @@ memoizedTC f c = gets memo >>= maybe memoize return . M.lookup c where
         modify $ \s -> s { memo = M.insert c r $ memo s }
         return r
 
-cofreeMu :: Functor f => Free f -> Cofree f ()
-cofree (Free f) = () :< fmap cofreeMu f
+cofreeMu :: Functor f => Free f a -> Cofree f ()
+cofreeMu (Free f) = () :< fmap cofreeMu f
 
 attribute :: Cofree AST () -> Cofree AST (Type, TypeResult)
 attribute c =
@@ -86,8 +82,6 @@ attribute c =
 generateConstraints :: Cofree AST () -> TypeCheck (Cofree AST())
 
 generateConstraints (() :< AInteger _) = return (TInteger, mempty)
-generateConstraints (() :< AFloat _)   = return (TFloat, mempty)
-generateConstraints (() :< ABoolean _) = return (TBoolean, mempty)
 generateConstraints (() :< ASymbol s) = do
     var <- freshVarId
     return (var, TypeResult {
@@ -120,17 +114,16 @@ solveConstraints :: [Constraint] -> Maybe (M.Map Int Type)
 solveConstraints =
     foldl (\b a -> liftM2 mappend (solve b a) b) $ Just M.empty
     where solve maybeSubs (EqualityConstraint a b) = do
-        subs <- maybeSubs
-        mostGeneralUnifier (substitute subs a) (substitute subs b)
+              subs <- maybeSubs
+              mostGeneralUnifier (substitute subs a) (substitute subs b)
 
 mostGeneralUnifier :: Type -> Type -> Maybe (M.Map Int Type)
 mostGeneralUnifier (TVar i) b = Just $ M.singleton i b
 mostGeneralUnifier a (TVar i) = Just $ M.singleton i a
 
 mostGeneralUnifier TInteger TInteger = Just M.empty
-mostGeneralUnifier TFloat   TFloat   = Just M.empty
 
-mostGeneralUnifier (TLambda a b) (TLambda c d) = do
+mostGeneralUnifier (a :-> b) (c :-> d) = do
     s1 <- mostGeneralUnifier a c
     liftM2 mappend (mostGeneralUnifier (substitute s1 b) (substitute s1 d)) $ Just s1
 
@@ -138,7 +131,7 @@ mostGeneralUnifier _ _ = Nothing
 
 substitute :: M.Map Int Type -> Type -> Type
 substitue subs v@(TVar i) = maybe v (substitute subs) $ M.lookup i subs
-substitute subs (TLambda a b) = TLambda (substitute subs a) (substitute subs b)
+substitute subs (a :-> b) = (substitute subs a) :-> (substitute subs b)
 substitute _ t = t
 
 typeTree :: Cofree AST () -> Maybe (Cofree AST Type)
@@ -147,3 +140,4 @@ typeTree c =
         (r :< _) = result
         maybeSubs = solveConstraints . constraints $ snd r
     in  fmap (\subs -> fmap (substitute subs . fst) result) maybeSubs
+

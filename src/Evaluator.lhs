@@ -58,13 +58,14 @@ values but to *locations* in the store. The store, then, maps location to
 values.
 
 > type Location = Int
-> data Value = forall a . Show a => ClosV { symV  :: [Symbol]
->                                         , bodyV :: (Expr a)
->                                         , envV  :: Environment
+> data Value = forall a . Show a => VClos { vSym  :: [Symbol]
+>                                         , vBodyv :: (Expr a)
+>                                         , vEnv  :: Environment
 >                                         }
->            | NumV Integer
->            | ListV [Value]
->            | NilV
+>            | VSym Symbol
+>            | VNum Integer
+>            | VList [Value]
+>            | VNil
 >
 > deriving instance Show Value
 >
@@ -73,14 +74,13 @@ values.
 >
 > emptyEnv = Map.empty
 > emptyStore = IntMap.empty
->
 
 The store must also keep track of how many locations it has handed out. As the
 `StateT` monad can only hold one value as state, I wrap a `Store` and an `Int`
 together in one data type.
 
 > data MStore = MStore { mStore :: Store
->                      , mLoc :: Int
+>                      , mLoc   :: Int
 >                      }
 >     deriving Show
 
@@ -241,10 +241,10 @@ To illustrate what `Op` code looks like have a look at `opTest`:
 > opTest = runOp $ do
 >     loc1 <- fresh
 >     bind "huh" loc1
->     store loc1 $ NumV 5
->     (NumV val) <- lookup "huh" >>= fetch
+>     store loc1 $ VNum 5
+>     (VNum val) <- lookup "huh" >>= fetch
 >     bind "huh" 0
->     store 0 $ NumV (val * 2)
+>     store 0 $ VNum (val * 2)
 >     return ()
 
 Interpreting psilo
@@ -268,12 +268,21 @@ The function `interpret` handles the first part. You can even tell by its type:
 with `Op`, we handle the base case of being handed a `Pure` value. In this
 case, we return `NilV`.
 
-> interpret (Pure v) = return NilV
+> interpret (Pure v) = return VNil
 
 The rest of the interpreter is remarkably simple. Each case corresponds to a
 branch in our `AST` definition.
 
-> interpret (Free (AInteger n)) = return $ NumV n
+> interpret (Free (AInteger n)) = return $ VNum n
+
+Symbols may have prefixes or suffixes (well, eventually) which modify the
+semantic value of the symbol but not the actual raw value. For example, a `:&`
+suffix tells the compiler that the symbol is a shared reference and may be
+safely ignored.
+
+While this will be more nuanced or sophisticated in the future, in this
+evaluator at least we may safely ignore all suffixes.
+
 > interpret (Free (ASymbol  s)) = do
 >     val <- runOp $ lookup s >>= fetch
 >     return val
@@ -283,7 +292,7 @@ branch in our `AST` definition.
 >         x' <- return x
 >         let v = interpret x'
 >         v
->     return $ ListV vals
+>     return $ VList vals
 
 The below code for lambdas, while technically correct, has a huge problem: it
 copies its *entire* environment. A much smarter trick would be to only copy
@@ -303,18 +312,18 @@ one.
 
 > interpret (Free (ALambda args body)) = do
 >     (MEnv currentEnv) <- ask
->     return $ ClosV args body currentEnv
+>     return $ VClos args body currentEnv
 
 During application, if we are given a symbol for an operator, check to see if
 it is a built-in operator and, if applicable, simply return the resulting
 `Value`.
 
 > interpret (Free (AApply fun args)) = do
->     (ListV argVals)       <- interpret args
+>     (VList argVals)       <- interpret args
 >     case builtin fun argVals of
 >         Just mv   -> return mv
 >         Nothing   -> do
->             (ClosV syms body env) <- interpret fun
+>             (VClos syms body env) <- interpret fun
 >             locations <- forM argVals $ \av -> do
 >                 newLoc <- runOp $ fresh
 >                 runOp $ store newLoc av
@@ -336,14 +345,14 @@ arithmetic). The following function attempts to evaluate a built-in, returning
 
 > builtin :: Expr a -> [Value] -> Maybe Value
 > builtin (Free (ASymbol sym)) args
->     | sym == "+"    = Just $ binOp ((+)) args
->     | sym == "*"    = Just $ binOp ((*)) args
->     | sym == "-"    = Just $ binOp ((-)) args
->     | sym == "/"    = Just $ binOp div   args
+>     | sym == "+"    = binOp ((+)) args
+>     | sym == "*"    = binOp ((*)) args
+>     | sym == "-"    = binOp ((-)) args
+>     | sym == "/"    = binOp div   args
 >     | otherwise     = Nothing
->     where binOp op xs = let (NumV l) = xs !! 0
->                             (NumV r) = xs !! 1
->                         in  NumV $ op l r
+>     where binOp op xs = let (VNum l) = xs !! 0
+>                             (VNum r) = xs !! 1
+>                         in  Just . VNum $ op l r
 > builtin _ _   = Nothing
 
 [plai]: http://cs.brown.edu/~sk/Publications/Books/ProgLangs/

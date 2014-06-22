@@ -18,6 +18,7 @@ This is probably sub-optimal; parsec is a harsh master.
 > import Control.Applicative ((<$>))
 > import Control.Monad (mapAndUnzipM)
 > import Control.Monad.Free
+> import Data.List.Split (splitOn)
 >
 > import qualified Text.Parsec.Expr as Ex
 > import qualified Text.Parsec.Token as Tok
@@ -38,8 +39,11 @@ bind values in lambda abstractions.
 > parseSymbol :: Parser (Expr a)
 > parseSymbol = do
 >     sym <- operator <|> identifier
->     return $ Free $ ASymbol sym
->
+>     sym' <- chomped sym
+>     return $ Free $ ASymbol sym'
+>     where chomped s = let s' = splitOn ":" s
+>                       in  return $ s' !! 0
+
 
 Lamba abstractions, or *functions*. A function definition is a list of symbols
 to bind to the elements of the argument list, and a psilo expression to

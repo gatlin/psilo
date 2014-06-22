@@ -20,7 +20,8 @@ The main purpose of this module is to remove some clutter from `Parser`.
 >     where ops = []
 >           names = ["\\","::","let","apply"]
 >           idStarts = letter <|> char '_'
->           idLetters = letter <|> char '_' <|> digit <|> char '-' <|> char '+' <|> char '?'
+>           idLetters = letter <|> char '_' <|> digit <|> char '-'
+>                   <|> char '+' <|> char '?' <|> char ':' <|> char '&'
 >           opStarts = oneOf "!$%&|*+-/:<=>?@^_~#"
 >           opLetters = oneOf "!$%&|*+-/:<=>?@^_~#" <|> letter <|> digit <|> char '-' <|> char '_'
 >           style = emptyDef {
