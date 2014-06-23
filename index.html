@@ -162,8 +162,8 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 ; =&gt; [ 1 4 9 16 25 ]
 
 (::= Stream (a)
-  (: Empty (Stream a))
-  (: Cons (-&gt; a (Stream a) (Stream a))))
+  (: Empty ())
+  (: Cons  (a (Stream a))))
 
 (= stream-length (strm:&amp;)
   (= stream-length-helper (strm:&amp; acc)
@@ -391,8 +391,8 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 <p>An algebraic data type is a <em>sum</em> of <em>product</em> types. More plainly, it is a type which can be one of several different list types. They are essentially a generalization of the technique shown in the “Subverting linearity” section.</p>
 <p>To give a simple idea of how to create ADTs, we will create an Optional type. An <code>Optional</code> value will be one which either has a value, or is explicitly devoid of value. This is useful for catching and managing failure, among others. Here is the code:</p>
 <pre><code>(::= Optional (a)
-  (: Nil    (Optional a))
-  (: Some   (-&gt; a (Optional a))))</code></pre>
+  (: Nil    ())
+  (: Some   ()))</code></pre>
 <p>Here, we name our type <code>Optional</code> and give it a <em>type variable</em>, here called <code>a</code>. It could have been any legal symbol starting with a lower case letter, though.</p>
 <p>We then defined two <em>value constructors</em> for our type: <code>Nil</code> and <code>Some</code>. <code>Nil</code> always produces an <code>Optional a</code> value, whereas <code>Some</code> is a function which takes a value of type <code>a</code> and returns a value of <code>Optional a</code>.</p>
 <p>Yes, you guessed correctly: value constructors are just functions automatically generated for you. Let’s use our new type:</p>
@@ -401,8 +401,8 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 <h3 id="example-1"><span class="header-section-number">5.4.3</span> Example 1</h3>
 <p>Let’s make more people!</p>
 <pre><code>(::= Person
-  (: Human (-&gt; String -&gt; Integer -&gt; Person))
-  (: Corp  (-&gt; String -&gt; Integer -&gt; String -&gt; Person)))
+  (: Human (String Integer))
+  (: Corp  (String Integer String)))
 
 (= birthday (p)
   (? p
@@ -435,8 +435,8 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 <h3 id="example-2"><span class="header-section-number">5.4.4</span> Example 2</h3>
 <p>As another example, let’s create a Boolean data type and some convenient utilities for it:</p>
 <pre><code>(::= Boolean  ()
-  (: True  (Boolean))
-  (: False (Boolean)))
+  (: True  ())
+  (: False ()))
 
 ; there is a builtin though
 (= if/new   (condition &#39;then &#39;else)

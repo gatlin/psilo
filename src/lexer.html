@@ -64,7 +64,8 @@ lexer <span class="fu">=</span> Tok.makeTokenParser style
     <span class="kw">where</span> ops <span class="fu">=</span> []
           names <span class="fu">=</span> [<span class="st">&quot;\\&quot;</span>,<span class="st">&quot;::&quot;</span>,<span class="st">&quot;let&quot;</span>,<span class="st">&quot;apply&quot;</span>]
           idStarts <span class="fu">=</span> letter <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;_&#39;</span>
-          idLetters <span class="fu">=</span> letter <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;_&#39;</span> <span class="fu">&lt;|&gt;</span> digit <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;-&#39;</span> <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;+&#39;</span> <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;?&#39;</span>
+          idLetters <span class="fu">=</span> letter <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;_&#39;</span> <span class="fu">&lt;|&gt;</span> digit <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;-&#39;</span>
+                  <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;+&#39;</span> <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;?&#39;</span> <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;:&#39;</span> <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;&amp;&#39;</span>
           opStarts <span class="fu">=</span> oneOf <span class="st">&quot;!$%&amp;|*+-/:&lt;=&gt;?@^_~#&quot;</span>
           opLetters <span class="fu">=</span> oneOf <span class="st">&quot;!$%&amp;|*+-/:&lt;=&gt;?@^_~#&quot;</span> <span class="fu">&lt;|&gt;</span> letter <span class="fu">&lt;|&gt;</span> digit <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;-&#39;</span> <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;_&#39;</span>
           style <span class="fu">=</span> emptyDef {

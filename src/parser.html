@@ -60,6 +60,7 @@ The Parser
 <span class="kw">import </span><span class="dt">Control.Applicative</span> ((&lt;$&gt;))
 <span class="kw">import </span><span class="dt">Control.Monad</span> (mapAndUnzipM)
 <span class="kw">import </span><span class="dt">Control.Monad.Free</span>
+<span class="kw">import </span><span class="dt">Data.List.Split</span> (splitOn)
 
 <span class="kw">import qualified</span> <span class="dt">Text.Parsec.Expr</span> <span class="kw">as</span> <span class="dt">Ex</span>
 <span class="kw">import qualified</span> <span class="dt">Text.Parsec.Token</span> <span class="kw">as</span> <span class="dt">Tok</span>
@@ -75,7 +76,10 @@ parseNumber <span class="fu">=</span> try ( <span class="kw">do</span> { n <span
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">parseSymbol ::</span> <span class="dt">Parser</span> (<span class="dt">Expr</span> a)
 parseSymbol <span class="fu">=</span> <span class="kw">do</span>
     sym <span class="ot">&lt;-</span> operator <span class="fu">&lt;|&gt;</span> identifier
-    return <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">ASymbol</span> sym</code></pre>
+    sym&#39; <span class="ot">&lt;-</span> chomped sym
+    return <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">ASymbol</span> sym&#39;
+    <span class="kw">where</span> chomped s <span class="fu">=</span> <span class="kw">let</span> s&#39; <span class="fu">=</span> splitOn <span class="st">&quot;:&quot;</span> s
+                      <span class="kw">in</span>  return <span class="fu">$</span> s&#39; <span class="fu">!!</span> <span class="dv">0</span></code></pre>
 <p>Lamba abstractions, or <em>functions</em>. A function definition is a list of symbols to bind to the elements of the argument list, and a psilo expression to evaluate in the context of the arguments.</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">parseFn ::</span> <span class="dt">Parser</span> (<span class="dt">Expr</span> a)
 parseFn <span class="fu">=</span> <span class="kw">do</span>
