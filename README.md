@@ -74,8 +74,8 @@ The grammar is a work in progress. At the moment, psilo code looks like this:
     ; => [ 1 4 9 16 25 ]
 
     (::= Stream (a)
-      (: Empty (Stream a))
-      (: Cons (-> a (Stream a) (Stream a))))
+      (: Empty ())
+      (: Cons  (a (Stream a))))
 
     (= stream-length (strm:&)
       (= stream-length-helper (strm:& acc)
@@ -527,8 +527,8 @@ devoid of value. This is useful for catching and managing failure, among
 others. Here is the code:
 
     (::= Optional (a)
-      (: Nil    (Optional a))
-      (: Some   (-> a (Optional a))))
+      (: Nil    ())
+      (: Some   ()))
 
 Here, we name our type `Optional` and give it a *type variable*, here called
 `a`. It could have been any legal symbol starting with a lower case letter,
@@ -558,8 +558,8 @@ create a value which doesn't have an environment.
 Let's make more people!
 
     (::= Person
-      (: Human (-> String -> Integer -> Person))
-      (: Corp  (-> String -> Integer -> String -> Person)))
+      (: Human (String Integer))
+      (: Corp  (String Integer String)))
 
     (= birthday (p)
       (? p
@@ -597,8 +597,8 @@ As another example, let's create a Boolean data type and some convenient
 utilities for it:
 
     (::= Boolean  ()
-      (: True  (Boolean))
-      (: False (Boolean)))
+      (: True  ())
+      (: False ()))
 
     ; there is a builtin though
     (= if/new   (condition 'then 'else)
