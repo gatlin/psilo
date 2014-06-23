@@ -394,7 +394,7 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 <p>To give a simple idea of how to create ADTs, we will create an Optional type. An <code>Optional</code> value will be one which either has a value, or is explicitly devoid of value. This is useful for catching and managing failure, among others. Here is the code:</p>
 <pre><code>(::= Optional (a)
   (: Nil    ())
-  (: Some   (a)))</code></pre>
+  (: Some   a))</code></pre>
 <p>Here, we name our type <code>Optional</code> and give it a <em>type variable</em>, here called <code>a</code>. It could have been any legal symbol starting with a lower case letter, though.</p>
 <p>We then defined two <em>value constructors</em> for our type: <code>Nil</code> and <code>Some</code>. <code>Nil</code> always produces an <code>Optional a</code> value, whereas <code>Some</code> is a function which takes a value of type <code>a</code> and returns a value of <code>Optional a</code>.</p>
 <p>Yes, you guessed correctly: value constructors are just functions automatically generated for you. Let’s use our new type:</p>
@@ -403,8 +403,8 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 <h3 id="example-1"><span class="header-section-number">5.4.3</span> Example 1</h3>
 <p>Let’s make more people!</p>
 <pre><code>(::= Person
-  (: Human (String Integer))
-  (: Corp  (String Integer String)))
+  (: Human String Integer)
+  (: Corp  String Integer String))
 
 (: birthday (-&gt; Person Person))
 (= birthday (&#39;(Human name age))
