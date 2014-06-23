@@ -83,14 +83,13 @@
 <li><a href="#closures"><span class="toc-section-number">5.3</span> Closures</a><ul>
 <li><a href="#basics"><span class="toc-section-number">5.3.1</span> Basics</a></li>
 <li><a href="#subverting-linearity"><span class="toc-section-number">5.3.2</span> Subverting linearity</a></li>
-<li><a href="#quotes-and-closures"><span class="toc-section-number">5.3.3</span> Quotes and closures</a></li>
 </ul></li>
 <li><a href="#algebraic-data-types"><span class="toc-section-number">5.4</span> Algebraic Data Types</a><ul>
 <li><a href="#prelude-structures"><span class="toc-section-number">5.4.1</span> Prelude: structures</a></li>
 <li><a href="#introduction-to-adts"><span class="toc-section-number">5.4.2</span> Introduction to ADTs</a></li>
 <li><a href="#example-1"><span class="toc-section-number">5.4.3</span> Example 1</a></li>
 <li><a href="#example-2"><span class="toc-section-number">5.4.4</span> Example 2</a></li>
-<li><a href="#operator-and-quoting"><span class="toc-section-number">5.4.5</span> <code>?</code> operator and quoting</a></li>
+<li><a href="#pattern-matching-and-quoting"><span class="toc-section-number">5.4.5</span> Pattern matching and quoting</a></li>
 </ul></li>
 <li><a href="#continuations"><span class="toc-section-number">5.5</span> Continuations</a><ul>
 <li><a href="#introduction"><span class="toc-section-number">5.5.1</span> Introduction</a></li>
@@ -142,6 +141,7 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 <li>If the computer can do it, it should.</li>
 </ul>
 <h1 id="status"><span class="header-section-number">3</span> Status</h1>
+<p><strong>22 June 2014</strong> For now, getting rid of the <code>?</code> operator in favor of pattern matching. Clearer code and reinforces the notion of function-as-parser.</p>
 <p><strong>17 June 2014</strong> Algebraic Data Types are going to be more like GADTs in Haskell and the syntax reflects this. The symbol for creating ADTs is reminiscent of EBNF as well.</p>
 <p><strong>10 June 2014</strong> The syntax and semantics for lists and types have been dramatically changed and simplified. Essentially, structs are quoted lists which takes advantage of a number of other features to make ADTs and continuations much simpler. I have also discarded the syntax for type annotations and will revisit it.</p>
 <p><strong>29 May 2014</strong> A nascent evaluator is now committed. By no means is it complete, but I can successfully run computations in a rough subset of the language, so that’s something!</p>
@@ -149,32 +149,48 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 <p>Also the source code is now Literate Haskell as I want the psilo compiler to also be a human-language guide to the language’s structure and implementation.</p>
 <h1 id="synopsis"><span class="header-section-number">4</span> Synopsis</h1>
 <p>The grammar is a work in progress. At the moment, psilo code looks like this:</p>
-<pre><code>(let ((square (\ (x:&amp;) (* x x)))
+<pre><code>; let bindings and anonymous functions
+(let ((square (\ (x:&amp;) (* x x)))
       (add1   (\ (x:&amp;) (+ 1 x))))
   (add1 (square 5)))
 
 ; =&gt; 26
 
+; vectors: automatic SIMD structures
 (let ((square (\ (x:&amp;) (* x x)))
       (a      [ 1 2 3 4 5 ] ))
   (square a))
 
 ; =&gt; [ 1 4 9 16 25 ]
 
-(::= Stream (a)
-  (: Empty ())
-  (: Cons  (a (Stream a))))
+; a type defining the grammar of arithmetic
+(::= Arithmetic (a)
+  (: Value a)
+  (: Add (Arithmetic a) (Arithmetic a))
+  (: Mul (Arithmetic a) (Arithmetic a)))
 
-(= stream-length (strm:&amp;)
-  (= stream-length-helper (strm:&amp; acc)
-    (? strm
-      (&#39;(Nil)      0)
-      (&#39;(Cons h t) (stream-length-helper t (+ 1 acc)))))
-  (stream-length-helper strm 0))
+; a function interpreting arithmetic
+(: arith (-&gt; (Arithmetic Integer) Integer))
+(= arith (&#39;(Value v)) v)
+(= arith (&#39;(Add x y))
+  (+ (arith x)
+     (arith y)))
 
-(let ((s    &#39;(Cons 1 (Cons 2 (Cons 3 (Nil))))))
-  (stream-length s))
-; =&gt; 3</code></pre>
+(= arith (&#39;(Mul x y))
+  (* (arith x)
+     (arith y)))
+
+; example usage
+(let ((a &#39;(Add
+            (Mul
+              (Value 5)
+              (Value 6))
+            (Mul
+              (Value 2)
+              (Value 3)))))
+  (arith a))
+
+; =&gt; 36</code></pre>
 <h1 id="detail"><span class="header-section-number">5</span> Detail</h1>
 <h2 id="basics-expressions-primitive-types-and-functions"><span class="header-section-number">5.1</span> Basics: Expressions, primitive types, and functions</h2>
 <h3 id="expressions"><span class="header-section-number">5.1.1</span> Expressions</h3>
@@ -360,20 +376,6 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 <p><code>p</code> is a closure, so it, <code>name</code>, and <code>age</code> are all linear. However in this example I create a value representing a person and pass it a function which calls <code>make-person</code> with modified values. This resulting closure is used to shadow <code>p</code>.</p>
 <p>Shadowing a linear value mutates the value. Thus we have safely mutated encapsulated data.</p>
 <p>This is a bit like the original notion of an object described by Alan Kay: the object listens for messages and dispatches based on the message. Because of the linearity restrictions, the mutated value are encapsulated inside the closure; we can only actually retrieve them when we are ready to destroy the closure.</p>
-<h3 id="quotes-and-closures"><span class="header-section-number">5.3.3</span> Quotes and closures</h3>
-<p>The quote operators are actually just nice ways to construct ad-hoc closures.</p>
-<pre><code>(\  ()
-  (foo x y))</code></pre>
-<p>and</p>
-<pre><code>&#39;(foo x y)</code></pre>
-<p>Are essentially the same. Similarly,</p>
-<pre><code>((\ (x y)
-   (\ ()
-     (foo x y)))
- value-1 value-2)</code></pre>
-<p>and</p>
-<pre><code>`(foo ,x ,y)</code></pre>
-<p>do basically the same thing. The point, though, is that the quote operators allow you to more easily manipulate these expressions before evaluating them, giving you a lot of control and expressivity.</p>
 <h2 id="algebraic-data-types"><span class="header-section-number">5.4</span> Algebraic Data Types</h2>
 <h3 id="prelude-structures"><span class="header-section-number">5.4.1</span> Prelude: structures</h3>
 <p>If you just want some tagged structure of data, the quote operators are sufficient:</p>
@@ -404,27 +406,29 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
   (: Human (String Integer))
   (: Corp  (String Integer String)))
 
-(= birthday (p)
-  (? p
-    (&#39;(Human name age)       &#39;(Human name (+ 1 age)))
-    (&#39;(Corp name age tax-id) &#39;(Corp name (+ 1 age) tax-id)))))
+(: birthday (-&gt; Person Person))
+(= birthday (&#39;(Human name age))
+  `(Human ,name ,(+ 1 age)))
 
-(= show-yourself (p)
-  (? p
-    (&#39;(Human name age) (display
-                         (++ &quot;Name: &quot;
-                             name
-                             &quot;, age: &quot;
-                             (show age))))
-    (&#39;(Corp name age tax-id)
-      (display
-        (++ &quot;Corp Name: &quot;
-            name
-            &quot;, founded &quot;
-            (show age)
-            &quot; years ago. (&quot;
-            tax-id
-            &quot;).&quot;)))))
+(= birthday (&#39;(Corp name age tax-id))
+  `(Corp ,name ,(+ 1 age) ,tax-id))
+
+(: show-yourself (-&gt; Person ()))
+(= show-yourself (&#39;(Human name age))
+  (display
+    (++ &quot;Name: &quot;
+        name
+        &quot;, age: &quot;
+        (show age))))
+
+(= show-yourself (&#39;(Corp name age tax-id))
+  (display
+    (++ &quot;Corp Name: &quot;
+        name
+        &quot;, founded &quot;
+        (show age)
+        &quot; years ago. Tax ID: &quot;
+        tax-id)))
 
 (let ((h    &#39;(Human &quot;gatlin&quot; 25))
       (c    &#39;(Corp  &quot;Buy-N-Large&quot; 100 &quot;123456789&quot;)))
@@ -449,24 +453,21 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
       (foo x)
       (error &quot;x is not 2&quot;)))</code></pre>
 <p>The <code>if</code> expression we just created does what you would expect: it defers evaluation of either branch until it knows which to take.</p>
-<h3 id="operator-and-quoting"><span class="header-section-number">5.4.5</span> <code>?</code> operator and quoting</h3>
+<h3 id="pattern-matching-and-quoting"><span class="header-section-number">5.4.5</span> Pattern matching and quoting</h3>
 <p><em>Note: while all of psilo is a work in progress, quasi-quoting is possibly the least developed of my ideas. As is I could make it work but I admit I don’t have a rock solid theoretical foundation quite yet. Just accept it for now.</em></p>
-<p>The <code>?</code> operator provides some syntactic convenience for writing case-wise evaluation functions of algebraic data types. The above code could be rewritten thusly:</p>
-<pre><code>(= if/new   (condition &#39;then &#39;else)
-  (? condition
-    (&#39;(True)    (then))
-    (&#39;(False)   (else))))</code></pre>
+<p>Any ADT you define permits - nay, <em>requires</em> - you to write functions which account for all of its cases. You do so by quoting the argument and deconstructing it.</p>
+<pre><code>(: if/new (-&gt; Boolean a a a))
+(= if/new (&#39;(True) &#39;then _) (then))
+(= if/new (&#39;(False) _ &#39;else) (else))</code></pre>
 <p>Or for another example:</p>
 <pre><code>(::= Stream   (a)
-  (:    End (Stream a))
-  (:    Cons (-&gt; a (Stream a) (Stream a))))
+  (:    End ())
+  (:    Cons a (Stream a)))
 
-(= stream-length    (strm:&amp;)
-  (? strm
-    (&#39;(End)      0)
-    (&#39;(Cons h t) (+ 1 (stream-length t)))))</code></pre>
-<p><code>?</code> checks to see if there is some set of substitutions which makes the target (here, <code>strm</code>) equivalent to any of the cases. Since symbol equality is rather narrow, we essentially get a nice pattern matching syntax.</p>
-<p>At the moment, <code>?</code> is a bit magic. I’m trying to think of how I might make it less so.</p>
+(: stream-length (-&gt; (Stream a) Int))
+(= stream-length (&#39;(End)) 0)
+(= stream-length (&#39;(Cons _ t))
+    (+ 1 (stream-length t)))</code></pre>
 <h2 id="continuations"><span class="header-section-number">5.5</span> Continuations</h2>
 <h3 id="introduction"><span class="header-section-number">5.5.1</span> Introduction</h3>
 <p>We still have a problem: there is no way to write imperative programs. The following would be nice to have sometimes, though:</p>
@@ -505,16 +506,16 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'">'+e+'<\/'+'a'+'>');
 <h3 id="example-creating-begin"><span class="header-section-number">5.5.4</span> Example: creating <code>begin</code></h3>
 <p>A continuation is like defining an embedded language, and this language must specify commands. As a motivating example, I will create a continuation with one simple command: <code>Then</code>.</p>
 <pre><code>(::=  Then    (k)
-  (:    Then (-&gt; k (Then k))))</code></pre>
+  (:    Then k))</code></pre>
 <p>The language is a simple algebraic data type, and it has one production rule: sentences are composed of nested <code>Then</code>s. The <code>k</code> is a placeholder for the continuation (pronounced with a hard “k” sound).</p>
 <p>Having specified our language, we must write an interpreter function, which I will call <code>imperatively</code>:</p>
-<pre><code>(continuation   imperatively (Then)   (expr)
-  (? expr
-    (&#39;(Term v) (v))
-    (&#39;(Cont k)
-      (? k
-        (&#39;(Then next)  (imperatively (next))))))</code></pre>
-<p>A <strong>lot</strong> is going on under the hood here. Suffice it to say, the <code>continuation</code> operator consumes programs written in our language but how do we write them?</p>
+<pre><code>(: imperatively (-&gt; (Then k) k))
+(= imperatively (&#39;(Term v)) v)
+(= imperatively (&#39;(Cont (Then next)))
+  (imperatively (next)))</code></pre>
+<p>And then we declare our continuation:</p>
+<pre><code>(continuation Then imperatively)</code></pre>
+<p>A <strong>lot</strong> is going on under the hood here. Suffice it to say, the <code>continuation</code> operator takes a language specification and a parser for that language - in our terms, an ADT and a function.</p>
 <p>Continuations are constructed using <code>do</code>. <code>do</code> takes lists of compatibly-typed expressions and constructs the continuation. To evaluate your embedded program, you call the continuation function you wrote.</p>
 <p>So the definition of <code>begin</code> is actually quite simple:</p>
 <pre><code>(= begin    (exprs)
