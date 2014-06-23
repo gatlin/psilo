@@ -1,6 +1,6 @@
 /* Example of vectors and normalize-transpose */
 
-(let ((square (\ (x) (* x x)))
+(let ((square (\ (x:&) (* x x)))
       (vec    [1 2 3 4 5 6]))
   (square vec))
 

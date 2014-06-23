@@ -30,6 +30,9 @@ Philosophy:
 Status
 ===
 
+**22 June 2014** For now, getting rid of the `?` operator in favor of pattern
+matching. Clearer code and reinforces the notion of function-as-parser.
+
 **17 June 2014** Algebraic Data Types are going to be more like GADTs in
 Haskell and the syntax reflects this. The symbol for creating ADTs is
 reminiscent of EBNF as well.
@@ -55,32 +58,48 @@ Synopsis
 
 The grammar is a work in progress. At the moment, psilo code looks like this:
 
+    ; let bindings and anonymous functions
     (let ((square (\ (x:&) (* x x)))
           (add1   (\ (x:&) (+ 1 x))))
       (add1 (square 5)))
 
     ; => 26
 
+    ; vectors: automatic SIMD structures
     (let ((square (\ (x:&) (* x x)))
           (a      [ 1 2 3 4 5 ] ))
       (square a))
 
     ; => [ 1 4 9 16 25 ]
 
-    (::= Stream (a)
-      (: Empty ())
-      (: Cons  (a (Stream a))))
+    ; a type defining the grammar of arithmetic
+    (::= Arithmetic (a)
+      (: Value a)
+      (: Add (Arithmetic a) (Arithmetic a))
+      (: Mul (Arithmetic a) (Arithmetic a)))
 
-    (= stream-length (strm:&)
-      (= stream-length-helper (strm:& acc)
-        (? strm
-          ('(Nil)      0)
-          ('(Cons h t) (stream-length-helper t (+ 1 acc)))))
-      (stream-length-helper strm 0))
+    ; a function interpreting arithmetic
+    (: arith (-> (Arithmetic Integer) Integer))
+    (= arith ('(Value v)) v)
+    (= arith ('(Add x y))
+      (+ (arith x)
+         (arith y)))
 
-    (let ((s    '(Cons 1 (Cons 2 (Cons 3 (Nil))))))
-      (stream-length s))
-    ; => 3
+    (= arith ('(Mul x y))
+      (* (arith x)
+         (arith y)))
+
+    ; example usage
+    (let ((a '(Add
+                (Mul
+                  (Value 5)
+                  (Value 6))
+                (Mul
+                  (Value 2)
+                  (Value 3)))))
+      (arith a))
+
+    ; => 36
 
 Detail
 ===
@@ -459,32 +478,6 @@ object listens for messages and dispatches based on the message. Because of the
 linearity restrictions, the mutated value are encapsulated inside the closure;
 we can only actually retrieve them when we are ready to destroy the closure.
 
-### Quotes and closures
-
-The quote operators are actually just nice ways to construct ad-hoc closures.
-
-    (\  ()
-      (foo x y))
-
-and
-
-    '(foo x y)
-
-Are essentially the same. Similarly,
-
-    ((\ (x y)
-       (\ ()
-         (foo x y)))
-     value-1 value-2)
-
-and
-
-    `(foo ,x ,y)
-
-do basically the same thing. The point, though, is that the quote operators
-allow you to more easily manipulate these expressions before evaluating them,
-giving you a lot of control and expressivity.
-
 Algebraic Data Types
 ---
 
@@ -555,27 +548,29 @@ Let's make more people!
       (: Human (String Integer))
       (: Corp  (String Integer String)))
 
-    (= birthday (p)
-      (? p
-        ('(Human name age)       '(Human name (+ 1 age)))
-        ('(Corp name age tax-id) '(Corp name (+ 1 age) tax-id)))))
+    (: birthday (-> Person Person))
+    (= birthday ('(Human name age))
+      `(Human ,name ,(+ 1 age)))
 
-    (= show-yourself (p)
-      (? p
-        ('(Human name age) (display
-                             (++ "Name: "
-                                 name
-                                 ", age: "
-                                 (show age))))
-        ('(Corp name age tax-id)
-          (display
-            (++ "Corp Name: "
-                name
-                ", founded "
-                (show age)
-                " years ago. ("
-                tax-id
-                ").")))))
+    (= birthday ('(Corp name age tax-id))
+      `(Corp ,name ,(+ 1 age) ,tax-id))
+
+    (: show-yourself (-> Person ()))
+    (= show-yourself ('(Human name age))
+      (display
+        (++ "Name: "
+            name
+            ", age: "
+            (show age))))
+
+    (= show-yourself ('(Corp name age tax-id))
+      (display
+        (++ "Corp Name: "
+            name
+            ", founded "
+            (show age)
+            " years ago. Tax ID: "
+            tax-id)))
 
     (let ((h    '(Human "gatlin" 25))
           (c    '(Corp  "Buy-N-Large" 100 "123456789")))
@@ -608,38 +603,31 @@ utilities for it:
 The `if` expression we just created does what you would expect: it defers
 evaluation of either branch until it knows which to take.
 
-### `?` operator and quoting
+### Pattern matching and quoting
 
 *Note: while all of psilo is a work in progress, quasi-quoting is possibly the
 least developed of my ideas. As is I could make it work but I admit I don't
 have a rock solid theoretical foundation quite yet. Just accept it for now.*
 
-The `?` operator provides some syntactic convenience for writing case-wise
-evaluation functions of algebraic data types. The above code could be rewritten
-thusly:
+Any ADT you define permits - nay, *requires* - you to write functions which
+account for all of its cases. You do so by quoting the argument and
+deconstructing it.
 
-    (= if/new   (condition 'then 'else)
-      (? condition
-        ('(True)    (then))
-        ('(False)   (else))))
+    (: if/new (-> Boolean a a a))
+    (= if/new ('(True) 'then _) (then))
+    (= if/new ('(False) _ 'else) (else))
 
 Or for another example:
 
     (::= Stream   (a)
-      (:    End (Stream a))
-      (:    Cons (-> a (Stream a) (Stream a))))
+      (:    End ())
+      (:    Cons a (Stream a)))
 
-    (= stream-length    (strm:&)
-      (? strm
-        ('(End)      0)
-        ('(Cons h t) (+ 1 (stream-length t)))))
+    (: stream-length (-> (Stream a) Int))
+    (= stream-length ('(End)) 0)
+    (= stream-length ('(Cons _ t))
+        (+ 1 (stream-length t)))
 
-`?` checks to see if there is some set of substitutions which makes the target
-(here, `strm`) equivalent to any of the cases. Since symbol equality is rather
-narrow, we essentially get a nice pattern matching syntax.
-
-At the moment, `?` is a bit magic. I'm trying to think of how I might make it
-less so.
 
 Continuations
 ---
@@ -722,7 +710,7 @@ specify commands. As a motivating example, I will create a continuation with
 one simple command: `Then`.
 
     (::=  Then    (k)
-      (:    Then (-> k (Then k))))
+      (:    Then k))
 
 The language is a simple algebraic data type, and it has one production rule:
 sentences are composed of nested `Then`s. The `k` is a placeholder for the
@@ -731,16 +719,18 @@ continuation (pronounced with a hard "k" sound).
 Having specified our language, we must write an interpreter function, which I
 will call `imperatively`:
 
-    (continuation   imperatively (Then)   (expr)
-      (? expr
-        ('(Term v) (v))
-        ('(Cont k)
-          (? k
-            ('(Then next)  (imperatively (next))))))
+    (: imperatively (-> (Then k) k))
+    (= imperatively ('(Term v)) v)
+    (= imperatively ('(Cont (Then next)))
+      (imperatively (next)))
+
+And then we declare our continuation:
+
+    (continuation Then imperatively)
 
 A **lot** is going on under the hood here. Suffice it to say, the
-`continuation` operator consumes programs written in our language but how do we
-write them?
+`continuation` operator takes a language specification and a parser for that
+language - in our terms, an ADT and a function.
 
 Continuations are constructed using `do`. `do` takes lists of compatibly-typed
 expressions and constructs the continuation. To evaluate your embedded program,
