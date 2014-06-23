@@ -515,7 +515,7 @@ others. Here is the code:
 
     (::= Optional (a)
       (: Nil    ())
-      (: Some   (a)))
+      (: Some   a))
 
 Here, we name our type `Optional` and give it a *type variable*, here called
 `a`. It could have been any legal symbol starting with a lower case letter,
@@ -545,8 +545,8 @@ create a value which doesn't have an environment.
 Let's make more people!
 
     (::= Person
-      (: Human (String Integer))
-      (: Corp  (String Integer String)))
+      (: Human String Integer)
+      (: Corp  String Integer String))
 
     (: birthday (-> Person Person))
     (= birthday ('(Human name age))
