@@ -20,18 +20,12 @@ Technical Features (planned):
 - Dead-simple parallelism with special array types
 - Orthogonal core syntax and semantics for your performance and my sanity
 
-Philosophical Features:
+Philosophy:
 
-- All programs are parsers of some input language. psilo is carefully designed
-  to promote this way of thinking and make it performant.
-
-- That which is required should be elegant; that which is optional should be
-  pragmatic.
-
-- If it can be determined at compile time, it should be.
-
-- Advanced computer science ideas should be exposed, but not mandatory for
-  writing high quality programs.
+- All programming is manipulating languages.
+- Types define grammars; functions define parsers.
+- The earlier a question may be answered, the better.
+- If the computer can do it, it should.
 
 Status
 ===
