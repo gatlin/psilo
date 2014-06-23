@@ -528,7 +528,7 @@ others. Here is the code:
 
     (::= Optional (a)
       (: Nil    ())
-      (: Some   ()))
+      (: Some   (a)))
 
 Here, we name our type `Optional` and give it a *type variable*, here called
 `a`. It could have been any legal symbol starting with a lower case letter,
