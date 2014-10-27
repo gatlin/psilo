@@ -30,7 +30,16 @@ This is probably sub-optimal; parsec is a harsh master.
 > parseNumber = try ( do { n <- integer
 >                        ; return $ Free $ AInteger n
 >                        } )
->
+
+Booleans are represented by the atoms `#t` and `#f`.
+
+> parseBoolean :: Parser (Expr a)
+> parseBoolean = do
+>     char '#'
+>     b <- char 't' <|> char 'f'
+>     case b of
+>         't' -> return $ Free $ ABoolean True
+>         'f' -> return $ Free $ ABoolean False
 
 Symbols are like "atoms" in other lisps or Erlang. They are equivalent
 only to themselves and have no intrinsic value. They are mostly used to
@@ -136,7 +145,8 @@ utility.
 Top level expression parser
 
 > parseExpr :: Parser (Expr a)
-> parseExpr = parseSymbol
+> parseExpr = parseBoolean
+>         <|> parseSymbol
 >         <|> parseNumber
 >         <|> (try (char '\'') >> parseQuote)
 >         <|> (try (char '`')  >> parseQuasi)
@@ -145,7 +155,8 @@ Top level expression parser
 Expression parser inside a quoted list
 
 > parseExprInQuote :: Parser (Expr a)
-> parseExprInQuote = parseSymbol
+> parseExprInQuote = parseBoolean
+>                <|> parseSymbol
 >                <|> parseNumber
 >                <|> (try (char '\'') >> parseQuote)
 >                <|> parens ( parseQuotedList )
@@ -153,7 +164,8 @@ Expression parser inside a quoted list
 Expression parser inside a quasiquoted list
 
 > parseExprInQuasi :: Parser (Expr a)
-> parseExprInQuasi = parseSymbol
+> parseExprInQuasi = parseBoolean
+>                <|> parseSymbol
 >                <|> parseNumber
 >                <|> (try (reserved "'") >>  parseQuote)
 >                <|> (try (reserved "`" ) >> parseQuasi)

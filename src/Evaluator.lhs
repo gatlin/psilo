@@ -33,7 +33,7 @@ Imports and language extensions
 > module Evaluator where
 >
 > import Control.Monad.Free
-> import Prelude hiding (not,and,log,lookup)
+> import Prelude hiding (log,lookup)
 > import Control.Monad
 > import Control.Monad.State
 > import Control.Monad.Free
@@ -59,15 +59,22 @@ values.
 
 > type Location = Int
 > data Value = forall a . Show a => VClos { vSym  :: [Symbol]
->                                         , vBodyv :: (Expr a)
+>                                         , vBody :: (Expr a)
 >                                         , vEnv  :: Environment
 >                                         }
 >            | VSym Symbol
->            | VNum Integer
+>            | VNum  { unNum :: Integer }
+>            | VBool { unBool :: Bool }
 >            | VList [Value]
 >            | VNil
 >
-> deriving instance Show Value
+> instance Show Value where
+>     show (VSym s)   = "'" ++ s
+>     show (VNum n)   = show n
+>     show (VBool b)  = if b then "#t" else "#f"
+>     show (VNil)     = "(nil)"
+>     show (VClos _ _ e)  = "<function> with Environment: " ++ (show e)
+>     show (VList xs) = concat $ map show xs
 >
 > type Environment = Map.Map Symbol Int
 > type Store       = IntMap.IntMap Value
@@ -109,8 +116,11 @@ With the above default initial states for the environment and the store, I'm
 ready to define the mapping from a `Machine` to `IO`, which is essentially just
 calling the various monad transformer `run` functions in succession.
 
+> runMachineWithStore :: Machine a -> MStore -> IO (a, MStore)
+> runMachineWithStore k st = runStateT (runReaderT (runM k) initialEnv) st
+
 > runMachine :: Machine a -> IO (a, MStore)
-> runMachine k = runStateT (runReaderT (runM k) initialEnv) initialStore
+> runMachine k = runMachineWithStore k initialStore
 
 Now all that is left is a means of building a `Machine` from psilo code.
 
@@ -134,6 +144,7 @@ fresh store locations on demand.
 >     | Lookup Symbol (Location -> k)
 >     | Store  Location Value k
 >     | Fetch  Location (Value -> k)
+>     | Delete Location k
 >     | Fresh  (Location -> k)
 >     deriving Functor
 
@@ -156,6 +167,9 @@ will write `Op` programs in.
 
 > fetch :: Location -> Op Value
 > fetch l = liftF $ Fetch l id
+
+> delete :: Location -> Op ()
+> delete l = liftF $ Delete l ()
 
 > fresh :: Op Location
 > fresh = liftF $ Fresh id
@@ -226,6 +240,13 @@ By this point should be able to figure out what `fetch` does.
 >     val    <- return $ sto IntMap.! loc
 >     runOp $ next val
 
+> runOp (Free (Delete loc next)) = do
+>     state <- get
+>     sto   <- return $ mStore state
+>     sto'  <- return $ IntMap.delete loc sto
+>     put $ state { mStore = sto' }
+>     runOp next
+
 `fresh` gets the state, extracts the location, increments it, puts it back in,
 and returns the original.
 
@@ -272,6 +293,8 @@ case, we return `NilV`.
 
 The rest of the interpreter is remarkably simple. Each case corresponds to a
 branch in our `AST` definition.
+
+> interpret (Free (ABoolean b)) = return $ VBool b
 
 > interpret (Free (AInteger n)) = return $ VNum n
 
@@ -330,8 +353,12 @@ it is a built-in operator and, if applicable, simply return the resulting
 >                 return newLoc
 >             let env' = Map.fromList $ zip syms locations
 >             newFrame <- return $ Map.union env' env
->             local (\(MEnv e) -> MEnv (Map.union newFrame e)) $ do
->                 interpret body
+>             oldEnv   <- ask
+>             retVal   <- local (\(MEnv e) -> MEnv (Map.union newFrame e)) $
+>                             interpret body
+>             -- clean up the store
+>             runOp $ forM_ locations $ \loc -> delete loc
+>             return retVal
 
 This interpreter is flexible and powerful because we built up the appropriate
 abstractions.
@@ -345,14 +372,19 @@ arithmetic). The following function attempts to evaluate a built-in, returning
 
 > builtin :: Expr a -> [Value] -> Maybe Value
 > builtin (Free (ASymbol sym)) args
->     | sym == "+"    = binOp ((+)) args
->     | sym == "*"    = binOp ((*)) args
->     | sym == "-"    = binOp ((-)) args
->     | sym == "/"    = binOp div   args
+>     | sym == "+"    = numOp sum args
+>     | sym == "*"    = numOp product args
+>     | sym == "-"    = numBinOp ((-)) args
+>     | sym == "/"    = numBinOp div   args
+>     | sym == "and"  = Just . VBool $ and (map unBool args)
+>     | sym == "or"   = Just . VBool $ or  (map unBool args)
+>     | sym == "not"  = Just . VBool $ not (unBool . head $ args)
 >     | otherwise     = Nothing
->     where binOp op xs = let (VNum l) = xs !! 0
->                             (VNum r) = xs !! 1
->                         in  Just . VNum $ op l r
+>     where numBinOp op xs = let (VNum l) = xs !! 0
+>                                (VNum r) = xs !! 1
+>                             in  Just . VNum $ op l r
+>           numOp    op xs = Just . VNum $ sum (map unNum args)
+
 > builtin _ _   = Nothing
 
 [plai]: http://cs.brown.edu/~sk/Publications/Books/ProgLangs/

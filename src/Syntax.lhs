@@ -50,6 +50,7 @@ Not bad, huh?
 >
 > data AST a
 >     = AInteger Integer
+>     | ABoolean Bool
 >     | ASymbol { toSym :: Symbol }
 >     | ALambda [Symbol] a
 >     | AApply a a
