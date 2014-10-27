@@ -14,7 +14,7 @@ This is probably sub-optimal; parsec is a harsh master.
 > module Parser where
 >
 > import Text.Parsec
-> import Text.Parsec.String (Parser)
+> import Text.Parsec.String (Parser, parseFromFile)
 > import Control.Applicative ((<$>))
 > import Control.Monad (mapAndUnzipM)
 > import Control.Monad.Free
@@ -142,6 +142,19 @@ utility.
 >     x <- parseSymbol <|> parseExpr
 >     return $ (Free . AList) [(Free . ASymbol) "comma", x]
 
+Definitions - that is, permanent additions to the environment and store - are
+treated especially as strictly speaking they are not expressions.
+
+> parseDefn :: Parser (Expr a)
+> parseDefn = do
+>     optional whitespace
+>     reserved "="
+>     optional whitespace
+>     (Free (ASymbol sym)) <- parseSymbol
+>     optional whitespace
+>     val <- parseExpr
+>     return $ Free $ ADefine sym val
+
 Top level expression parser
 
 > parseExpr :: Parser (Expr a)
@@ -150,7 +163,7 @@ Top level expression parser
 >         <|> parseNumber
 >         <|> (try (char '\'') >> parseQuote)
 >         <|> (try (char '`')  >> parseQuasi)
->         <|> parens ( parseFn <|> parseLet <|> parseApp )
+>         <|> parens ( parseDefn <|> parseFn <|> parseLet <|> parseApp )
 
 Expression parser inside a quoted list
 
@@ -184,8 +197,10 @@ Expression parser inside a quasiquoted list
 >     x <- parseExpr
 >     return x
 
-> doParse :: String -> Either ParseError (Expr a)
-> doParse s = parse (contents parseExpr) "<stdin>" s
+> type Parsed a = Either ParseError [Expr a]
 
-> parseTopLevel :: String -> Either ParseError [Expr a]
+> parseFile :: String -> IO (Parsed a)
+> parseFile fname = parseFromFile topLevel fname
+
+> parseTopLevel :: String -> Parsed a
 > parseTopLevel s = parse (contents topLevel) "<stdin>" s

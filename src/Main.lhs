@@ -16,6 +16,7 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 >
 > import System.Environment
 > import System.IO
+> import Text.Parsec
 
 `eval` amounts to taking a line of code (a line in the repl, an expression
 otherwise), getting the `Expr` value from the parser and then running a
@@ -23,17 +24,19 @@ otherwise), getting the `Expr` value from the parser and then running a
 
 The result is the state of the machine after it has been run.
 
-> eval :: String -> MStore -> IO MStore
-> eval line store = do
->     let res = parseTopLevel line
+> eval :: Either ParseError [Expr ()] -> MStore -> IO [MStore]
+> eval res store = do
 >     case res of
->         Left err -> print err >> return store
->         Right [ex] -> execute (ex :: Expr ()) >>= return
+>         Left err -> print err >> return [store]
+>         Right ex -> mapM execute (ex :: [Expr ()]) >>= return
 >
 >     where execute v = do
->               (val, store') <- runMachine . interpret $ v
+>               (val, store') <- (runMachineWithState store ev') . interpret $ v
 >               putStrLn . show $ val
 >               return store'
+>           ev' = case (mFinalEnv store) of
+>                     Nothing -> initialEnv
+>                     Just  e -> MEnv e
 
 The repl is nothing more than calling `eval` in an endless loop.
 
@@ -47,14 +50,17 @@ The repl is nothing more than calling `eval` in an endless loop.
 >                 case input of
 >                     ":state" -> liftIO (putStrLn . show $ store) >> loop store
 >                     _        -> do
->                         store' <- liftIO $ eval input store
+>                         (store':_) <- liftIO $ eval (parseTopLevel input) store
 >                         loop store'
 
-If we execute `eval` on the contents of a file of code, we have a normal
-interpreter:
+If we gave psilo a file name we parse and evaluate it instead of starting the
+REPL.
 
 > execFile :: String -> IO ()
-> execFile fname = readFile fname >>= (flip eval) initialStore >> return ()
+> execFile fname = do
+>     parsed <- liftIO $ parseFile fname
+>     eval parsed initialStore
+>     return ()
 
 > main :: IO ()
 > main = do

@@ -66,6 +66,7 @@ values.
 >            | VNum  { unNum :: Integer }
 >            | VBool { unBool :: Bool }
 >            | VList [Value]
+>            | VDefine Symbol
 >            | VNil
 >
 > instance Show Value where
@@ -75,6 +76,7 @@ values.
 >     show (VNil)     = "(nil)"
 >     show (VClos _ _ e)  = "<function> with Environment: " ++ (show e)
 >     show (VList xs) = concat $ map show xs
+>     show (VDefine _)= "<definition>"
 >
 > type Environment = Map.Map Symbol Int
 > type Store       = IntMap.IntMap Value
@@ -88,6 +90,7 @@ together in one data type.
 
 > data MStore = MStore { mStore :: Store
 >                      , mLoc   :: Int
+>                      , mFinalEnv :: Maybe Environment
 >                      }
 >     deriving Show
 
@@ -107,6 +110,7 @@ Behold: the `Machine` monad, a stack of monad transformers.
 > initialStore :: MStore
 > initialStore = MStore { mStore = emptyStore
 >                       , mLoc   = 1
+>                       , mFinalEnv = Nothing
 >                       }
 
 > initialEnv :: MEnv
@@ -116,11 +120,11 @@ With the above default initial states for the environment and the store, I'm
 ready to define the mapping from a `Machine` to `IO`, which is essentially just
 calling the various monad transformer `run` functions in succession.
 
-> runMachineWithStore :: Machine a -> MStore -> IO (a, MStore)
-> runMachineWithStore k st = runStateT (runReaderT (runM k) initialEnv) st
+> runMachineWithState :: MStore -> MEnv -> Machine a -> IO (a, MStore)
+> runMachineWithState st ev k = runStateT (runReaderT (runM k) ev) st where
 
 > runMachine :: Machine a -> IO (a, MStore)
-> runMachine k = runMachineWithStore k initialStore
+> runMachine k = runMachineWithState initialStore initialEnv k
 
 Now all that is left is a means of building a `Machine` from psilo code.
 
@@ -344,7 +348,8 @@ it is a built-in operator and, if applicable, simply return the resulting
 
 > interpret (Free (AApply fun args)) = do
 >     (VList argVals)       <- interpret args
->     case builtin fun argVals of
+>     res <- builtin fun argVals
+>     case res of
 >         Just mv   -> return mv
 >         Nothing   -> do
 >             (VClos syms body env) <- interpret fun
@@ -361,6 +366,16 @@ it is a built-in operator and, if applicable, simply return the resulting
 >             runOp $ forM_ locations $ \loc -> delete loc
 >             return retVal
 
+> interpret (Free (ADefine sym val)) = do
+>     newLoc <- runOp fresh
+>     val'   <- interpret val
+>     runOp $ store newLoc val'
+>     newFrame <- return $ Map.fromList [(sym, newLoc)]
+>     MEnv env <- ask
+>     state <- get
+>     put $ state { mFinalEnv = Just (Map.union newFrame env) }
+>     return $ VDefine sym
+
 This interpreter is flexible and powerful because we built up the appropriate
 abstractions.
 
@@ -371,21 +386,21 @@ As a final note, some symbols denote built-in operators (mostly involving
 arithmetic). The following function attempts to evaluate a built-in, returning
 (maybe) a `Machine Value`.
 
-> builtin :: Expr a -> [Value] -> Maybe Value
+> --builtin :: Expr a -> [Value] -> Machine (Maybe Value)
 > builtin (Free (ASymbol sym)) args
 >     | sym == "+"    = numOp sum args
 >     | sym == "*"    = numOp product args
 >     | sym == "-"    = numBinOp ((-)) args
 >     | sym == "/"    = numBinOp div   args
->     | sym == "and"  = Just . VBool $ and (map unBool args)
->     | sym == "or"   = Just . VBool $ or  (map unBool args)
->     | sym == "not"  = Just . VBool $ not (unBool . head $ args)
->     | otherwise     = Nothing
+>     | sym == "and"  = return $ Just . VBool $ and (map unBool args)
+>     | sym == "or"   = return $ Just . VBool $ or  (map unBool args)
+>     | sym == "not"  = return $ Just . VBool $ not (unBool . head $ args)
+>     | otherwise     = return  Nothing
 >     where numBinOp op xs = let (VNum l) = xs !! 0
 >                                (VNum r) = xs !! 1
->                             in  Just . VNum $ op l r
->           numOp    op xs = Just . VNum $ sum (map unNum args)
+>                             in  return $ Just . VNum $ op l r
+>           numOp    op xs = return $ Just . VNum $ op (map unNum args)
 
-> builtin _ _   = Nothing
+> builtin _ _   = return Nothing
 
 [plai]: http://cs.brown.edu/~sk/Publications/Books/ProgLangs/
