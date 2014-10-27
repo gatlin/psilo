@@ -1,0 +1,157 @@
+\documentclass[]{article}
+\usepackage{lmodern}
+\usepackage{amssymb,amsmath}
+\usepackage{ifxetex,ifluatex}
+\usepackage{fixltx2e} % provides \textsubscript
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+\else % if luatex or xelatex
+  \ifxetex
+    \usepackage{mathspec}
+    \usepackage{xltxtra,xunicode}
+  \else
+    \usepackage{fontspec}
+  \fi
+  \defaultfontfeatures{Mapping=tex-text,Scale=MatchLowercase}
+  \newcommand{\euro}{€}
+\fi
+% use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+% use microtype if available
+\IfFileExists{microtype.sty}{%
+\usepackage{microtype}
+\UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\newenvironment{Shaded}{}{}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{{#1}}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.56,0.13,0.00}{{#1}}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{{#1}}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{{#1}}}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{{#1}}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{{#1}}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{{#1}}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textit{{#1}}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{{#1}}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{{#1}}}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.02,0.16,0.49}{{#1}}}
+\newcommand{\RegionMarkerTok}[1]{{#1}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{{#1}}}}
+\newcommand{\NormalTok}[1]{{#1}}
+\ifxetex
+  \usepackage[setpagesize=false, % page size defined by xetex
+              unicode=false, % unicode breaks when used with xetex
+              xetex]{hyperref}
+\else
+  \usepackage[unicode=true]{hyperref}
+\fi
+\hypersetup{breaklinks=true,
+            bookmarks=true,
+            pdfauthor={},
+            pdftitle={psilo},
+            colorlinks=true,
+            citecolor=blue,
+            urlcolor=blue,
+            linkcolor=magenta,
+            pdfborder={0 0 0}}
+\urlstyle{same}  % don't use monospace font for urls
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt minus 1pt}
+\setlength{\emergencystretch}{3em}  % prevent overfull lines
+\setcounter{secnumdepth}{0}
+
+\title{psilo}
+\date{}
+
+\begin{document}
+\maketitle
+
+This is the main program outline. If an argument is present on the
+command line then we execute the program in that file and halt.
+Otherwise we fire up a repl.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{module} \DataTypeTok{Main} \KeywordTok{where}
+
+\KeywordTok{import }\DataTypeTok{Parser}
+\KeywordTok{import }\DataTypeTok{Syntax}
+\KeywordTok{import }\DataTypeTok{Evaluator}
+
+\KeywordTok{import }\DataTypeTok{Control.Monad.Trans}
+\KeywordTok{import }\DataTypeTok{System.Console.Haskeline}
+
+\KeywordTok{import }\DataTypeTok{System.Environment}
+\KeywordTok{import }\DataTypeTok{System.IO}
+\end{Highlighting}
+\end{Shaded}
+
+\texttt{eval} amounts to taking a line of code (a line in the repl, an
+expression otherwise), getting the \texttt{Expr} value from the parser
+and then running a \texttt{Machine} with said value.
+
+The result is the state of the machine after it has been run.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{eval ::} \DataTypeTok{String} \OtherTok{->} \DataTypeTok{MStore} \OtherTok{->} \DataTypeTok{IO} \DataTypeTok{MStore}
+\NormalTok{eval line store }\FunctionTok{=} \KeywordTok{do}
+    \KeywordTok{let} \NormalTok{res }\FunctionTok{=} \NormalTok{parseTopLevel line}
+    \KeywordTok{case} \NormalTok{res }\KeywordTok{of}
+        \DataTypeTok{Left} \NormalTok{err }\OtherTok{->} \NormalTok{print err }\FunctionTok{>>} \NormalTok{return store}
+        \DataTypeTok{Right} \NormalTok{[ex] }\OtherTok{->} \NormalTok{execute (}\OtherTok{ex ::} \DataTypeTok{Expr} \NormalTok{()) }\FunctionTok{>>=} \NormalTok{return}
+
+    \KeywordTok{where} \NormalTok{execute v }\FunctionTok{=} \KeywordTok{do}
+              \NormalTok{(val, store') }\OtherTok{<-} \NormalTok{runMachine }\FunctionTok{.} \NormalTok{interpret }\FunctionTok{$} \NormalTok{v}
+              \NormalTok{putStrLn }\FunctionTok{.} \NormalTok{show }\FunctionTok{$} \NormalTok{val}
+              \NormalTok{return store'}
+\end{Highlighting}
+\end{Shaded}
+
+The repl is nothing more than calling \texttt{eval} in an endless loop.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{repl ::} \DataTypeTok{IO} \NormalTok{()}
+\NormalTok{repl }\FunctionTok{=} \NormalTok{runInputT defaultSettings (loop initialStore) }\KeywordTok{where}
+    \NormalTok{loop store }\FunctionTok{=} \KeywordTok{do}
+        \NormalTok{minput }\OtherTok{<-} \NormalTok{getInputLine }\StringTok{"psilo> "}
+        \KeywordTok{case} \NormalTok{minput }\KeywordTok{of}
+            \DataTypeTok{Nothing} \OtherTok{->} \NormalTok{outputStrLn }\StringTok{"Goodbye."}
+            \DataTypeTok{Just} \NormalTok{input }\OtherTok{->} \KeywordTok{do}
+                \KeywordTok{case} \NormalTok{input }\KeywordTok{of}
+                    \StringTok{":state"} \OtherTok{->} \NormalTok{liftIO (putStrLn }\FunctionTok{.} \NormalTok{show }\FunctionTok{$} \NormalTok{store) }\FunctionTok{>>} \NormalTok{loop store}
+                    \NormalTok{_        }\OtherTok{->} \KeywordTok{do}
+                        \NormalTok{store' }\OtherTok{<-} \NormalTok{liftIO }\FunctionTok{$} \NormalTok{eval input store}
+                        \NormalTok{loop store'}
+\end{Highlighting}
+\end{Shaded}
+
+If we execute \texttt{eval} on the contents of a file of code, we have a
+normal interpreter:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{execFile ::} \DataTypeTok{String} \OtherTok{->} \DataTypeTok{IO} \NormalTok{()}
+\NormalTok{execFile fname }\FunctionTok{=} \NormalTok{readFile fname }\FunctionTok{>>=} \NormalTok{(flip eval) initialStore }\FunctionTok{>>} \NormalTok{return ()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{main ::} \DataTypeTok{IO} \NormalTok{()}
+\NormalTok{main }\FunctionTok{=} \KeywordTok{do}
+    \NormalTok{args }\OtherTok{<-} \NormalTok{getArgs}
+    \KeywordTok{case} \NormalTok{args }\KeywordTok{of}
+        \NormalTok{[]      }\OtherTok{->} \NormalTok{repl }\FunctionTok{>>} \NormalTok{return ()}
+        \NormalTok{[fname] }\OtherTok{->} \NormalTok{execFile fname }\FunctionTok{>>} \NormalTok{return ()}
+\end{Highlighting}
+\end{Shaded}
+
+\end{document}

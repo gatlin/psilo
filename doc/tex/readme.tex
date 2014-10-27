@@ -1,0 +1,147 @@
+\documentclass[]{article}
+\usepackage{lmodern}
+\usepackage{amssymb,amsmath}
+\usepackage{ifxetex,ifluatex}
+\usepackage{fixltx2e} % provides \textsubscript
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+\else % if luatex or xelatex
+  \ifxetex
+    \usepackage{mathspec}
+    \usepackage{xltxtra,xunicode}
+  \else
+    \usepackage{fontspec}
+  \fi
+  \defaultfontfeatures{Mapping=tex-text,Scale=MatchLowercase}
+  \newcommand{\euro}{€}
+\fi
+% use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+% use microtype if available
+\IfFileExists{microtype.sty}{%
+\usepackage{microtype}
+\UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\ifxetex
+  \usepackage[setpagesize=false, % page size defined by xetex
+              unicode=false, % unicode breaks when used with xetex
+              xetex]{hyperref}
+\else
+  \usepackage[unicode=true]{hyperref}
+\fi
+\hypersetup{breaklinks=true,
+            bookmarks=true,
+            pdfauthor={},
+            pdftitle={},
+            colorlinks=true,
+            citecolor=blue,
+            urlcolor=blue,
+            linkcolor=magenta,
+            pdfborder={0 0 0}}
+\urlstyle{same}  % don't use monospace font for urls
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt minus 1pt}
+\setlength{\emergencystretch}{3em}  % prevent overfull lines
+\setcounter{secnumdepth}{0}
+
+\date{}
+
+\begin{document}
+
+\section{psilo}\label{psilo}
+
+a parallel, safe, inferencing list operation language for writing
+interesting programs. \href{https://github.com/gatlin/psilo}{View it on
+GitHub.}
+
+© 2014 \href{http://niltag.net}{Gatlin Johnson}
+\href{mailto:gatlin@niltag.net}{\nolinkurl{gatlin@niltag.net}}
+
+\section{What is psilo?}\label{what-is-psilo}
+
+psilo will be a programming language created with the philosophy that
+\emph{all} programs essentially define (restricted) languages.
+
+Technical Features (planned):
+
+\begin{itemize}
+\itemsep1pt\parskip0pt\parsep0pt
+\item
+  No run-time garbage collection necessary owing to uniqueness types
+\item
+  Static typing for compile-time verification and optimization
+\item
+  Malleable syntax with macros
+\item
+  Dead-simple parallelism with special array types
+\item
+  Monadic continuations and iteratee composition made dead simple
+\item
+  Orthogonal core syntax and semantics for your performance and my
+  sanity
+\end{itemize}
+
+Philosophy:
+
+\begin{itemize}
+\itemsep1pt\parskip0pt\parsep0pt
+\item
+  All programming is manipulating languages.
+\item
+  Types define grammars; functions define parsers.
+\item
+  The earlier a question may be answered, the better.
+\item
+  If the computer can do it, it should.
+\end{itemize}
+
+\section{Status}\label{status}
+
+Psilo is still being designed. I have implemented a really simple
+evaluator as well as this website so that when the time comes, I won't
+have tedious tooling or process issues getting in the way of
+implementation.
+
+Additionally, the simple interpreter might be of educational value.
+
+\section{How to build}\label{how-to-build}
+
+You need the Glasgow Haskell Compiler and a number of libraries; I
+suggest starting off with \href{http://haskell.org/platform}{the Haskell
+platform}.
+
+Clone the repository:
+
+\begin{verbatim}
+git clone https://github.com/gatlin/psilo
+\end{verbatim}
+
+Set up a cabal sandbox:
+
+\begin{verbatim}
+cabal sandbox init
+cabal configure
+cabal install --only-dependencies
+\end{verbatim}
+
+Then make with:
+
+\begin{verbatim}
+make
+\end{verbatim}
+
+And return to the Edenic, pre-build post-checkout status of the code
+with
+
+\begin{verbatim}
+make clean
+\end{verbatim}
+
+\section{Questions / comments / hate
+mail}\label{questions-comments-hate-mail}
+
+Use the Issues feature of GitHub or email me:
+\href{mailto:gatlin@niltag.net}{\nolinkurl{gatlin@niltag.net}}.
+
+\end{document}

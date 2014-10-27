@@ -1,0 +1,334 @@
+\documentclass[]{article}
+\usepackage{lmodern}
+\usepackage{amssymb,amsmath}
+\usepackage{ifxetex,ifluatex}
+\usepackage{fixltx2e} % provides \textsubscript
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+\else % if luatex or xelatex
+  \ifxetex
+    \usepackage{mathspec}
+    \usepackage{xltxtra,xunicode}
+  \else
+    \usepackage{fontspec}
+  \fi
+  \defaultfontfeatures{Mapping=tex-text,Scale=MatchLowercase}
+  \newcommand{\euro}{€}
+\fi
+% use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+% use microtype if available
+\IfFileExists{microtype.sty}{%
+\usepackage{microtype}
+\UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\newenvironment{Shaded}{}{}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{{#1}}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.56,0.13,0.00}{{#1}}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{{#1}}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{{#1}}}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{{#1}}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{{#1}}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{{#1}}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textit{{#1}}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{{#1}}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{{#1}}}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.02,0.16,0.49}{{#1}}}
+\newcommand{\RegionMarkerTok}[1]{{#1}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{{#1}}}}
+\newcommand{\NormalTok}[1]{{#1}}
+\ifxetex
+  \usepackage[setpagesize=false, % page size defined by xetex
+              unicode=false, % unicode breaks when used with xetex
+              xetex]{hyperref}
+\else
+  \usepackage[unicode=true]{hyperref}
+\fi
+\hypersetup{breaklinks=true,
+            bookmarks=true,
+            pdfauthor={},
+            pdftitle={The Parser},
+            colorlinks=true,
+            citecolor=blue,
+            urlcolor=blue,
+            linkcolor=magenta,
+            pdfborder={0 0 0}}
+\urlstyle{same}  % don't use monospace font for urls
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt minus 1pt}
+\setlength{\emergencystretch}{3em}  % prevent overfull lines
+\setcounter{secnumdepth}{0}
+
+\title{The Parser}
+\date{}
+
+\begin{document}
+\maketitle
+
+This implements the basic s-expression syntax along with some sugar,
+like \texttt{let} bindings.
+
+The result of one of the top-level parsing functions is a
+\texttt{Parser (Expr a)} value from which the \texttt{Expr} value may be
+extracted and given to the evaluator.
+
+This is probably sub-optimal; parsec is a harsh master.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{module} \DataTypeTok{Parser} \KeywordTok{where}
+
+\KeywordTok{import }\DataTypeTok{Text.Parsec}
+\KeywordTok{import }\DataTypeTok{Text.Parsec.String} \NormalTok{(}\DataTypeTok{Parser}\NormalTok{)}
+\KeywordTok{import }\DataTypeTok{Control.Applicative} \NormalTok{((<$>))}
+\KeywordTok{import }\DataTypeTok{Control.Monad} \NormalTok{(mapAndUnzipM)}
+\KeywordTok{import }\DataTypeTok{Control.Monad.Free}
+\KeywordTok{import }\DataTypeTok{Data.List.Split} \NormalTok{(splitOn)}
+
+\KeywordTok{import qualified} \DataTypeTok{Text.Parsec.Expr} \KeywordTok{as} \DataTypeTok{Ex}
+\KeywordTok{import qualified} \DataTypeTok{Text.Parsec.Token} \KeywordTok{as} \DataTypeTok{Tok}
+
+\KeywordTok{import }\DataTypeTok{Syntax}
+\KeywordTok{import }\DataTypeTok{Lexer}
+
+\OtherTok{parseNumber ::} \DataTypeTok{Parser} \NormalTok{(}\DataTypeTok{Expr} \NormalTok{a)}
+\NormalTok{parseNumber }\FunctionTok{=} \NormalTok{try ( }\KeywordTok{do} \NormalTok{\{ n }\OtherTok{<-} \NormalTok{integer}
+                       \NormalTok{; return }\FunctionTok{$} \DataTypeTok{Free} \FunctionTok{$} \DataTypeTok{AInteger} \NormalTok{n}
+                       \NormalTok{\} )}
+\end{Highlighting}
+\end{Shaded}
+
+Booleans are represented by the atoms \texttt{\#t} and \texttt{\#f}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{parseBoolean ::} \DataTypeTok{Parser} \NormalTok{(}\DataTypeTok{Expr} \NormalTok{a)}
+\NormalTok{parseBoolean }\FunctionTok{=} \KeywordTok{do}
+    \NormalTok{char }\CharTok{'#'}
+    \NormalTok{b }\OtherTok{<-} \NormalTok{char }\CharTok{'t'} \FunctionTok{<|>} \NormalTok{char }\CharTok{'f'}
+    \KeywordTok{case} \NormalTok{b }\KeywordTok{of}
+        \CharTok{'t'} \OtherTok{->} \NormalTok{return }\FunctionTok{$} \DataTypeTok{Free} \FunctionTok{$} \DataTypeTok{ABoolean} \DataTypeTok{True}
+        \CharTok{'f'} \OtherTok{->} \NormalTok{return }\FunctionTok{$} \DataTypeTok{Free} \FunctionTok{$} \DataTypeTok{ABoolean} \DataTypeTok{False}
+\end{Highlighting}
+\end{Shaded}
+
+Symbols are like ``atoms'' in other lisps or Erlang. They are equivalent
+only to themselves and have no intrinsic value. They are mostly used to
+bind values in lambda abstractions.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{parseSymbol ::} \DataTypeTok{Parser} \NormalTok{(}\DataTypeTok{Expr} \NormalTok{a)}
+\NormalTok{parseSymbol }\FunctionTok{=} \KeywordTok{do}
+    \NormalTok{sym }\OtherTok{<-} \NormalTok{operator }\FunctionTok{<|>} \NormalTok{identifier}
+    \NormalTok{sym' }\OtherTok{<-} \NormalTok{chomped sym}
+    \NormalTok{return }\FunctionTok{$} \DataTypeTok{Free} \FunctionTok{$} \DataTypeTok{ASymbol} \NormalTok{sym'}
+    \KeywordTok{where} \NormalTok{chomped s }\FunctionTok{=} \KeywordTok{let} \NormalTok{s' }\FunctionTok{=} \NormalTok{splitOn }\StringTok{":"} \NormalTok{s}
+                      \KeywordTok{in}  \NormalTok{return }\FunctionTok{$} \NormalTok{s' }\FunctionTok{!!} \DecValTok{0}
+\end{Highlighting}
+\end{Shaded}
+
+Lamba abstractions, or \emph{functions}. A function definition is a list
+of symbols to bind to the elements of the argument list, and a psilo
+expression to evaluate in the context of the arguments.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{parseFn ::} \DataTypeTok{Parser} \NormalTok{(}\DataTypeTok{Expr} \NormalTok{a)}
+\NormalTok{parseFn }\FunctionTok{=} \KeywordTok{do}
+    \NormalTok{reserved }\StringTok{"\textbackslash{}\textbackslash{}"}
+    \NormalTok{optional whitespace}
+    \NormalTok{(}\DataTypeTok{Free} \NormalTok{(}\DataTypeTok{AList} \NormalTok{arg)) }\OtherTok{<-} \NormalTok{parens parseQuotedList}
+    \NormalTok{optional whitespace}
+    \NormalTok{body }\OtherTok{<-} \NormalTok{parseExpr}
+    \NormalTok{return }\FunctionTok{$} \DataTypeTok{Free} \FunctionTok{$} \DataTypeTok{ALambda} \NormalTok{(expr2symlist arg) body}
+\end{Highlighting}
+\end{Shaded}
+
+\texttt{let} bindings are formally equivalent to wrapping an expression
+in an outer closure and immediately evaluating it, like so:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{parseLetBinding ::} \DataTypeTok{Parser} \NormalTok{(}\DataTypeTok{Expr} \NormalTok{a)}
+\NormalTok{parseLetBinding }\FunctionTok{=} \KeywordTok{do}
+    \NormalTok{optional whitespace}
+    \NormalTok{sym }\OtherTok{<-} \NormalTok{parseSymbol}
+    \NormalTok{optional whitespace}
+    \NormalTok{val }\OtherTok{<-} \NormalTok{parseExpr}
+    \NormalTok{return }\FunctionTok{$} \DataTypeTok{Free} \FunctionTok{.} \DataTypeTok{AList} \FunctionTok{$} \NormalTok{[sym, val]}
+
+\OtherTok{parseLetBindings ::} \DataTypeTok{Parser} \NormalTok{(}\DataTypeTok{Expr} \NormalTok{a)}
+\NormalTok{parseLetBindings }\FunctionTok{=} \NormalTok{fmap (}\DataTypeTok{Free} \FunctionTok{.} \DataTypeTok{AList}\NormalTok{) }\FunctionTok{$} \NormalTok{parens parseLetBinding }\OtherTok{`sepBy`} \NormalTok{whitespace}
+
+\OtherTok{parseLet ::} \DataTypeTok{Parser} \NormalTok{(}\DataTypeTok{Expr} \NormalTok{a)}
+\NormalTok{parseLet }\FunctionTok{=} \KeywordTok{do}
+    \NormalTok{reserved }\StringTok{"let"}
+    \NormalTok{optional whitespace}
+    \NormalTok{(}\DataTypeTok{Free} \NormalTok{(}\DataTypeTok{AList} \NormalTok{assns)) }\OtherTok{<-} \NormalTok{parens parseLetBindings}
+    \NormalTok{body  }\OtherTok{<-} \NormalTok{parseExpr }\FunctionTok{<|>} \NormalTok{return (}\DataTypeTok{Free} \NormalTok{(}\DataTypeTok{AList} \NormalTok{[]))}
+    \NormalTok{(args,operands) }\OtherTok{<-} \NormalTok{(flip mapAndUnzipM) assns }\FunctionTok{$} \NormalTok{\textbackslash{}(}\DataTypeTok{Free} \NormalTok{(}\DataTypeTok{AList} \NormalTok{(x}\FunctionTok{:}\NormalTok{y}\FunctionTok{:}\NormalTok{_))) }\OtherTok{->} \NormalTok{return (x,y)}
+    \NormalTok{operands' }\OtherTok{<-} \NormalTok{return }\FunctionTok{$} \DataTypeTok{Free} \FunctionTok{$} \DataTypeTok{AList} \NormalTok{operands}
+    \NormalTok{fun }\OtherTok{<-} \NormalTok{return }\FunctionTok{$} \DataTypeTok{Free} \FunctionTok{$} \DataTypeTok{ALambda} \NormalTok{(expr2symlist args) body}
+    \NormalTok{return }\FunctionTok{$} \DataTypeTok{Free} \NormalTok{(}\DataTypeTok{AApply} \NormalTok{fun operands')}
+\end{Highlighting}
+\end{Shaded}
+
+The application of a function to a list of arguments, a single symbol,
+or an arbitrary expression value.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{parseApp ::} \DataTypeTok{Parser} \NormalTok{(}\DataTypeTok{Expr} \NormalTok{a)}
+\NormalTok{parseApp }\FunctionTok{=} \KeywordTok{do}
+    \NormalTok{try (reserved }\StringTok{"apply"}\NormalTok{) }\FunctionTok{>>} \NormalTok{(}\KeywordTok{do}
+        \NormalTok{optional whitespace}
+        \NormalTok{fun }\OtherTok{<-} \NormalTok{parseExpr}
+        \NormalTok{optional whitespace}
+        \NormalTok{body }\OtherTok{<-} \NormalTok{(try (char }\CharTok{'\textbackslash{}''}\NormalTok{) }\FunctionTok{>>} \NormalTok{parens parseQuotedList)}
+            \FunctionTok{<|>} \NormalTok{(try (char }\CharTok{'`'}\NormalTok{) }\FunctionTok{>>} \NormalTok{parens parseUnquotable)}
+        \NormalTok{return }\FunctionTok{$} \DataTypeTok{Free} \NormalTok{(}\DataTypeTok{AApply} \NormalTok{fun body))}
+    \FunctionTok{<|>} \NormalTok{(}\KeywordTok{do}
+        \NormalTok{fst }\OtherTok{<-} \NormalTok{try parseSymbol }\FunctionTok{<|>} \NormalTok{try (parens parseFn) }\FunctionTok{<|>} \NormalTok{parens parseApp}
+        \NormalTok{optional whitespace}
+        \NormalTok{rst }\OtherTok{<-} \NormalTok{fmap (}\DataTypeTok{Free} \FunctionTok{.} \DataTypeTok{AList}\NormalTok{) }\FunctionTok{$} \NormalTok{parseExpr }\OtherTok{`sepBy`} \NormalTok{whitespace}
+        \NormalTok{return }\FunctionTok{$} \DataTypeTok{Free} \NormalTok{(}\DataTypeTok{AApply} \NormalTok{fst rst))}
+\end{Highlighting}
+\end{Shaded}
+
+Regular list created by the quote (') operator. Enters a state where
+everything is treated as a literal - no applications allowed.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{parseQuotedList ::} \DataTypeTok{Parser} \NormalTok{(}\DataTypeTok{Expr} \NormalTok{a)}
+\NormalTok{parseQuotedList }\FunctionTok{=} \NormalTok{fmap (}\DataTypeTok{Free} \FunctionTok{.} \DataTypeTok{AList}\NormalTok{) }\FunctionTok{$} \NormalTok{parseExprInQuote }\OtherTok{`sepBy`} \NormalTok{whitespace}
+\end{Highlighting}
+\end{Shaded}
+
+Similar to a quoted list, except a comma operator (,) may be used to go
+back into a state where application is allowed.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{parseUnquotable ::} \DataTypeTok{Parser} \NormalTok{(}\DataTypeTok{Expr} \NormalTok{a)}
+\NormalTok{parseUnquotable }\FunctionTok{=} \NormalTok{fmap (}\DataTypeTok{Free} \FunctionTok{.} \DataTypeTok{AList}\NormalTok{) }\FunctionTok{$} \NormalTok{parseExprInQuasi }\OtherTok{`sepBy`} \NormalTok{whitespace}
+\end{Highlighting}
+\end{Shaded}
+
+Many things may be quoted, not just lists.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{parseQuote ::} \DataTypeTok{Parser} \NormalTok{(}\DataTypeTok{Expr} \NormalTok{a)}
+\NormalTok{parseQuote }\FunctionTok{=} \KeywordTok{do}
+    \NormalTok{x }\OtherTok{<-} \NormalTok{parseSymbol }\FunctionTok{<|>} \NormalTok{parseNumber }\FunctionTok{<|>} \NormalTok{parens parseQuotedList}
+    \NormalTok{return }\FunctionTok{$} \NormalTok{(}\DataTypeTok{Free} \FunctionTok{.} \DataTypeTok{AList}\NormalTok{) [(}\DataTypeTok{Free} \FunctionTok{.} \DataTypeTok{ASymbol}\NormalTok{) }\StringTok{"quote"}\NormalTok{, x]}
+\end{Highlighting}
+\end{Shaded}
+
+You can quasi-quote anything you can quote, though this is of dubious
+utility.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{parseQuasi ::} \DataTypeTok{Parser} \NormalTok{(}\DataTypeTok{Expr} \NormalTok{a)}
+\NormalTok{parseQuasi }\FunctionTok{=} \KeywordTok{do}
+    \NormalTok{x }\OtherTok{<-} \NormalTok{parseSymbol }\FunctionTok{<|>} \NormalTok{parseNumber }\FunctionTok{<|>} \NormalTok{parens parseUnquotable}
+    \NormalTok{return }\FunctionTok{$} \NormalTok{(}\DataTypeTok{Free} \FunctionTok{.} \DataTypeTok{AList}\NormalTok{) [(}\DataTypeTok{Free} \FunctionTok{.} \DataTypeTok{ASymbol}\NormalTok{) }\StringTok{"quasi"}\NormalTok{, x]}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{parseComma ::} \DataTypeTok{Parser} \NormalTok{(}\DataTypeTok{Expr} \NormalTok{a)}
+\NormalTok{parseComma }\FunctionTok{=} \KeywordTok{do}
+    \NormalTok{x }\OtherTok{<-} \NormalTok{parseSymbol }\FunctionTok{<|>} \NormalTok{parseExpr}
+    \NormalTok{return }\FunctionTok{$} \NormalTok{(}\DataTypeTok{Free} \FunctionTok{.} \DataTypeTok{AList}\NormalTok{) [(}\DataTypeTok{Free} \FunctionTok{.} \DataTypeTok{ASymbol}\NormalTok{) }\StringTok{"comma"}\NormalTok{, x]}
+\end{Highlighting}
+\end{Shaded}
+
+Top level expression parser
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{parseExpr ::} \DataTypeTok{Parser} \NormalTok{(}\DataTypeTok{Expr} \NormalTok{a)}
+\NormalTok{parseExpr }\FunctionTok{=} \NormalTok{parseBoolean}
+        \FunctionTok{<|>} \NormalTok{parseSymbol}
+        \FunctionTok{<|>} \NormalTok{parseNumber}
+        \FunctionTok{<|>} \NormalTok{(try (char }\CharTok{'\textbackslash{}''}\NormalTok{) }\FunctionTok{>>} \NormalTok{parseQuote)}
+        \FunctionTok{<|>} \NormalTok{(try (char }\CharTok{'`'}\NormalTok{)  }\FunctionTok{>>} \NormalTok{parseQuasi)}
+        \FunctionTok{<|>} \NormalTok{parens ( parseFn }\FunctionTok{<|>} \NormalTok{parseLet }\FunctionTok{<|>} \NormalTok{parseApp )}
+\end{Highlighting}
+\end{Shaded}
+
+Expression parser inside a quoted list
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{parseExprInQuote ::} \DataTypeTok{Parser} \NormalTok{(}\DataTypeTok{Expr} \NormalTok{a)}
+\NormalTok{parseExprInQuote }\FunctionTok{=} \NormalTok{parseBoolean}
+               \FunctionTok{<|>} \NormalTok{parseSymbol}
+               \FunctionTok{<|>} \NormalTok{parseNumber}
+               \FunctionTok{<|>} \NormalTok{(try (char }\CharTok{'\textbackslash{}''}\NormalTok{) }\FunctionTok{>>} \NormalTok{parseQuote)}
+               \FunctionTok{<|>} \NormalTok{parens ( parseQuotedList )}
+\end{Highlighting}
+\end{Shaded}
+
+Expression parser inside a quasiquoted list
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{parseExprInQuasi ::} \DataTypeTok{Parser} \NormalTok{(}\DataTypeTok{Expr} \NormalTok{a)}
+\NormalTok{parseExprInQuasi }\FunctionTok{=} \NormalTok{parseBoolean}
+               \FunctionTok{<|>} \NormalTok{parseSymbol}
+               \FunctionTok{<|>} \NormalTok{parseNumber}
+               \FunctionTok{<|>} \NormalTok{(try (reserved }\StringTok{"'"}\NormalTok{) }\FunctionTok{>>}  \NormalTok{parseQuote)}
+               \FunctionTok{<|>} \NormalTok{(try (reserved }\StringTok{"`"} \NormalTok{) }\FunctionTok{>>} \NormalTok{parseQuasi)}
+               \FunctionTok{<|>} \NormalTok{(try (char }\CharTok{','}\NormalTok{)  }\FunctionTok{>>}     \NormalTok{parseComma)}
+               \FunctionTok{<|>} \NormalTok{parens ( parseUnquotable )}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{contents ::} \DataTypeTok{Parser} \NormalTok{a }\OtherTok{->} \DataTypeTok{Parser} \NormalTok{a}
+\NormalTok{contents p }\FunctionTok{=} \KeywordTok{do}
+    \NormalTok{whitespace}
+    \NormalTok{r }\OtherTok{<-} \NormalTok{p}
+    \NormalTok{eof}
+    \NormalTok{return r}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{topLevel ::} \DataTypeTok{Parser} \NormalTok{[}\DataTypeTok{Expr} \NormalTok{a]}
+\NormalTok{topLevel }\FunctionTok{=} \NormalTok{many }\FunctionTok{$} \KeywordTok{do}
+    \NormalTok{x }\OtherTok{<-} \NormalTok{parseExpr}
+    \NormalTok{return x}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{doParse ::} \DataTypeTok{String} \OtherTok{->} \DataTypeTok{Either} \DataTypeTok{ParseError} \NormalTok{(}\DataTypeTok{Expr} \NormalTok{a)}
+\NormalTok{doParse s }\FunctionTok{=} \NormalTok{parse (contents parseExpr) }\StringTok{"<stdin>"} \NormalTok{s}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{parseTopLevel ::} \DataTypeTok{String} \OtherTok{->} \DataTypeTok{Either} \DataTypeTok{ParseError} \NormalTok{[}\DataTypeTok{Expr} \NormalTok{a]}
+\NormalTok{parseTopLevel s }\FunctionTok{=} \NormalTok{parse (contents topLevel) }\StringTok{"<stdin>"} \NormalTok{s}
+\end{Highlighting}
+\end{Shaded}
+
+\end{document}

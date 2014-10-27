@@ -1,0 +1,637 @@
+\documentclass[]{article}
+\usepackage{lmodern}
+\usepackage{amssymb,amsmath}
+\usepackage{ifxetex,ifluatex}
+\usepackage{fixltx2e} % provides \textsubscript
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+\else % if luatex or xelatex
+  \ifxetex
+    \usepackage{mathspec}
+    \usepackage{xltxtra,xunicode}
+  \else
+    \usepackage{fontspec}
+  \fi
+  \defaultfontfeatures{Mapping=tex-text,Scale=MatchLowercase}
+  \newcommand{\euro}{€}
+\fi
+% use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+% use microtype if available
+\IfFileExists{microtype.sty}{%
+\usepackage{microtype}
+\UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\newenvironment{Shaded}{}{}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{{#1}}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.56,0.13,0.00}{{#1}}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{{#1}}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{{#1}}}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{{#1}}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{{#1}}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{{#1}}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textit{{#1}}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{{#1}}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{{#1}}}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.02,0.16,0.49}{{#1}}}
+\newcommand{\RegionMarkerTok}[1]{{#1}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{{#1}}}}
+\newcommand{\NormalTok}[1]{{#1}}
+\ifxetex
+  \usepackage[setpagesize=false, % page size defined by xetex
+              unicode=false, % unicode breaks when used with xetex
+              xetex]{hyperref}
+\else
+  \usepackage[unicode=true]{hyperref}
+\fi
+\hypersetup{breaklinks=true,
+            bookmarks=true,
+            pdfauthor={},
+            pdftitle={The psilo Virtual Machine},
+            colorlinks=true,
+            citecolor=blue,
+            urlcolor=blue,
+            linkcolor=magenta,
+            pdfborder={0 0 0}}
+\urlstyle{same}  % don't use monospace font for urls
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt minus 1pt}
+\setlength{\emergencystretch}{3em}  % prevent overfull lines
+\setcounter{secnumdepth}{0}
+
+\title{The psilo Virtual Machine}
+\date{}
+
+\begin{document}
+\maketitle
+
+The virtual machine consists of two things:
+
+\begin{itemize}
+\itemsep1pt\parskip0pt\parsep0pt
+\item
+  a statically scoped mapping from symbols to store locations (the
+  ``environment''); and
+\item
+  a persistent mapping from locations to values (the ``store'').
+\end{itemize}
+
+Thus a \texttt{Machine} is a monad composed of \texttt{ReaderT} and
+\texttt{StateT} monad transformers.
+
+The Reader monad permits function-local overwriting of the contained
+state which is automatically rolled back -- precisely the behavior we
+want out of our lexical environment.
+
+The State monad, on the other hand, is persistent until the end of the
+machine's execution and thus handles dynamic scope and state.
+
+\subsection{Imports and language
+extensions}\label{imports-and-language-extensions}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{\{-# LANGUAGE DeriveFunctor #-\}}
+\OtherTok{\{-# LANGUAGE DeriveFoldable #-\}}
+\OtherTok{\{-# LANGUAGE DeriveTraversable #-\}}
+\OtherTok{\{-# LANGUAGE StandaloneDeriving #-\}}
+\OtherTok{\{-# LANGUAGE TypeSynonymInstances #-\}}
+\OtherTok{\{-# LANGUAGE FlexibleInstances #-\}}
+\OtherTok{\{-# LANGUAGE OverlappingInstances #-\}}
+\OtherTok{\{-# LANGUAGE GeneralizedNewtypeDeriving #-\}}
+\OtherTok{\{-# LANGUAGE ExistentialQuantification #-\}}
+
+\KeywordTok{module} \DataTypeTok{Evaluator} \KeywordTok{where}
+
+\KeywordTok{import }\DataTypeTok{Control.Monad.Free}
+\KeywordTok{import }\DataTypeTok{Prelude} \KeywordTok{hiding} \NormalTok{(log,lookup)}
+\KeywordTok{import }\DataTypeTok{Control.Monad}
+\KeywordTok{import }\DataTypeTok{Control.Monad.State}
+\KeywordTok{import }\DataTypeTok{Control.Monad.Free}
+\KeywordTok{import }\DataTypeTok{Control.Monad.Trans}
+\KeywordTok{import }\DataTypeTok{Control.Monad.Reader}
+\KeywordTok{import qualified} \DataTypeTok{Data.Map.Strict} \KeywordTok{as} \DataTypeTok{Map}
+\KeywordTok{import qualified} \DataTypeTok{Data.IntMap.Strict} \KeywordTok{as} \DataTypeTok{IntMap}
+\KeywordTok{import }\DataTypeTok{Data.Foldable} \NormalTok{(}\DataTypeTok{Foldable}\NormalTok{, fold)}
+\KeywordTok{import }\DataTypeTok{Data.Traversable} \NormalTok{(}\DataTypeTok{Traversable}\NormalTok{, sequence)}
+\KeywordTok{import }\DataTypeTok{Data.List} \NormalTok{(intersperse)}
+
+\KeywordTok{import }\DataTypeTok{Parser}
+\KeywordTok{import }\DataTypeTok{Syntax}
+\end{Highlighting}
+\end{Shaded}
+
+\subsection{The Machine}\label{the-machine}
+
+Borrowing (stealing?) from Krishnamurthi's inimitable
+\href{http://cs.brown.edu/~sk/Publications/Books/ProgLangs/}{Programming
+Languages: Application and Interpretation} the environment does not map
+symbols to values but to \emph{locations} in the store. The store, then,
+maps location to values.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{type} \DataTypeTok{Location} \FunctionTok{=} \DataTypeTok{Int}
+\KeywordTok{data} \DataTypeTok{Value} \FunctionTok{=} \NormalTok{forall a }\FunctionTok{.} \DataTypeTok{Show} \NormalTok{a }\OtherTok{=>} \DataTypeTok{VClos} \NormalTok{\{}\OtherTok{ vSym  ::} \NormalTok{[}\DataTypeTok{Symbol}\NormalTok{]}
+                                        \NormalTok{,}\OtherTok{ vBody ::} \NormalTok{(}\DataTypeTok{Expr} \NormalTok{a)}
+                                        \NormalTok{,}\OtherTok{ vEnv  ::} \DataTypeTok{Environment}
+                                        \NormalTok{\}}
+           \FunctionTok{|} \DataTypeTok{VSym} \DataTypeTok{Symbol}
+           \FunctionTok{|} \DataTypeTok{VNum}  \NormalTok{\{}\OtherTok{ unNum ::} \DataTypeTok{Integer} \NormalTok{\}}
+           \FunctionTok{|} \DataTypeTok{VBool} \NormalTok{\{}\OtherTok{ unBool ::} \DataTypeTok{Bool} \NormalTok{\}}
+           \FunctionTok{|} \DataTypeTok{VList} \NormalTok{[}\DataTypeTok{Value}\NormalTok{]}
+           \FunctionTok{|} \DataTypeTok{VNil}
+
+\KeywordTok{instance} \DataTypeTok{Show} \DataTypeTok{Value} \KeywordTok{where}
+    \NormalTok{show (}\DataTypeTok{VSym} \NormalTok{s)   }\FunctionTok{=} \StringTok{"'"} \FunctionTok{++} \NormalTok{s}
+    \NormalTok{show (}\DataTypeTok{VNum} \NormalTok{n)   }\FunctionTok{=} \NormalTok{show n}
+    \NormalTok{show (}\DataTypeTok{VBool} \NormalTok{b)  }\FunctionTok{=} \KeywordTok{if} \NormalTok{b }\KeywordTok{then} \StringTok{"#t"} \KeywordTok{else} \StringTok{"#f"}
+    \NormalTok{show (}\DataTypeTok{VNil}\NormalTok{)     }\FunctionTok{=} \StringTok{"(nil)"}
+    \NormalTok{show (}\DataTypeTok{VClos} \NormalTok{_ _ e)  }\FunctionTok{=} \StringTok{"<function> with Environment: "} \FunctionTok{++} \NormalTok{(show e)}
+    \NormalTok{show (}\DataTypeTok{VList} \NormalTok{xs) }\FunctionTok{=} \NormalTok{concat }\FunctionTok{$} \NormalTok{map show xs}
+
+\KeywordTok{type} \DataTypeTok{Environment} \FunctionTok{=} \DataTypeTok{Map.Map} \DataTypeTok{Symbol} \DataTypeTok{Int}
+\KeywordTok{type} \DataTypeTok{Store}       \FunctionTok{=} \DataTypeTok{IntMap.IntMap} \DataTypeTok{Value}
+
+\NormalTok{emptyEnv }\FunctionTok{=} \NormalTok{Map.empty}
+\NormalTok{emptyStore }\FunctionTok{=} \NormalTok{IntMap.empty}
+\end{Highlighting}
+\end{Shaded}
+
+The store must also keep track of how many locations it has handed out.
+As the \texttt{StateT} monad can only hold one value as state, I wrap a
+\texttt{Store} and an \texttt{Int} together in one data type.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{data} \DataTypeTok{MStore} \FunctionTok{=} \DataTypeTok{MStore} \NormalTok{\{}\OtherTok{ mStore ::} \DataTypeTok{Store}
+                     \NormalTok{,}\OtherTok{ mLoc   ::} \DataTypeTok{Int}
+                     \NormalTok{\}}
+    \KeywordTok{deriving} \DataTypeTok{Show}
+\end{Highlighting}
+\end{Shaded}
+
+I do the same thing with \texttt{Environment} defensively in case I need
+to store more data in the \texttt{ReaderT} in the future.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{data} \DataTypeTok{MEnv} \FunctionTok{=} \DataTypeTok{MEnv} \NormalTok{\{}\OtherTok{ mEnv ::} \DataTypeTok{Environment} \NormalTok{\}}
+    \KeywordTok{deriving} \DataTypeTok{Show}
+\end{Highlighting}
+\end{Shaded}
+
+Behold: the \texttt{Machine} monad, a stack of monad transformers.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{newtype} \DataTypeTok{Machine} \NormalTok{a }\FunctionTok{=} \DataTypeTok{M} \NormalTok{\{}\OtherTok{ runM ::} \DataTypeTok{ReaderT} \DataTypeTok{MEnv} \NormalTok{(}\DataTypeTok{StateT} \DataTypeTok{MStore} \DataTypeTok{IO}\NormalTok{) a \}}
+    \KeywordTok{deriving} \NormalTok{(}\DataTypeTok{Monad}\NormalTok{, }\DataTypeTok{MonadIO}\NormalTok{, }\DataTypeTok{MonadState} \DataTypeTok{MStore}\NormalTok{, }\DataTypeTok{MonadReader} \DataTypeTok{MEnv}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{initialStore ::} \DataTypeTok{MStore}
+\NormalTok{initialStore }\FunctionTok{=} \DataTypeTok{MStore} \NormalTok{\{ mStore }\FunctionTok{=} \NormalTok{emptyStore}
+                      \NormalTok{, mLoc   }\FunctionTok{=} \DecValTok{1}
+                      \NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{initialEnv ::} \DataTypeTok{MEnv}
+\NormalTok{initialEnv }\FunctionTok{=} \DataTypeTok{MEnv} \NormalTok{\{ mEnv }\FunctionTok{=} \NormalTok{emptyEnv \}}
+\end{Highlighting}
+\end{Shaded}
+
+With the above default initial states for the environment and the store,
+I'm ready to define the mapping from a \texttt{Machine} to \texttt{IO},
+which is essentially just calling the various monad transformer
+\texttt{run} functions in succession.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{runMachineWithStore ::} \DataTypeTok{Machine} \NormalTok{a }\OtherTok{->} \DataTypeTok{MStore} \OtherTok{->} \DataTypeTok{IO} \NormalTok{(a, }\DataTypeTok{MStore}\NormalTok{)}
+\NormalTok{runMachineWithStore k st }\FunctionTok{=} \NormalTok{runStateT (runReaderT (runM k) initialEnv) st}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{runMachine ::} \DataTypeTok{Machine} \NormalTok{a }\OtherTok{->} \DataTypeTok{IO} \NormalTok{(a, }\DataTypeTok{MStore}\NormalTok{)}
+\NormalTok{runMachine k }\FunctionTok{=} \NormalTok{runMachineWithStore k initialStore}
+\end{Highlighting}
+\end{Shaded}
+
+Now all that is left is a means of building a \texttt{Machine} from
+psilo code.
+
+\subsection{The operation language}\label{the-operation-language}
+
+Executing a psilo program on this machine amounts to:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\itemsep1pt\parskip0pt\parsep0pt
+\item
+  Unwinding \texttt{Expr} values and concurrently
+\item
+  Building the corresponding \texttt{Machine} values.
+\end{enumerate}
+
+To aid in this second step I define an intermediate operation language,
+\texttt{Op}, which will encapsulate some common machine-oriented tasks.
+This should simplify the proper interpreter function.
+
+\texttt{Op} allows for manipulation of the environment and store, and
+also provides fresh store locations on demand.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{data} \DataTypeTok{OpF} \NormalTok{k}
+    \FunctionTok{=} \DataTypeTok{Bind}   \DataTypeTok{Symbol} \DataTypeTok{Location} \NormalTok{k}
+    \FunctionTok{|} \DataTypeTok{Lookup} \DataTypeTok{Symbol} \NormalTok{(}\DataTypeTok{Location} \OtherTok{->} \NormalTok{k)}
+    \FunctionTok{|} \DataTypeTok{Store}  \DataTypeTok{Location} \DataTypeTok{Value} \NormalTok{k}
+    \FunctionTok{|} \DataTypeTok{Fetch}  \DataTypeTok{Location} \NormalTok{(}\DataTypeTok{Value} \OtherTok{->} \NormalTok{k)}
+    \FunctionTok{|} \DataTypeTok{Delete} \DataTypeTok{Location} \NormalTok{k}
+    \FunctionTok{|} \DataTypeTok{Fresh}  \NormalTok{(}\DataTypeTok{Location} \OtherTok{->} \NormalTok{k)}
+    \KeywordTok{deriving} \DataTypeTok{Functor}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{type} \DataTypeTok{Op} \FunctionTok{=} \DataTypeTok{Free} \DataTypeTok{OpF}
+\end{Highlighting}
+\end{Shaded}
+
+Nevermind the \texttt{Free} constructor for now.
+
+The utility of the following convenience functions will be clearer when
+we get to the interpreter. A crude explanation is that these are the
+``commands'' we will write \texttt{Op} programs in.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{bind ::} \DataTypeTok{Symbol} \OtherTok{->} \DataTypeTok{Location} \OtherTok{->} \DataTypeTok{Op} \NormalTok{()}
+\NormalTok{bind s l }\FunctionTok{=} \NormalTok{liftF }\FunctionTok{$} \DataTypeTok{Bind} \NormalTok{s l ()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{lookup}\OtherTok{ ::} \DataTypeTok{Symbol} \OtherTok{->} \DataTypeTok{Op} \DataTypeTok{Location}
+\NormalTok{lookup s }\FunctionTok{=} \NormalTok{liftF }\FunctionTok{$} \DataTypeTok{Lookup} \NormalTok{s id}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{store ::} \DataTypeTok{Location} \OtherTok{->} \DataTypeTok{Value} \OtherTok{->} \DataTypeTok{Op} \NormalTok{()}
+\NormalTok{store l v }\FunctionTok{=} \NormalTok{liftF }\FunctionTok{$} \DataTypeTok{Store} \NormalTok{l v ()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{fetch ::} \DataTypeTok{Location} \OtherTok{->} \DataTypeTok{Op} \DataTypeTok{Value}
+\NormalTok{fetch l }\FunctionTok{=} \NormalTok{liftF }\FunctionTok{$} \DataTypeTok{Fetch} \NormalTok{l id}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{delete ::} \DataTypeTok{Location} \OtherTok{->} \DataTypeTok{Op} \NormalTok{()}
+\NormalTok{delete l }\FunctionTok{=} \NormalTok{liftF }\FunctionTok{$} \DataTypeTok{Delete} \NormalTok{l ()}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{fresh ::} \DataTypeTok{Op} \DataTypeTok{Location}
+\NormalTok{fresh }\FunctionTok{=} \NormalTok{liftF }\FunctionTok{$} \DataTypeTok{Fresh} \NormalTok{id}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{lookupVar ::} \DataTypeTok{Symbol} \OtherTok{->} \DataTypeTok{MEnv} \OtherTok{->} \DataTypeTok{Location}
+\NormalTok{lookupVar sym (}\DataTypeTok{MEnv} \NormalTok{env) }\FunctionTok{=} \NormalTok{env }\FunctionTok{Map.!} \NormalTok{sym}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{bindVar ::} \DataTypeTok{Symbol} \OtherTok{->} \DataTypeTok{Location} \OtherTok{->} \DataTypeTok{MEnv} \OtherTok{->} \DataTypeTok{MEnv}
+\NormalTok{bindVar sym loc (}\DataTypeTok{MEnv} \NormalTok{env) }\FunctionTok{=} \DataTypeTok{MEnv} \FunctionTok{$} \NormalTok{Map.insert sym loc env}
+\end{Highlighting}
+\end{Shaded}
+
+\subsection{The \texttt{Op} interpreter and the \texttt{Free}
+monad}\label{the-op-interpreter-and-the-free-monad}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{runOp ::} \DataTypeTok{Op} \NormalTok{a }\OtherTok{->} \DataTypeTok{Machine} \NormalTok{a}
+\end{Highlighting}
+\end{Shaded}
+
+For each branch of our \texttt{OpF} data type definition, we have a case
+for the \texttt{Op} interpreter to handle.
+
+\texttt{Op} and \texttt{OpF} are slightly different: the former is the
+latter transformed by the \texttt{Free} monad type constructor.
+\texttt{Free} is exactly that: you give it a functor value and get a
+monad for ``free''; ie, you get a data type which implements
+\texttt{\textgreater{}\textgreater{}=} and \texttt{return}.
+
+However, \texttt{Free} monads all get the same generic implementations
+of \texttt{\textgreater{}\textgreater{}=} and \texttt{bind}. All the
+semantics of your data type must be specified in a \emph{run} function
+of some kind which breaks down these aggregate values to build some
+result. \texttt{runOp} is such a function for \texttt{Op}.
+
+\texttt{Free} creates types which have a base case for storing ``Pure''
+values (in Haskell, the \texttt{return} function may also be called
+\texttt{pure} because it wraps a \emph{pure} value in a monadic
+context). \texttt{Free} values all have a continuation argument (which I
+call \texttt{next}, conventionally), whereas \texttt{Pure} values do
+not: they are leaves of a syntax tree.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{runOp (}\DataTypeTok{Pure} \NormalTok{v) }\FunctionTok{=} \NormalTok{return v}
+\end{Highlighting}
+\end{Shaded}
+
+All the other value constructors are wrapped in \texttt{Free}.
+
+\texttt{bind}ing is the act of associating a symbol with a location in
+memory.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{runOp (}\DataTypeTok{Free} \NormalTok{(}\DataTypeTok{Bind} \NormalTok{sym loc next)) }\FunctionTok{=} \KeywordTok{do}
+    \NormalTok{env }\OtherTok{<-} \NormalTok{ask}
+    \NormalTok{local (bindVar sym loc) }\FunctionTok{$} \NormalTok{runOp next}
+\end{Highlighting}
+\end{Shaded}
+
+The inverse operation is called a \texttt{lookup} in our parlance:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{runOp (}\DataTypeTok{Free} \NormalTok{(}\DataTypeTok{Lookup} \NormalTok{sym next)) }\FunctionTok{=} \KeywordTok{do}
+    \NormalTok{loc }\OtherTok{<-} \NormalTok{asks (lookupVar sym)}
+    \NormalTok{runOp }\FunctionTok{$} \NormalTok{next loc}
+\end{Highlighting}
+\end{Shaded}
+
+If we have a location (perhaps by calling \texttt{fresh}) to store a
+value in - and a value - we can associate them by \texttt{get}ting the
+state, picking out the \texttt{Store}, and inserting our location and
+value in the map. Then we \texttt{put} the state back in and continue on
+our merry way.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{runOp (}\DataTypeTok{Free} \NormalTok{(}\DataTypeTok{Store} \NormalTok{loc val next)) }\FunctionTok{=} \KeywordTok{do}
+    \NormalTok{state  }\OtherTok{<-} \NormalTok{get}
+    \NormalTok{sto    }\OtherTok{<-} \NormalTok{return }\FunctionTok{$} \NormalTok{mStore state}
+    \NormalTok{sto'   }\OtherTok{<-} \NormalTok{return }\FunctionTok{$} \NormalTok{IntMap.insert loc val sto}
+    \NormalTok{put }\FunctionTok{$} \NormalTok{state \{ mStore }\FunctionTok{=} \NormalTok{sto' \}}
+    \NormalTok{runOp next}
+\end{Highlighting}
+\end{Shaded}
+
+By this point should be able to figure out what \texttt{fetch} does.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{runOp (}\DataTypeTok{Free} \NormalTok{(}\DataTypeTok{Fetch} \NormalTok{loc next)) }\FunctionTok{=} \KeywordTok{do}
+    \NormalTok{state  }\OtherTok{<-} \NormalTok{get}
+    \NormalTok{sto    }\OtherTok{<-} \NormalTok{return }\FunctionTok{$} \NormalTok{mStore state}
+    \NormalTok{val    }\OtherTok{<-} \NormalTok{return }\FunctionTok{$} \NormalTok{sto }\FunctionTok{IntMap.!} \NormalTok{loc}
+    \NormalTok{runOp }\FunctionTok{$} \NormalTok{next val}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{runOp (}\DataTypeTok{Free} \NormalTok{(}\DataTypeTok{Delete} \NormalTok{loc next)) }\FunctionTok{=} \KeywordTok{do}
+    \NormalTok{state }\OtherTok{<-} \NormalTok{get}
+    \NormalTok{sto   }\OtherTok{<-} \NormalTok{return }\FunctionTok{$} \NormalTok{mStore state}
+    \NormalTok{sto'  }\OtherTok{<-} \NormalTok{return }\FunctionTok{$} \NormalTok{IntMap.delete loc sto}
+    \NormalTok{put }\FunctionTok{$} \NormalTok{state \{ mStore }\FunctionTok{=} \NormalTok{sto' \}}
+    \NormalTok{runOp next}
+\end{Highlighting}
+\end{Shaded}
+
+\texttt{fresh} gets the state, extracts the location, increments it,
+puts it back in, and returns the original.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{runOp (}\DataTypeTok{Free} \NormalTok{(}\DataTypeTok{Fresh} \NormalTok{next)) }\FunctionTok{=} \KeywordTok{do}
+    \NormalTok{state }\OtherTok{<-} \NormalTok{get}
+    \NormalTok{loc   }\OtherTok{<-} \NormalTok{return }\FunctionTok{$} \NormalTok{mLoc state}
+    \NormalTok{put }\FunctionTok{$} \NormalTok{state \{ mLoc }\FunctionTok{=} \NormalTok{(loc }\FunctionTok{+} \DecValTok{1}\NormalTok{) \}}
+    \NormalTok{runOp }\FunctionTok{$} \NormalTok{next loc}
+\end{Highlighting}
+\end{Shaded}
+
+To illustrate what \texttt{Op} code looks like have a look at
+\texttt{opTest}:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{opTest ::} \DataTypeTok{Machine} \NormalTok{()}
+\NormalTok{opTest }\FunctionTok{=} \NormalTok{runOp }\FunctionTok{$} \KeywordTok{do}
+    \NormalTok{loc1 }\OtherTok{<-} \NormalTok{fresh}
+    \NormalTok{bind }\StringTok{"huh"} \NormalTok{loc1}
+    \NormalTok{store loc1 }\FunctionTok{$} \DataTypeTok{VNum} \DecValTok{5}
+    \NormalTok{(}\DataTypeTok{VNum} \NormalTok{val) }\OtherTok{<-} \NormalTok{lookup }\StringTok{"huh"} \FunctionTok{>>=} \NormalTok{fetch}
+    \NormalTok{bind }\StringTok{"huh"} \DecValTok{0}
+    \NormalTok{store }\DecValTok{0} \FunctionTok{$} \DataTypeTok{VNum} \NormalTok{(val }\FunctionTok{*} \DecValTok{2}\NormalTok{)}
+    \NormalTok{return ()}
+\end{Highlighting}
+\end{Shaded}
+
+\subsection{Interpreting psilo}\label{interpreting-psilo}
+
+Now that we have a static environment and a dynamic store, a machine
+which holds them, and a low-level operation language to control the
+machine, we can now set ourselves to interpreting psilo.
+
+As stated elsewhere, executing psilo programs is the act of
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\itemsep1pt\parskip0pt\parsep0pt
+\item
+  transforming \texttt{Expr} values to \texttt{Machine} values and
+\item
+  unwinding \texttt{Machine} values.
+\end{enumerate}
+
+The function \texttt{interpret} handles the first part. You can even
+tell by its type: \texttt{Expr a -\textgreater{} Machine Value}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{interpret ::} \DataTypeTok{Show} \NormalTok{a }\OtherTok{=>} \DataTypeTok{Expr} \NormalTok{a }\OtherTok{->} \DataTypeTok{Machine} \DataTypeTok{Value}
+\end{Highlighting}
+\end{Shaded}
+
+\texttt{Expr} is defined as \texttt{type Expr = Free AST}. Since
+\texttt{Expr} is a \texttt{Free} monad, as with \texttt{Op}, we handle
+the base case of being handed a \texttt{Pure} value. In this case, we
+return \texttt{NilV}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{interpret (}\DataTypeTok{Pure} \NormalTok{v) }\FunctionTok{=} \NormalTok{return }\DataTypeTok{VNil}
+\end{Highlighting}
+\end{Shaded}
+
+The rest of the interpreter is remarkably simple. Each case corresponds
+to a branch in our \texttt{AST} definition.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{interpret (}\DataTypeTok{Free} \NormalTok{(}\DataTypeTok{ABoolean} \NormalTok{b)) }\FunctionTok{=} \NormalTok{return }\FunctionTok{$} \DataTypeTok{VBool} \NormalTok{b}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{interpret (}\DataTypeTok{Free} \NormalTok{(}\DataTypeTok{AInteger} \NormalTok{n)) }\FunctionTok{=} \NormalTok{return }\FunctionTok{$} \DataTypeTok{VNum} \NormalTok{n}
+\end{Highlighting}
+\end{Shaded}
+
+Symbols may have prefixes or suffixes (well, eventually) which modify
+the semantic value of the symbol but not the actual raw value. For
+example, a \texttt{:\&} suffix tells the compiler that the symbol is a
+shared reference and may be safely ignored.
+
+While this will be more nuanced or sophisticated in the future, in this
+evaluator at least we may safely ignore all suffixes.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{interpret (}\DataTypeTok{Free} \NormalTok{(}\DataTypeTok{ASymbol}  \NormalTok{s)) }\FunctionTok{=} \KeywordTok{do}
+    \NormalTok{val }\OtherTok{<-} \NormalTok{runOp }\FunctionTok{$} \NormalTok{lookup s }\FunctionTok{>>=} \NormalTok{fetch}
+    \NormalTok{return val}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{interpret (}\DataTypeTok{Free} \NormalTok{(}\DataTypeTok{AList} \NormalTok{xs)) }\FunctionTok{=} \KeywordTok{do}
+    \NormalTok{vals }\OtherTok{<-} \NormalTok{forM xs }\FunctionTok{$} \NormalTok{\textbackslash{}x }\OtherTok{->} \KeywordTok{do}
+        \NormalTok{x' }\OtherTok{<-} \NormalTok{return x}
+        \KeywordTok{let} \NormalTok{v }\FunctionTok{=} \NormalTok{interpret x'}
+        \NormalTok{v}
+    \NormalTok{return }\FunctionTok{$} \DataTypeTok{VList} \NormalTok{vals}
+\end{Highlighting}
+\end{Shaded}
+
+The below code for lambdas, while technically correct, has a huge
+problem: it copies its \emph{entire} environment. A much smarter trick
+would be to only copy that which is actually used.
+
+Also, function application is currently very stupid. It is intended that
+functions will take one argument, a list containing the actual values to
+be processed. The process is simple:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  If the operand list is sufficiently long, zip it with the list of
+  symbols in the function.
+\item
+  Create an \texttt{Environment} out of this zipped list.
+\item
+  Form a union between this new environment and the current, favoring
+  the new one.
+\end{enumerate}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{interpret (}\DataTypeTok{Free} \NormalTok{(}\DataTypeTok{ALambda} \NormalTok{args body)) }\FunctionTok{=} \KeywordTok{do}
+    \NormalTok{(}\DataTypeTok{MEnv} \NormalTok{currentEnv) }\OtherTok{<-} \NormalTok{ask}
+    \NormalTok{return }\FunctionTok{$} \DataTypeTok{VClos} \NormalTok{args body currentEnv}
+\end{Highlighting}
+\end{Shaded}
+
+During application, if we are given a symbol for an operator, check to
+see if it is a built-in operator and, if applicable, simply return the
+resulting \texttt{Value}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{interpret (}\DataTypeTok{Free} \NormalTok{(}\DataTypeTok{AApply} \NormalTok{fun args)) }\FunctionTok{=} \KeywordTok{do}
+    \NormalTok{(}\DataTypeTok{VList} \NormalTok{argVals)       }\OtherTok{<-} \NormalTok{interpret args}
+    \KeywordTok{case} \NormalTok{builtin fun argVals }\KeywordTok{of}
+        \DataTypeTok{Just} \NormalTok{mv   }\OtherTok{->} \NormalTok{return mv}
+        \DataTypeTok{Nothing}   \OtherTok{->} \KeywordTok{do}
+            \NormalTok{(}\DataTypeTok{VClos} \NormalTok{syms body env) }\OtherTok{<-} \NormalTok{interpret fun}
+            \NormalTok{locations }\OtherTok{<-} \NormalTok{forM argVals }\FunctionTok{$} \NormalTok{\textbackslash{}av }\OtherTok{->} \KeywordTok{do}
+                \NormalTok{newLoc }\OtherTok{<-} \NormalTok{runOp }\FunctionTok{$} \NormalTok{fresh}
+                \NormalTok{runOp }\FunctionTok{$} \NormalTok{store newLoc av}
+                \NormalTok{return newLoc}
+            \KeywordTok{let} \NormalTok{env' }\FunctionTok{=} \NormalTok{Map.fromList }\FunctionTok{$} \NormalTok{zip syms locations}
+            \NormalTok{newFrame }\OtherTok{<-} \NormalTok{return }\FunctionTok{$} \NormalTok{Map.union env' env}
+            \NormalTok{oldEnv   }\OtherTok{<-} \NormalTok{ask}
+            \NormalTok{retVal   }\OtherTok{<-} \NormalTok{local (\textbackslash{}(}\DataTypeTok{MEnv} \NormalTok{e) }\OtherTok{->} \DataTypeTok{MEnv} \NormalTok{(Map.union newFrame e)) }\FunctionTok{$}
+                            \NormalTok{interpret body}
+            \CommentTok{-- clean up the store}
+            \NormalTok{runOp }\FunctionTok{$} \NormalTok{forM_ locations }\FunctionTok{$} \NormalTok{\textbackslash{}loc }\OtherTok{->} \NormalTok{delete loc}
+            \NormalTok{return retVal}
+\end{Highlighting}
+\end{Shaded}
+
+This interpreter is flexible and powerful because we built up the
+appropriate abstractions.
+
+\subsection{Built-in operators}\label{built-in-operators}
+
+As a final note, some symbols denote built-in operators (mostly
+involving arithmetic). The following function attempts to evaluate a
+built-in, returning (maybe) a \texttt{Machine Value}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\OtherTok{builtin ::} \DataTypeTok{Expr} \NormalTok{a }\OtherTok{->} \NormalTok{[}\DataTypeTok{Value}\NormalTok{] }\OtherTok{->} \DataTypeTok{Maybe} \DataTypeTok{Value}
+\NormalTok{builtin (}\DataTypeTok{Free} \NormalTok{(}\DataTypeTok{ASymbol} \NormalTok{sym)) args}
+    \FunctionTok{|} \NormalTok{sym }\FunctionTok{==} \StringTok{"+"}    \FunctionTok{=} \NormalTok{numOp sum args}
+    \FunctionTok{|} \NormalTok{sym }\FunctionTok{==} \StringTok{"*"}    \FunctionTok{=} \NormalTok{numOp product args}
+    \FunctionTok{|} \NormalTok{sym }\FunctionTok{==} \StringTok{"-"}    \FunctionTok{=} \NormalTok{numBinOp ((}\FunctionTok{-}\NormalTok{)) args}
+    \FunctionTok{|} \NormalTok{sym }\FunctionTok{==} \StringTok{"/"}    \FunctionTok{=} \NormalTok{numBinOp div   args}
+    \FunctionTok{|} \NormalTok{sym }\FunctionTok{==} \StringTok{"and"}  \FunctionTok{=} \DataTypeTok{Just} \FunctionTok{.} \DataTypeTok{VBool} \FunctionTok{$} \NormalTok{and (map unBool args)}
+    \FunctionTok{|} \NormalTok{sym }\FunctionTok{==} \StringTok{"or"}   \FunctionTok{=} \DataTypeTok{Just} \FunctionTok{.} \DataTypeTok{VBool} \FunctionTok{$} \NormalTok{or  (map unBool args)}
+    \FunctionTok{|} \NormalTok{sym }\FunctionTok{==} \StringTok{"not"}  \FunctionTok{=} \DataTypeTok{Just} \FunctionTok{.} \DataTypeTok{VBool} \FunctionTok{$} \NormalTok{not (unBool }\FunctionTok{.} \NormalTok{head }\FunctionTok{$} \NormalTok{args)}
+    \FunctionTok{|} \NormalTok{otherwise     }\FunctionTok{=} \DataTypeTok{Nothing}
+    \KeywordTok{where} \NormalTok{numBinOp op xs }\FunctionTok{=} \KeywordTok{let} \NormalTok{(}\DataTypeTok{VNum} \NormalTok{l) }\FunctionTok{=} \NormalTok{xs }\FunctionTok{!!} \DecValTok{0}
+                               \NormalTok{(}\DataTypeTok{VNum} \NormalTok{r) }\FunctionTok{=} \NormalTok{xs }\FunctionTok{!!} \DecValTok{1}
+                            \KeywordTok{in}  \DataTypeTok{Just} \FunctionTok{.} \DataTypeTok{VNum} \FunctionTok{$} \NormalTok{op l r}
+          \NormalTok{numOp    op xs }\FunctionTok{=} \DataTypeTok{Just} \FunctionTok{.} \DataTypeTok{VNum} \FunctionTok{$} \NormalTok{sum (map unNum args)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{builtin _ _   }\FunctionTok{=} \DataTypeTok{Nothing}
+\end{Highlighting}
+\end{Shaded}
+
+\end{document}

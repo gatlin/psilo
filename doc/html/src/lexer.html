@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>The Lexer | psilo</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="../css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="../css/jumbotron-narrow.css" rel="stylesheet">
+
+    <!-- glyphicons -->
+    <link href="../css/bootstrap-glyphicons.css" rel="stylesheet">
+
+    <link href="../css/style.css" rel="stylesheet">
+  <style type="text/css">
+table.sourceCode, tr.sourceCode, td.lineNumbers, td.sourceCode {
+  margin: 0; padding: 0; vertical-align: baseline; border: none; }
+table.sourceCode { width: 100%; }
+td.lineNumbers { text-align: right; padding-right: 4px; padding-left: 4px; color: #aaaaaa; border-right: 1px solid #aaaaaa; }
+td.sourceCode { padding-left: 5px; }
+code > span.kw { color: #0000ff; }
+code > span.ch { color: #008080; }
+code > span.st { color: #008080; }
+code > span.co { color: #008000; }
+code > span.ot { color: #ff4000; }
+code > span.al { color: #ff0000; }
+code > span.er { font-weight: bold; }
+    code{white-space: pre;}
+  </style>
+  </head>
+
+  <body>
+
+    <div class="container">
+      <ol class="breadcrumb">
+          <li><a href="/">home</a></li>
+          <li><a href="/psilo/">psilo</a></li>
+      </ol>
+      <div class="page-header col-md-12 col-lg-10 col-lg-offset-1">
+        <h1>
+The Lexer
+        </h1>
+      </div>
+      <div class="row">
+        <div id="content" class="col-md-12 col-lg-10 col-lg-offset-1">
+
+<p>psilo has a comparatively simple grammar and lexing it is fairly straightforward. Parsec has a number of utilities for accomplishing exactly what I wish to accomplish so I happily and humbly defer to its facilities.</p>
+<p>The main purpose of this module is to remove some clutter from <code>Parser</code>.</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">module</span> <span class="dt">Lexer</span> <span class="kw">where</span>
+
+<span class="kw">import </span><span class="dt">Text.Parsec</span>
+<span class="kw">import </span><span class="dt">Text.Parsec.String</span> (<span class="dt">Parser</span>)
+<span class="kw">import </span><span class="dt">Text.Parsec.Language</span> (emptyDef)
+<span class="kw">import qualified</span> <span class="dt">Text.Parsec.Token</span> <span class="kw">as</span> <span class="dt">Tok</span>
+
+<span class="ot">lexer ::</span> <span class="dt">Tok.TokenParser</span> ()
+lexer <span class="fu">=</span> Tok.makeTokenParser style
+    <span class="kw">where</span> ops <span class="fu">=</span> []
+          names <span class="fu">=</span> [<span class="st">&quot;\\&quot;</span>,<span class="st">&quot;::&quot;</span>,<span class="st">&quot;let&quot;</span>,<span class="st">&quot;apply&quot;</span>]
+          idStarts <span class="fu">=</span> letter <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;_&#39;</span>
+          idLetters <span class="fu">=</span> letter <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;_&#39;</span> <span class="fu">&lt;|&gt;</span> digit <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;-&#39;</span>
+                  <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;+&#39;</span> <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;?&#39;</span> <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;:&#39;</span> <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;&amp;&#39;</span>
+          opStarts <span class="fu">=</span> oneOf <span class="st">&quot;!$%&amp;|*+-/:&lt;=&gt;?@^_~#&quot;</span>
+          opLetters <span class="fu">=</span> oneOf <span class="st">&quot;!$%&amp;|*+-/:&lt;=&gt;?@^_~#&quot;</span> <span class="fu">&lt;|&gt;</span> letter <span class="fu">&lt;|&gt;</span> digit <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;-&#39;</span> <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;_&#39;</span>
+          style <span class="fu">=</span> emptyDef {
+                      Tok.commentLine <span class="fu">=</span> <span class="st">&quot;;&quot;</span>
+                    , Tok.reservedOpNames <span class="fu">=</span> ops
+                    , Tok.reservedNames <span class="fu">=</span> names
+                    , Tok.caseSensitive <span class="fu">=</span> <span class="dt">True</span>
+                    , Tok.identStart <span class="fu">=</span> idStarts
+                    , Tok.identLetter <span class="fu">=</span> idLetters
+                    , Tok.opStart <span class="fu">=</span> opStarts
+                    , Tok.opLetter <span class="fu">=</span> opLetters
+                    , Tok.commentStart <span class="fu">=</span> <span class="st">&quot;/*&quot;</span>
+                    , Tok.commentEnd <span class="fu">=</span> <span class="st">&quot;*/&quot;</span>
+          }
+
+<span class="ot">integer ::</span> <span class="dt">Parser</span> <span class="dt">Integer</span>
+integer <span class="fu">=</span> Tok.integer lexer
+
+<span class="ot">parens ::</span> <span class="dt">Parser</span> a <span class="ot">-&gt;</span> <span class="dt">Parser</span> a
+parens <span class="fu">=</span> Tok.parens lexer
+
+<span class="ot">whitespace ::</span> <span class="dt">Parser</span> ()
+whitespace <span class="fu">=</span> Tok.whiteSpace lexer
+
+<span class="ot">nl ::</span> <span class="dt">Parser</span> ()
+nl <span class="fu">=</span> skipMany newline
+
+<span class="ot">reserved ::</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">Parser</span> ()
+reserved <span class="fu">=</span> Tok.reserved lexer
+
+<span class="ot">reservedOp ::</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">Parser</span> ()
+reservedOp <span class="fu">=</span> Tok.reservedOp lexer
+
+<span class="ot">identifier ::</span> <span class="dt">Parser</span> <span class="dt">String</span>
+identifier <span class="fu">=</span> Tok.identifier lexer
+
+<span class="ot">operator ::</span> <span class="dt">Parser</span> <span class="dt">String</span>
+operator <span class="fu">=</span> Tok.operator lexer</code></pre>
+
+        </div><!-- content -->
+    </div><!-- row -->
+
+      <div class="footer">
+        <p>&copy; 2013-2014. Theme lovingly stolen from other people.</p>
+      </div>
+
+    </div> <!-- /container -->
+
+  </body>
+</html>
