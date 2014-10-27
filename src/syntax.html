@@ -83,6 +83,7 @@ type Expr = Mu AST</code></pre>
     <span class="fu">|</span> <span class="dt">ALambda</span> [<span class="dt">Symbol</span>] a
     <span class="fu">|</span> <span class="dt">AApply</span> a a
     <span class="fu">|</span> <span class="dt">AList</span> [a]
+    <span class="fu">|</span> <span class="dt">ADefine</span> <span class="dt">Symbol</span> a
 
 <span class="kw">deriving</span> <span class="kw">instance</span> <span class="dt">Show</span> a <span class="ot">=&gt;</span> <span class="dt">Show</span> (<span class="dt">AST</span> a)
 <span class="kw">deriving</span> <span class="kw">instance</span> <span class="dt">Functor</span> <span class="dt">AST</span>

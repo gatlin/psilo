@@ -97,6 +97,7 @@ The psilo Virtual Machine
            <span class="fu">|</span> <span class="dt">VNum</span>  {<span class="ot"> unNum ::</span> <span class="dt">Integer</span> }
            <span class="fu">|</span> <span class="dt">VBool</span> {<span class="ot"> unBool ::</span> <span class="dt">Bool</span> }
            <span class="fu">|</span> <span class="dt">VList</span> [<span class="dt">Value</span>]
+           <span class="fu">|</span> <span class="dt">VDefine</span> <span class="dt">Symbol</span>
            <span class="fu">|</span> <span class="dt">VNil</span>
 
 <span class="kw">instance</span> <span class="dt">Show</span> <span class="dt">Value</span> <span class="kw">where</span>
@@ -106,6 +107,7 @@ The psilo Virtual Machine
     show (<span class="dt">VNil</span>)     <span class="fu">=</span> <span class="st">&quot;(nil)&quot;</span>
     show (<span class="dt">VClos</span> _ _ e)  <span class="fu">=</span> <span class="st">&quot;&lt;function&gt; with Environment: &quot;</span> <span class="fu">++</span> (show e)
     show (<span class="dt">VList</span> xs) <span class="fu">=</span> concat <span class="fu">$</span> map show xs
+    show (<span class="dt">VDefine</span> _)<span class="fu">=</span> <span class="st">&quot;&lt;definition&gt;&quot;</span>
 
 <span class="kw">type</span> <span class="dt">Environment</span> <span class="fu">=</span> <span class="dt">Map.Map</span> <span class="dt">Symbol</span> <span class="dt">Int</span>
 <span class="kw">type</span> <span class="dt">Store</span>       <span class="fu">=</span> <span class="dt">IntMap.IntMap</span> <span class="dt">Value</span>
@@ -115,6 +117,7 @@ emptyStore <span class="fu">=</span> IntMap.empty</code></pre>
 <p>The store must also keep track of how many locations it has handed out. As the <code>StateT</code> monad can only hold one value as state, I wrap a <code>Store</code> and an <code>Int</code> together in one data type.</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">MStore</span> <span class="fu">=</span> <span class="dt">MStore</span> {<span class="ot"> mStore ::</span> <span class="dt">Store</span>
                      ,<span class="ot"> mLoc   ::</span> <span class="dt">Int</span>
+                     ,<span class="ot"> mFinalEnv ::</span> <span class="dt">Maybe</span> <span class="dt">Environment</span>
                      }
     <span class="kw">deriving</span> <span class="dt">Show</span></code></pre>
 <p>I do the same thing with <code>Environment</code> defensively in case I need to store more data in the <code>ReaderT</code> in the future.</p>
@@ -126,14 +129,15 @@ emptyStore <span class="fu">=</span> IntMap.empty</code></pre>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">initialStore ::</span> <span class="dt">MStore</span>
 initialStore <span class="fu">=</span> <span class="dt">MStore</span> { mStore <span class="fu">=</span> emptyStore
                       , mLoc   <span class="fu">=</span> <span class="dv">1</span>
+                      , mFinalEnv <span class="fu">=</span> <span class="dt">Nothing</span>
                       }</code></pre>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">initialEnv ::</span> <span class="dt">MEnv</span>
 initialEnv <span class="fu">=</span> <span class="dt">MEnv</span> { mEnv <span class="fu">=</span> emptyEnv }</code></pre>
 <p>With the above default initial states for the environment and the store, I'm ready to define the mapping from a <code>Machine</code> to <code>IO</code>, which is essentially just calling the various monad transformer <code>run</code> functions in succession.</p>
-<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">runMachineWithStore ::</span> <span class="dt">Machine</span> a <span class="ot">-&gt;</span> <span class="dt">MStore</span> <span class="ot">-&gt;</span> <span class="dt">IO</span> (a, <span class="dt">MStore</span>)
-runMachineWithStore k st <span class="fu">=</span> runStateT (runReaderT (runM k) initialEnv) st</code></pre>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">runMachineWithState ::</span> <span class="dt">MStore</span> <span class="ot">-&gt;</span> <span class="dt">MEnv</span> <span class="ot">-&gt;</span> <span class="dt">Machine</span> a <span class="ot">-&gt;</span> <span class="dt">IO</span> (a, <span class="dt">MStore</span>)
+runMachineWithState st ev k <span class="fu">=</span> runStateT (runReaderT (runM k) ev) st <span class="kw">where</span></code></pre>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">runMachine ::</span> <span class="dt">Machine</span> a <span class="ot">-&gt;</span> <span class="dt">IO</span> (a, <span class="dt">MStore</span>)
-runMachine k <span class="fu">=</span> runMachineWithStore k initialStore</code></pre>
+runMachine k <span class="fu">=</span> runMachineWithState initialStore initialEnv k</code></pre>
 <p>Now all that is left is a means of building a <code>Machine</code> from psilo code.</p>
 <h2 id="the-operation-language">The operation language</h2>
 <p>Executing a psilo program on this machine amounts to:</p>
@@ -199,11 +203,12 @@ bindVar sym loc (<span class="dt">MEnv</span> env) <span class="fu">=</span> <sp
     sto    <span class="ot">&lt;-</span> return <span class="fu">$</span> mStore state
     val    <span class="ot">&lt;-</span> return <span class="fu">$</span> sto <span class="fu">IntMap.!</span> loc
     runOp <span class="fu">$</span> next val</code></pre>
-<pre class="sourceCode literate haskell"><code class="sourceCode haskell">runOp (<span class="dt">Free</span> (<span class="dt">Delete</span> loc next)) <span class="fu">=</span> <span class="kw">do</span>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell">runOp (<span class="dt">Free</span> (<span class="dt">Delete</span> target next)) <span class="fu">=</span> <span class="kw">do</span>
     state <span class="ot">&lt;-</span> get
     sto   <span class="ot">&lt;-</span> return <span class="fu">$</span> mStore state
-    sto&#39;  <span class="ot">&lt;-</span> return <span class="fu">$</span> IntMap.delete loc sto
-    put <span class="fu">$</span> state { mStore <span class="fu">=</span> sto&#39; }
+    loc   <span class="ot">&lt;-</span> return <span class="fu">$</span> mLoc   state
+    sto&#39;  <span class="ot">&lt;-</span> return <span class="fu">$</span> IntMap.delete target sto
+    put <span class="fu">$</span> state { mStore <span class="fu">=</span> sto&#39;, mLoc <span class="fu">=</span> loc <span class="fu">-</span> <span class="dv">1</span> }
     runOp next</code></pre>
 <p><code>fresh</code> gets the state, extracts the location, increments it, puts it back in, and returns the original.</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell">runOp (<span class="dt">Free</span> (<span class="dt">Fresh</span> next)) <span class="fu">=</span> <span class="kw">do</span>
@@ -259,7 +264,8 @@ opTest <span class="fu">=</span> runOp <span class="fu">$</span> <span class="kw
 <p>During application, if we are given a symbol for an operator, check to see if it is a built-in operator and, if applicable, simply return the resulting <code>Value</code>.</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell">interpret (<span class="dt">Free</span> (<span class="dt">AApply</span> fun args)) <span class="fu">=</span> <span class="kw">do</span>
     (<span class="dt">VList</span> argVals)       <span class="ot">&lt;-</span> interpret args
-    <span class="kw">case</span> builtin fun argVals <span class="kw">of</span>
+    res <span class="ot">&lt;-</span> builtin fun argVals
+    <span class="kw">case</span> res <span class="kw">of</span>
         <span class="dt">Just</span> mv   <span class="ot">-&gt;</span> return mv
         <span class="dt">Nothing</span>   <span class="ot">-&gt;</span> <span class="kw">do</span>
             (<span class="dt">VClos</span> syms body env) <span class="ot">&lt;-</span> interpret fun
@@ -275,24 +281,33 @@ opTest <span class="fu">=</span> runOp <span class="fu">$</span> <span class="kw
             <span class="co">-- clean up the store</span>
             runOp <span class="fu">$</span> forM_ locations <span class="fu">$</span> \loc <span class="ot">-&gt;</span> delete loc
             return retVal</code></pre>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell">interpret (<span class="dt">Free</span> (<span class="dt">ADefine</span> sym val)) <span class="fu">=</span> <span class="kw">do</span>
+    newLoc <span class="ot">&lt;-</span> runOp fresh
+    val&#39;   <span class="ot">&lt;-</span> interpret val
+    runOp <span class="fu">$</span> store newLoc val&#39;
+    newFrame <span class="ot">&lt;-</span> return <span class="fu">$</span> Map.fromList [(sym, newLoc)]
+    <span class="dt">MEnv</span> env <span class="ot">&lt;-</span> ask
+    state <span class="ot">&lt;-</span> get
+    put <span class="fu">$</span> state { mFinalEnv <span class="fu">=</span> <span class="dt">Just</span> (Map.union newFrame env) }
+    return <span class="fu">$</span> <span class="dt">VDefine</span> sym</code></pre>
 <p>This interpreter is flexible and powerful because we built up the appropriate abstractions.</p>
 <h2 id="built-in-operators">Built-in operators</h2>
 <p>As a final note, some symbols denote built-in operators (mostly involving arithmetic). The following function attempts to evaluate a built-in, returning (maybe) a <code>Machine Value</code>.</p>
-<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">builtin ::</span> <span class="dt">Expr</span> a <span class="ot">-&gt;</span> [<span class="dt">Value</span>] <span class="ot">-&gt;</span> <span class="dt">Maybe</span> <span class="dt">Value</span>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="co">--builtin :: Expr a -&gt; [Value] -&gt; Machine (Maybe Value)</span>
 builtin (<span class="dt">Free</span> (<span class="dt">ASymbol</span> sym)) args
     <span class="fu">|</span> sym <span class="fu">==</span> <span class="st">&quot;+&quot;</span>    <span class="fu">=</span> numOp sum args
     <span class="fu">|</span> sym <span class="fu">==</span> <span class="st">&quot;*&quot;</span>    <span class="fu">=</span> numOp product args
     <span class="fu">|</span> sym <span class="fu">==</span> <span class="st">&quot;-&quot;</span>    <span class="fu">=</span> numBinOp ((<span class="fu">-</span>)) args
     <span class="fu">|</span> sym <span class="fu">==</span> <span class="st">&quot;/&quot;</span>    <span class="fu">=</span> numBinOp div   args
-    <span class="fu">|</span> sym <span class="fu">==</span> <span class="st">&quot;and&quot;</span>  <span class="fu">=</span> <span class="dt">Just</span> <span class="fu">.</span> <span class="dt">VBool</span> <span class="fu">$</span> and (map unBool args)
-    <span class="fu">|</span> sym <span class="fu">==</span> <span class="st">&quot;or&quot;</span>   <span class="fu">=</span> <span class="dt">Just</span> <span class="fu">.</span> <span class="dt">VBool</span> <span class="fu">$</span> or  (map unBool args)
-    <span class="fu">|</span> sym <span class="fu">==</span> <span class="st">&quot;not&quot;</span>  <span class="fu">=</span> <span class="dt">Just</span> <span class="fu">.</span> <span class="dt">VBool</span> <span class="fu">$</span> not (unBool <span class="fu">.</span> head <span class="fu">$</span> args)
-    <span class="fu">|</span> otherwise     <span class="fu">=</span> <span class="dt">Nothing</span>
+    <span class="fu">|</span> sym <span class="fu">==</span> <span class="st">&quot;and&quot;</span>  <span class="fu">=</span> return <span class="fu">$</span> <span class="dt">Just</span> <span class="fu">.</span> <span class="dt">VBool</span> <span class="fu">$</span> and (map unBool args)
+    <span class="fu">|</span> sym <span class="fu">==</span> <span class="st">&quot;or&quot;</span>   <span class="fu">=</span> return <span class="fu">$</span> <span class="dt">Just</span> <span class="fu">.</span> <span class="dt">VBool</span> <span class="fu">$</span> or  (map unBool args)
+    <span class="fu">|</span> sym <span class="fu">==</span> <span class="st">&quot;not&quot;</span>  <span class="fu">=</span> return <span class="fu">$</span> <span class="dt">Just</span> <span class="fu">.</span> <span class="dt">VBool</span> <span class="fu">$</span> not (unBool <span class="fu">.</span> head <span class="fu">$</span> args)
+    <span class="fu">|</span> otherwise     <span class="fu">=</span> return  <span class="dt">Nothing</span>
     <span class="kw">where</span> numBinOp op xs <span class="fu">=</span> <span class="kw">let</span> (<span class="dt">VNum</span> l) <span class="fu">=</span> xs <span class="fu">!!</span> <span class="dv">0</span>
                                (<span class="dt">VNum</span> r) <span class="fu">=</span> xs <span class="fu">!!</span> <span class="dv">1</span>
-                            <span class="kw">in</span>  <span class="dt">Just</span> <span class="fu">.</span> <span class="dt">VNum</span> <span class="fu">$</span> op l r
-          numOp    op xs <span class="fu">=</span> <span class="dt">Just</span> <span class="fu">.</span> <span class="dt">VNum</span> <span class="fu">$</span> sum (map unNum args)</code></pre>
-<pre class="sourceCode literate haskell"><code class="sourceCode haskell">builtin _ _   <span class="fu">=</span> <span class="dt">Nothing</span></code></pre>
+                            <span class="kw">in</span>  return <span class="fu">$</span> <span class="dt">Just</span> <span class="fu">.</span> <span class="dt">VNum</span> <span class="fu">$</span> op l r
+          numOp    op xs <span class="fu">=</span> return <span class="fu">$</span> <span class="dt">Just</span> <span class="fu">.</span> <span class="dt">VNum</span> <span class="fu">$</span> op (map unNum args)</code></pre>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell">builtin _ _   <span class="fu">=</span> return <span class="dt">Nothing</span></code></pre>
 
         </div><!-- content -->
     </div><!-- row -->
