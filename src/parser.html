@@ -72,6 +72,14 @@ The Parser
 parseNumber <span class="fu">=</span> try ( <span class="kw">do</span> { n <span class="ot">&lt;-</span> integer
                        ; return <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">AInteger</span> n
                        } )</code></pre>
+<p>Booleans are represented by the atoms <code>#t</code> and <code>#f</code>.</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">parseBoolean ::</span> <span class="dt">Parser</span> (<span class="dt">Expr</span> a)
+parseBoolean <span class="fu">=</span> <span class="kw">do</span>
+    char <span class="ch">&#39;#&#39;</span>
+    b <span class="ot">&lt;-</span> char <span class="ch">&#39;t&#39;</span> <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;f&#39;</span>
+    <span class="kw">case</span> b <span class="kw">of</span>
+        <span class="ch">&#39;t&#39;</span> <span class="ot">-&gt;</span> return <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">ABoolean</span> <span class="dt">True</span>
+        <span class="ch">&#39;f&#39;</span> <span class="ot">-&gt;</span> return <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">ABoolean</span> <span class="dt">False</span></code></pre>
 <p>Symbols are like &quot;atoms&quot; in other lisps or Erlang. They are equivalent only to themselves and have no intrinsic value. They are mostly used to bind values in lambda abstractions.</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">parseSymbol ::</span> <span class="dt">Parser</span> (<span class="dt">Expr</span> a)
 parseSymbol <span class="fu">=</span> <span class="kw">do</span>
@@ -148,20 +156,23 @@ parseComma <span class="fu">=</span> <span class="kw">do</span>
     return <span class="fu">$</span> (<span class="dt">Free</span> <span class="fu">.</span> <span class="dt">AList</span>) [(<span class="dt">Free</span> <span class="fu">.</span> <span class="dt">ASymbol</span>) <span class="st">&quot;comma&quot;</span>, x]</code></pre>
 <p>Top level expression parser</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">parseExpr ::</span> <span class="dt">Parser</span> (<span class="dt">Expr</span> a)
-parseExpr <span class="fu">=</span> parseSymbol
+parseExpr <span class="fu">=</span> parseBoolean
+        <span class="fu">&lt;|&gt;</span> parseSymbol
         <span class="fu">&lt;|&gt;</span> parseNumber
         <span class="fu">&lt;|&gt;</span> (try (char <span class="ch">&#39;\&#39;&#39;</span>) <span class="fu">&gt;&gt;</span> parseQuote)
         <span class="fu">&lt;|&gt;</span> (try (char <span class="ch">&#39;`&#39;</span>)  <span class="fu">&gt;&gt;</span> parseQuasi)
         <span class="fu">&lt;|&gt;</span> parens ( parseFn <span class="fu">&lt;|&gt;</span> parseLet <span class="fu">&lt;|&gt;</span> parseApp )</code></pre>
 <p>Expression parser inside a quoted list</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">parseExprInQuote ::</span> <span class="dt">Parser</span> (<span class="dt">Expr</span> a)
-parseExprInQuote <span class="fu">=</span> parseSymbol
+parseExprInQuote <span class="fu">=</span> parseBoolean
+               <span class="fu">&lt;|&gt;</span> parseSymbol
                <span class="fu">&lt;|&gt;</span> parseNumber
                <span class="fu">&lt;|&gt;</span> (try (char <span class="ch">&#39;\&#39;&#39;</span>) <span class="fu">&gt;&gt;</span> parseQuote)
                <span class="fu">&lt;|&gt;</span> parens ( parseQuotedList )</code></pre>
 <p>Expression parser inside a quasiquoted list</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">parseExprInQuasi ::</span> <span class="dt">Parser</span> (<span class="dt">Expr</span> a)
-parseExprInQuasi <span class="fu">=</span> parseSymbol
+parseExprInQuasi <span class="fu">=</span> parseBoolean
+               <span class="fu">&lt;|&gt;</span> parseSymbol
                <span class="fu">&lt;|&gt;</span> parseNumber
                <span class="fu">&lt;|&gt;</span> (try (reserved <span class="st">&quot;&#39;&quot;</span>) <span class="fu">&gt;&gt;</span>  parseQuote)
                <span class="fu">&lt;|&gt;</span> (try (reserved <span class="st">&quot;`&quot;</span> ) <span class="fu">&gt;&gt;</span> parseQuasi)

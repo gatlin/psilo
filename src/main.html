@@ -63,28 +63,34 @@ psilo
 <span class="kw">import </span><span class="dt">System.Environment</span>
 <span class="kw">import </span><span class="dt">System.IO</span></code></pre>
 <p><code>eval</code> amounts to taking a line of code (a line in the repl, an expression otherwise), getting the <code>Expr</code> value from the parser and then running a <code>Machine</code> with said value.</p>
-<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">eval ::</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">IO</span> ()
-eval line <span class="fu">=</span> <span class="kw">do</span>
+<p>The result is the state of the machine after it has been run.</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">eval ::</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">MStore</span> <span class="ot">-&gt;</span> <span class="dt">IO</span> <span class="dt">MStore</span>
+eval line store <span class="fu">=</span> <span class="kw">do</span>
     <span class="kw">let</span> res <span class="fu">=</span> parseTopLevel line
     <span class="kw">case</span> res <span class="kw">of</span>
-        <span class="dt">Left</span> err <span class="ot">-&gt;</span> print err
-        <span class="dt">Right</span> ex <span class="ot">-&gt;</span> mapM_ execute (<span class="ot">ex ::</span> [<span class="dt">Expr</span> ()])
+        <span class="dt">Left</span> err <span class="ot">-&gt;</span> print err <span class="fu">&gt;&gt;</span> return store
+        <span class="dt">Right</span> [ex] <span class="ot">-&gt;</span> execute (<span class="ot">ex ::</span> <span class="dt">Expr</span> ()) <span class="fu">&gt;&gt;=</span> return
 
     <span class="kw">where</span> execute v <span class="fu">=</span> <span class="kw">do</span>
-              (val, _) <span class="ot">&lt;-</span> runMachine <span class="fu">.</span> interpret <span class="fu">$</span> v
-              putStrLn <span class="fu">.</span> show <span class="fu">$</span> val</code></pre>
+              (val, store&#39;) <span class="ot">&lt;-</span> runMachine <span class="fu">.</span> interpret <span class="fu">$</span> v
+              putStrLn <span class="fu">.</span> show <span class="fu">$</span> val
+              return store&#39;</code></pre>
 <p>The repl is nothing more than calling <code>eval</code> in an endless loop.</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">repl ::</span> <span class="dt">IO</span> ()
-repl <span class="fu">=</span> runInputT defaultSettings loop
-    <span class="kw">where</span>
-    loop <span class="fu">=</span> <span class="kw">do</span>
+repl <span class="fu">=</span> runInputT defaultSettings (loop initialStore) <span class="kw">where</span>
+    loop store <span class="fu">=</span> <span class="kw">do</span>
         minput <span class="ot">&lt;-</span> getInputLine <span class="st">&quot;psilo&gt; &quot;</span>
         <span class="kw">case</span> minput <span class="kw">of</span>
             <span class="dt">Nothing</span> <span class="ot">-&gt;</span> outputStrLn <span class="st">&quot;Goodbye.&quot;</span>
-            <span class="dt">Just</span> input <span class="ot">-&gt;</span> (liftIO <span class="fu">$</span> eval input) <span class="fu">&gt;&gt;</span> loop</code></pre>
+            <span class="dt">Just</span> input <span class="ot">-&gt;</span> <span class="kw">do</span>
+                <span class="kw">case</span> input <span class="kw">of</span>
+                    <span class="st">&quot;:state&quot;</span> <span class="ot">-&gt;</span> liftIO (putStrLn <span class="fu">.</span> show <span class="fu">$</span> store) <span class="fu">&gt;&gt;</span> loop store
+                    _        <span class="ot">-&gt;</span> <span class="kw">do</span>
+                        store&#39; <span class="ot">&lt;-</span> liftIO <span class="fu">$</span> eval input store
+                        loop store&#39;</code></pre>
 <p>If we execute <code>eval</code> on the contents of a file of code, we have a normal interpreter:</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">execFile ::</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">IO</span> ()
-execFile fname <span class="fu">=</span> readFile fname <span class="fu">&gt;&gt;=</span> eval</code></pre>
+execFile fname <span class="fu">=</span> readFile fname <span class="fu">&gt;&gt;=</span> (flip eval) initialStore <span class="fu">&gt;&gt;</span> return ()</code></pre>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">main ::</span> <span class="dt">IO</span> ()
 main <span class="fu">=</span> <span class="kw">do</span>
     args <span class="ot">&lt;-</span> getArgs
