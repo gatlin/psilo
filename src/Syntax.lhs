@@ -55,6 +55,7 @@ Not bad, huh?
 >     | ALambda [Symbol] a
 >     | AApply a a
 >     | AList [a]
+>     | ADefine Symbol a
 >
 > deriving instance Show a => Show (AST a)
 > deriving instance Functor AST

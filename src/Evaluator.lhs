@@ -240,11 +240,12 @@ By this point should be able to figure out what `fetch` does.
 >     val    <- return $ sto IntMap.! loc
 >     runOp $ next val
 
-> runOp (Free (Delete loc next)) = do
+> runOp (Free (Delete target next)) = do
 >     state <- get
 >     sto   <- return $ mStore state
->     sto'  <- return $ IntMap.delete loc sto
->     put $ state { mStore = sto' }
+>     loc   <- return $ mLoc   state
+>     sto'  <- return $ IntMap.delete target sto
+>     put $ state { mStore = sto', mLoc = loc - 1 }
 >     runOp next
 
 `fresh` gets the state, extracts the location, increments it, puts it back in,
