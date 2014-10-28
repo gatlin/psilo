@@ -9,12 +9,14 @@ programs. [View it on GitHub.](https://github.com/gatlin/psilo)
 What is psilo?
 ===
 
-psilo will be a language for writing software to process large streams of data
-as efficiently as possible. It is list processing taken to its logical
-conclusion, augmented with strong static types and compile time optimizations.
+psilo, like any lisp, will be a **lis**t **p**processor. However psilo will
+take advantage of a strong type system, linear types, and aggressive
+optimization techniques such as shortcut fusion. The goal is to make writing
+fast, resource-aware, parallelized stream processing programs as simple as
+possible.
 
-It is also nowhere close to being finished;  it's merely an educational
-experiment for myself.
+It is also nowhere close to being finished; at the moment this is purely
+exploratory.
 
 Technical Features (planned):
 
@@ -64,6 +66,10 @@ Here is some code the interpreter runs right now:
         (length-h xs 0))))
 
     (= square (\ (x) (* x x)))
+
+    (let
+      ((list-1 (cons 1 (cons 2 (cons 3 (nil))))))
+      (print (square (length list-1))))
 
 How to build
 ===
