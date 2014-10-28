@@ -83,8 +83,8 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+e+'<\
 // -->
 </script><noscript>&#x67;&#x61;&#116;&#108;&#x69;&#110;&#32;&#x61;&#116;&#32;&#110;&#x69;&#108;&#116;&#x61;&#x67;&#32;&#100;&#x6f;&#116;&#32;&#110;&#x65;&#116;</noscript></p>
 <h1 id="what-is-psilo"><span class="header-section-number">2</span> What is psilo?</h1>
-<p>psilo will be a language for writing software to process large streams of data as efficiently as possible. It is list processing taken to its logical conclusion, augmented with strong static types and compile time optimizations.</p>
-<p>It is also nowhere close to being finished; it’s merely an educational experiment for myself.</p>
+<p>psilo, like any lisp, will be a <strong>lis</strong>t <strong>p</strong>processor. However psilo will take advantage of a strong type system, linear types, and aggressive optimization techniques such as shortcut fusion. The goal is to make writing fast, resource-aware, parallelized stream processing programs as simple as possible.</p>
+<p>It is also nowhere close to being finished; at the moment this is purely exploratory.</p>
 <p>Technical Features (planned):</p>
 <ul>
 <li>No run-time garbage collection necessary owing to uniqueness types</li>
@@ -124,7 +124,11 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+e+'<\
            (\ ()     n)))))
     (length-h xs 0))))
 
-(= square (\ (x) (* x x)))</code></pre>
+(= square (\ (x) (* x x)))
+
+(let
+  ((list-1 (cons 1 (cons 2 (cons 3 (nil))))))
+  (print (square (length list-1))))</code></pre>
 <h1 id="how-to-build"><span class="header-section-number">4</span> How to build</h1>
 <p>You need the Glasgow Haskell Compiler and a number of libraries; I suggest starting off with <a href="http://haskell.org/platform">the Haskell platform</a>.</p>
 <p>Clone the repository:</p>
