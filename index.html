@@ -104,25 +104,26 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+e+'<\
 <p>Psilo is still being designed. I have written a really simple evaluator for prototyping and experimenting with the language which is actively being developed.</p>
 <p>While not production quality, the simple interpreter might be of educational value.</p>
 <p>Here is some code the interpreter runs right now:</p>
-<pre><code>(let
-  ((cons (\ (x y)               ; Prepend an item to a list
-           (\ (f g) (f x y))))
-   (nil  (\ ()                  ; Create an empty list
-           (\ (f g) (g))))
-   (car  (\ (xs)                ; Return head of a list
-           (xs (\ (x y) x))))
-   (cdr  (\ (xs)                ; Return tail of a list
-           (xs (\ (x y) y))))
-   (length (\ (xs)              ; Calculate the length of a list
-     (let
-       ((length-helper (\ (xs n)
-          (xs (\ (y ys) (length-helper ys (+ n 1)))
-              (\ ()     n)))))
-       (length-helper xs 0)))))
+<pre><code>(= cons (\ (x y)
+  (\ (f g) (f x y))))
+
+(= nil (\ ()
+  (\ (f g) (g))))
+
+(= car (\ (xs)
+  (xs (\ (x y) x))))
+
+(= cdr (\ (xs)
+  (xs (\ (x y) y))))
+
+(= length (\ (xs)
   (let
-     ; Sample list of 3 numbers
-    ((list-1 (cons 1 (cons 2 (cons 3 (nil))))))
-    (length list-1)))</code></pre>
+    ((length-h (\ (xs n)
+       (xs (\ (y ys) (length-h ys (+ n 1)))
+           (\ ()     n)))))
+    (length-h xs 0))))
+
+(= square (\ (x) (* x x)))</code></pre>
 <h1 id="how-to-build"><span class="header-section-number">4</span> How to build</h1>
 <p>You need the Glasgow Haskell Compiler and a number of libraries; I suggest starting off with <a href="http://haskell.org/platform">the Haskell platform</a>.</p>
 <p>Clone the repository:</p>
