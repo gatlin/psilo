@@ -1,7 +1,7 @@
 psilo
 =====
 
-a parallel, safe, inferencing list operation language for writing interesting
+a parallel, streaming, iterative list operation language for writing interesting
 programs. [View it on GitHub.](https://github.com/gatlin/psilo)
 
 &copy; 2014 [Gatlin Johnson](http://niltag.net) <gatlin@niltag.net>
@@ -9,15 +9,19 @@ programs. [View it on GitHub.](https://github.com/gatlin/psilo)
 What is psilo?
 ===
 
-psilo will be a programming language created with the philosophy that *all*
-programs essentially define (restricted) languages.
+psilo will be a language for writing software to process large streams of data
+as efficiently as possible. It is list processing taken to its logical
+conclusion, augmented with strong static types and compile time optimizations.
+
+It is also nowhere close to being finished;  it's merely an educational
+experiment for myself.
 
 Technical Features (planned):
 
 - No run-time garbage collection necessary owing to uniqueness types
 - Static typing for compile-time verification and optimization
 - Malleable syntax with macros
-- Dead-simple parallelism with special array types
+- Dead-simple parallelism via pipelines and special list types
 - Monadic continuations and iteratee composition made dead simple
 - Orthogonal core syntax and semantics for your performance and my sanity
 
@@ -31,11 +35,34 @@ Philosophy:
 Status
 ===
 
-Psilo is still being designed. I have implemented a really simple evaluator as
-well as this website so that when the time comes, I won't have tedious tooling
-or process issues getting in the way of implementation.
+Psilo is still being designed. I have written a really simple evaluator for
+prototyping and experimenting with the language which is actively being
+developed.
 
-Additionally, the simple interpreter might be of educational value.
+While not production quality, the simple interpreter might be of educational
+value.
+
+Here is some code the interpreter runs right now:
+
+    (let
+      ((cons (\ (x y)               ; Prepend an item to a list
+               (\ (f g) (f x y))))
+       (nil  (\ ()                  ; Create an empty list
+               (\ (f g) (g))))
+       (car  (\ (xs)                ; Return head of a list
+               (xs (\ (x y) x))))
+       (cdr  (\ (xs)                ; Return tail of a list
+               (xs (\ (x y) y))))
+       (length (\ (xs)              ; Calculate the length of a list
+         (let
+           ((length-helper (\ (xs n)
+              (xs (\ (y ys) (length-helper ys (+ n 1)))
+                  (\ ()     n)))))
+           (length-helper xs 0)))))
+      (let
+         ; Sample list of 3 numbers
+        ((list-1 (cons 1 (cons 2 (cons 3 (nil))))))
+        (length list-1)))
 
 How to build
 ===

@@ -73,6 +73,12 @@ values.
 >            | VDefine Symbol
 >            | VNil
 >
+> instance Eq Value where
+>     (VNum a)  == (VNum b)   = a == b
+>     (VBool a) == (VBool b)  = a == b
+>     (VSym a)  == (VSym b)   = a == b
+>     _         == _          = False
+>
 > instance Show Value where
 >     show (VSym s)   = "'" ++ s
 >     show (VNum n)   = show n
@@ -316,6 +322,8 @@ arithmetic). The following function attempts to evaluate a built-in, returning
 >     | sym == "*"    = numOp product args
 >     | sym == "-"    = numBinOp ((-)) args
 >     | sym == "/"    = numBinOp div   args
+>     | sym == "=?"   = return $ Just . VBool $ (args !! 0) == (args !! 1)
+>     | sym == "if"   = return . Just $ boolIf args
 >     | sym == "and"  = return $ Just . VBool $ and (map unBool args)
 >     | sym == "or"   = return $ Just . VBool $ or  (map unBool args)
 >     | sym == "not"  = return $ Just . VBool $ not (unBool . head $ args)
@@ -324,6 +332,7 @@ arithmetic). The following function attempts to evaluate a built-in, returning
 >                                (VNum r) = xs !! 1
 >                             in  return $ Just . VNum $ op l r
 >           numOp    op xs = return $ Just . VNum $ op (map unNum args)
+>           boolIf xs = if (unBool (xs !! 0)) then (xs !! 1) else (xs !! 2)
 
 > builtin (Free (AInteger n)) _ = return $ Just . VNum $ n
 > builtin (Free (ABoolean b)) _ = return $ Just . VBool $ b

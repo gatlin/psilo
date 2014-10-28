@@ -56,6 +56,7 @@ Not bad, huh?
 >     | AApply a a
 >     | AList [a]
 >     | ADefine Symbol a
+>     | AHylo Symbol [Symbol] a
 >
 > deriving instance Show a => Show (AST a)
 > deriving instance Functor AST
