@@ -11,4 +11,4 @@ clean:
 		rm -r pdf; \
 	fi;
 	rm html/index.html
-	rm -r html/src/*
+	rm html/src/*
