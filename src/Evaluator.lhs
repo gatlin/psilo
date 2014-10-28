@@ -24,9 +24,6 @@ is this intended to be efficient, production-quality software.
 Imports and language extensions
 ---
 
-> {-# LANGUAGE DeriveFunctor #-}
-> {-# LANGUAGE DeriveFoldable #-}
-> {-# LANGUAGE DeriveTraversable #-}
 > {-# LANGUAGE StandaloneDeriving #-}
 > {-# LANGUAGE TypeSynonymInstances #-}
 > {-# LANGUAGE FlexibleInstances #-}
@@ -93,7 +90,9 @@ values.
 > type Store       = IntMap.IntMap Value
 >
 > emptyEnv = Map.empty
+> {-# INLINE emptyEnv #-}
 > emptyStore = IntMap.empty
+> {-# INLINE emptyStore #-}
 
 The store must also keep track of how many locations it has handed out. As the
 `StateT` monad can only hold one value as state, I wrap a `Store` and an `Int`
@@ -105,15 +104,52 @@ together in one data type.
 >                      }
 >     deriving Show
 
+> initialStore :: MStore
+> initialStore = MStore { mStore = emptyStore
+>                       , mLoc   = 1
+>                       , mGlobalEnv = Nothing
+>                       }
+
+
+I do the same thing with `Environment` defensively in case I need to store more
+data in the `ReaderT` in the future.
+
+> data MEnv = MEnv { mEnv :: Environment }
+>     deriving Show
+
+> initialEnv :: MEnv
+> initialEnv = MEnv { mEnv = emptyEnv }
+
+Behold: the `Machine` monad, a stack of monad transformers.
+
+> newtype Machine a = M { runM :: ReaderT MEnv (StateT MStore IO) a }
+>     deriving (Monad, MonadIO, MonadState MStore, MonadReader MEnv)
+
+> runMachineWithState :: MStore -> MEnv -> Machine a -> IO (a, MStore)
+> runMachineWithState st ev k = runStateT (runReaderT (runM k) ev) st where
+
+> runMachine :: Machine a -> IO (a, MStore)
+> runMachine k = runMachineWithState initialStore initialEnv k
+
+With the above default initial states for the environment and the store, I'm
+ready to define the mapping from a `Machine` to `IO`, which is essentially just
+calling the various monad transformer `run` functions in succession.
+
+I define `Monoid` instances for my `Environment` and `Store` types for the
+benefit of the interpreter. For each `=` in the source code, I evaluate the
+statement to obtain a machine state containing the function definition. Once
+completed I merge the machine states together using `mconcat` from
+`Data.Monoid`.
+
 > shiftKeysBy n m = IntMap.mapKeys (+n) m
 > shiftValsBy n m = Map.map (+n) m
 
 > instance Monoid (Map.Map Symbol Int) where
->     mempty = Map.fromList []
+>     mempty = emptyEnv
 >     a `mappend` b = Map.union a (shiftValsBy (Map.size a) b)
 
 > instance Monoid (IntMap.IntMap Value) where
->     mempty = IntMap.fromList []
+>     mempty = emptyStore
 >     a `mappend` b = IntMap.union a (shiftKeysBy (IntMap.size a) b)
 
 > instance Monoid MStore where
@@ -124,40 +160,7 @@ together in one data type.
 >         mGlobalEnv = (mGlobalEnv a) `mappend` (mGlobalEnv b)
 >     }
 
-I do the same thing with `Environment` defensively in case I need to store more
-data in the `ReaderT` in the future.
-
-> data MEnv = MEnv { mEnv :: Environment }
->     deriving Show
-
-Behold: the `Machine` monad, a stack of monad transformers.
-
-> newtype Machine a = M { runM :: ReaderT MEnv (StateT MStore IO) a }
->     deriving (Monad, MonadIO, MonadState MStore, MonadReader MEnv)
-
-
-
-> initialStore :: MStore
-> initialStore = MStore { mStore = emptyStore
->                       , mLoc   = 1
->                       , mGlobalEnv = Nothing
->                       }
-
-> initialEnv :: MEnv
-> initialEnv = MEnv { mEnv = emptyEnv }
-
-With the above default initial states for the environment and the store, I'm
-ready to define the mapping from a `Machine` to `IO`, which is essentially just
-calling the various monad transformer `run` functions in succession.
-
-> runMachineWithState :: MStore -> MEnv -> Machine a -> IO (a, MStore)
-> runMachineWithState st ev k = runStateT (runReaderT (runM k) ev) st where
-
-> runMachine :: Machine a -> IO (a, MStore)
-> runMachine k = runMachineWithState initialStore initialEnv k
-
 Now all that is left is a means of building a `Machine` from psilo code.
-
 
 Interpreting psilo
 ---

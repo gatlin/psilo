@@ -33,6 +33,7 @@ if hash pandoc 2>/dev/null; then
         pandoc -s -t html5 -f markdown+lhs+yaml_metadata_block \
         --template=templates/src.tmpl.html \
         --normalize \
+        --variable n=$out \
         -o ./html/src/$out.html $f
     done
 else
