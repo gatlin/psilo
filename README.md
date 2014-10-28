@@ -9,7 +9,7 @@ programs. [View it on GitHub.](https://github.com/gatlin/psilo)
 What is psilo?
 ===
 
-psilo, like any lisp, will be a **lis**t **p**processor. However psilo will
+psilo, like any lisp, will be a **lis**t **p**rocessor. However psilo will
 take advantage of a strong type system, linear types, and aggressive
 optimization techniques such as shortcut fusion. The goal is to make writing
 fast, resource-aware, parallelized stream processing programs as simple as
