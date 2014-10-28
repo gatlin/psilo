@@ -17,6 +17,10 @@ our lexical environment.
 The State monad, on the other hand, is persistent until the end of the
 machine's execution and thus handles dynamic scope and state.
 
+Please note that this is simply a reference implementation of the virtual
+machine to start playing with psilo's grammar and other features; by no means
+is this intended to be efficient, production-quality software.
+
 Imports and language extensions
 ---
 
@@ -43,7 +47,7 @@ Imports and language extensions
 > import qualified Data.IntMap.Strict as IntMap
 > import Data.Foldable (Foldable, fold)
 > import Data.Traversable (Traversable, sequence)
-> import Data.List (intersperse)
+> import Data.List (intersperse, nub)
 >
 > import Parser
 > import Syntax
@@ -60,7 +64,7 @@ values.
 > type Location = Int
 > data Value = forall a . Show a => VClos { vSym  :: [Symbol]
 >                                         , vBody :: (Expr a)
->                                         , vEnv  :: Environment
+>                                         , vEnv  :: [(Symbol, Value)]
 >                                         }
 >            | VSym Symbol
 >            | VNum  { unNum :: Integer }
@@ -74,7 +78,7 @@ values.
 >     show (VNum n)   = show n
 >     show (VBool b)  = if b then "#t" else "#f"
 >     show (VNil)     = "(nil)"
->     show (VClos _ _ e)  = "<function> with Environment: " ++ (show e)
+>     show (VClos _ _ _)  = "<function>"
 >     show (VList xs) = concat $ map show xs
 >     show (VDefine _)= "<definition>"
 >
@@ -128,162 +132,75 @@ calling the various monad transformer `run` functions in succession.
 
 Now all that is left is a means of building a `Machine` from psilo code.
 
-The operation language
----
-
-Executing a psilo program on this machine amounts to:
-
-1. Unwinding `Expr` values and concurrently
-2. Building the corresponding `Machine` values.
-
-To aid in this second step I define an intermediate operation language, `Op`,
-which will encapsulate some common machine-oriented tasks. This should simplify
-the proper interpreter function.
-
-`Op` allows for manipulation of the environment and store, and also provides
-fresh store locations on demand.
-
-> data OpF k
->     = Bind   Symbol Location k
->     | Lookup Symbol (Location -> k)
->     | Store  Location Value k
->     | Fetch  Location (Value -> k)
->     | Delete Location k
->     | Fresh  (Location -> k)
->     deriving Functor
-
-> type Op = Free OpF
-
-Nevermind the `Free` constructor for now.
-
-The utility of the following convenience functions will be clearer when we get
-to the interpreter. A crude explanation is that these are the "commands" we
-will write `Op` programs in.
-
-> bind :: Symbol -> Location -> Op ()
-> bind s l = liftF $ Bind s l ()
-
-> lookup :: Symbol -> Op Location
-> lookup s = liftF $ Lookup s id
-
-> store :: Location -> Value -> Op ()
-> store l v = liftF $ Store l v ()
-
-> fetch :: Location -> Op Value
-> fetch l = liftF $ Fetch l id
-
-> delete :: Location -> Op ()
-> delete l = liftF $ Delete l ()
-
-> fresh :: Op Location
-> fresh = liftF $ Fresh id
-
-> lookupVar :: Symbol -> MEnv -> Location
-> lookupVar sym (MEnv env) = env Map.! sym
-
-> bindVar :: Symbol -> Location -> MEnv -> MEnv
-> bindVar sym loc (MEnv env) = MEnv $ Map.insert sym loc env
-
-The `Op` interpreter and the `Free` monad
----
-
-> runOp :: Op a -> Machine a
-
-For each branch of our `OpF` data type definition, we have a case for the `Op`
-interpreter to handle.
-
-`Op` and `OpF` are slightly different: the former is the latter transformed by
-the `Free` monad type constructor. `Free` is exactly that: you give it a
-functor value and get a monad for "free"; ie, you get a data type which
-implements `>>=` and `return`.
-
-However, `Free` monads all get the same generic implementations of `>>=` and
-`bind`. All the semantics of your data type must be specified in a *run*
-function of some kind which breaks down these aggregate values to build some
-result. `runOp` is such a function for `Op`.
-
-`Free` creates types which have a base case for storing "Pure" values (in
-Haskell, the `return` function may also be called `pure` because it wraps a
-*pure* value in a monadic context). `Free` values all have a continuation
-argument (which I call `next`, conventionally), whereas `Pure` values do not:
-they are leaves of a syntax tree.
-
-> runOp (Pure v) = return v
-
-All the other value constructors are wrapped in `Free`.
-
-`bind`ing is the act of associating a symbol with a location in memory.
-
-> runOp (Free (Bind sym loc next)) = do
->     env <- ask
->     local (bindVar sym loc) $ runOp next
-
-The inverse operation is called a `lookup` in our parlance:
-
-> runOp (Free (Lookup sym next)) = do
->     loc <- asks (lookupVar sym)
->     runOp $ next loc
-
-If we have a location (perhaps by calling `fresh`) to store a value in - and a
-value - we can associate them by `get`ting the state, picking out the `Store`,
-and inserting our location and value in the map. Then we `put` the state back
-in and continue on our merry way.
-
-> runOp (Free (Store loc val next)) = do
->     state  <- get
->     sto    <- return $ mStore state
->     sto'   <- return $ IntMap.insert loc val sto
->     put $ state { mStore = sto' }
->     runOp next
-
-By this point should be able to figure out what `fetch` does.
-
-> runOp (Free (Fetch loc next)) = do
->     state  <- get
->     sto    <- return $ mStore state
->     val    <- return $ sto IntMap.! loc
->     runOp $ next val
-
-> runOp (Free (Delete target next)) = do
->     state <- get
->     sto   <- return $ mStore state
->     loc   <- return $ mLoc   state
->     sto'  <- return $ IntMap.delete target sto
->     put $ state { mStore = sto', mLoc = loc - 1 }
->     runOp next
-
-`fresh` gets the state, extracts the location, increments it, puts it back in,
-and returns the original.
-
-> runOp (Free (Fresh next)) = do
->     state <- get
->     loc   <- return $ mLoc state
->     put $ state { mLoc = (loc + 1) }
->     runOp $ next loc
-
-To illustrate what `Op` code looks like have a look at `opTest`:
-
-> opTest :: Machine ()
-> opTest = runOp $ do
->     loc1 <- fresh
->     bind "huh" loc1
->     store loc1 $ VNum 5
->     (VNum val) <- lookup "huh" >>= fetch
->     bind "huh" 0
->     store 0 $ VNum (val * 2)
->     return ()
 
 Interpreting psilo
 ---
 
-Now that we have a static environment and a dynamic store, a machine which
-holds them, and a low-level operation language to control the machine, we can
-now set ourselves to interpreting psilo.
+Now that we have a static environment, a dynamic store, and a machine which
+holds the two, we can set ourselves to interpreting psilo.
 
 As stated elsewhere, executing psilo programs is the act of
 
 1. transforming `Expr` values to `Machine` values and
 2. unwinding `Machine` values.
+
+Some common operations have been factored out into helper functions, viz:
+
+> fresh :: Machine Location
+> fresh = do
+>     state <- get
+>     loc   <- return $ mLoc state
+>     put $ state { mLoc = (loc + 1) }
+>     return loc
+
+> fetch :: Location -> Machine (Maybe Value)
+> fetch loc = do
+>     state <- get
+>     sto   <- return $ mStore state
+>     val   <- return $ IntMap.lookup loc sto
+>     return val
+
+> lookup :: Symbol -> Machine Value
+> lookup sym = do
+>     MEnv env <- ask
+>     loc      <- return $ Map.lookup sym env
+>     case loc of
+>         Nothing -> do
+>             return VNil
+>         Just loc' -> do
+>             mv       <- fetch loc'
+>             case mv of
+>                 Nothing -> do
+>                     liftIO $ putStrLn $ "loc = " ++ show loc
+>                     return VNil
+>                 Just  v -> return v
+
+> store :: Location -> Value -> Machine ()
+> store loc val = do
+>     state <- get
+>     sto   <- return $ mStore state
+>     sto'  <- return $ IntMap.insert loc val sto
+>     put $ state { mStore = sto' }
+
+> delete :: Location -> Machine ()
+> delete loc = do
+>     state <- get
+>     sto   <- return $ mStore state
+>     sto'  <- return $ IntMap.delete loc sto
+>     put $ state { mStore = sto' }
+
+> bind :: Symbol -> Value -> Machine a -> Machine a
+> bind sym val next = do
+>     newLoc <- fresh
+>     store newLoc val
+>     state <- get
+>     maybeGlobalEnv <- return $ mFinalEnv state
+>     globalEnv <- case maybeGlobalEnv of
+>         Nothing -> return $ Map.fromList []
+>         Just e  -> return e
+>     let globalEnv' = Map.union (Map.fromList [(sym,newLoc)]) globalEnv
+>     put $ state { mFinalEnv = Just globalEnv' }
+>     local (\_ -> MEnv globalEnv') next
 
 The function `interpret` handles the first part. You can even tell by its type:
  `Expr a -> Machine Value`.
@@ -294,26 +211,20 @@ The function `interpret` handles the first part. You can even tell by its type:
 with `Op`, we handle the base case of being handed a `Pure` value. In this
 case, we return `NilV`.
 
-> interpret (Pure v) = return VNil
+> interpret (Pure _) = return VNil
 
-The rest of the interpreter is remarkably simple. Each case corresponds to a
-branch in our `AST` definition.
-
-> interpret (Free (ABoolean b)) = return $ VBool b
+Numbers and Booleans are easy enough to deal with:
 
 > interpret (Free (AInteger n)) = return $ VNum n
+> interpret (Free (ABoolean b)) = return $ VBool b
 
-Symbols may have prefixes or suffixes (well, eventually) which modify the
-semantic value of the symbol but not the actual raw value. For example, a `:&`
-suffix tells the compiler that the symbol is a shared reference and may be
-safely ignored.
+Symbols are slightly more interesting. We must lookup the location of the
+symbol's value in the environment, and then its value using the location.
 
-While this will be more nuanced or sophisticated in the future, in this
-evaluator at least we may safely ignore all suffixes.
+> interpret (Free (ASymbol s)) = lookup s >>= return
 
-> interpret (Free (ASymbol  s)) = do
->     val <- runOp $ lookup s >>= fetch
->     return val
+Lists are handled by iterating over the list of `Expr` values and constructing
+a list of `Value`s, which we wrap in `VList`.
 
 > interpret (Free (AList xs)) = do
 >     vals <- forM xs $ \x -> do
@@ -322,67 +233,80 @@ evaluator at least we may safely ignore all suffixes.
 >         v
 >     return $ VList vals
 
-The below code for lambdas, while technically correct, has a huge problem: it
-copies its *entire* environment. A much smarter trick would be to only copy
-that which is actually used.
-
-Also, function application is currently very stupid. It is intended that
-functions will take one argument, a list containing the actual values to be
-processed. The process is simple:
-
-1. If the operand list is sufficiently long, zip it with the list of symbols in
-the function.
-
-2. Create an `Environment` out of this zipped list.
-
-3. Form a union between this new environment and the current, favoring the new
-one.
+Function abstraction amounts to creating a closure; that is to say, an
+environment and a body expression. The environment is essentially a new frame
+that will be temporarily prepended to the main environment when the body is
+evaluated.
 
 > interpret (Free (ALambda args body)) = do
->     (MEnv currentEnv) <- ask
->     return $ VClos args body currentEnv
+>     vars <- variables body
+>     vars' <- forM vars $ \var -> do
+>         val <- lookup var
+>         return (var, val)
+>     return $ VClos args body vars'
 
-During application, if we are given a symbol for an operator, check to see if
-it is a built-in operator and, if applicable, simply return the resulting
-`Value`.
+Function application works by first checking to see if the operator is a
+built-in. If not, we must do the following:
 
-> interpret (Free (AApply fun args)) = do
->     (VList argVals)       <- interpret args
->     res <- builtin fun argVals
+1. Lookup the closure in the machine's environment.
+2. Augment the current environment with that of the closure.
+3. Evaluate the body of the closure.
+4. Roll back the changes to the environment.
+5. Return the value.
+
+> interpret (Free (AApply op args)) = do
+>     VList args' <- interpret args
+>     res   <- builtin op args'
+>     oldState <- get
 >     case res of
->         Just mv   -> return mv
->         Nothing   -> do
->             (VClos syms body env) <- interpret fun
->             locations <- forM argVals $ \av -> do
->                 newLoc <- runOp $ fresh
->                 runOp $ store newLoc av
->                 return newLoc
->             let env' = Map.fromList $ zip syms locations
->             newFrame <- return $ Map.union env' env
->             oldEnv   <- ask
->             retVal   <- local (\(MEnv e) -> MEnv (Map.union newFrame e)) $
->                             interpret body
->             -- clean up the store
->             runOp $ forM_ locations $ \loc -> delete loc
+>         Just v -> return v
+>         Nothing -> do
+>             (VClos syms body env) <- interpret op
+>             closedEnv <- forM env $ \(s, val) -> do
+>                 loc <- fresh
+>                 store loc val
+>                 return (s, loc)
+>             closedEnv' <- return $ Map.fromList closedEnv
+>             argEnv <- forM (zip syms args') $ \(sym, av) -> do
+>                 loc <- fresh
+>                 store loc av
+>                 return (sym, loc)
+>             argEnv' <- return $ Map.fromList argEnv
+>             newEnv <- return $ Map.union argEnv' closedEnv'
+>             retVal <- local (\(MEnv e) -> MEnv (Map.union newEnv e)) $
+>                 interpret body
+>             put oldState
 >             return retVal
 
-> interpret (Free (ADefine sym val)) = do
->     newLoc <- runOp fresh
->     val'   <- interpret val
->     runOp $ store newLoc val'
->     newFrame <- return $ Map.fromList [(sym, newLoc)]
->     MEnv env <- ask
->     state <- get
->     put $ state { mFinalEnv = Just (Map.union newFrame env) }
->     return $ VDefine sym
+Definitions are handled differently than other expressions because, really,
+they're not expressions. You can't meaningfully compose definitions. They are
+simply a guarded mechanism for the programmer to modify the global environment.
 
-This interpreter is flexible and powerful because we built up the appropriate
-abstractions.
+> interpret (Free (ADefine sym val)) = do
+>     val' <- interpret val
+>     bind sym val' $ return $ VDefine sym
+
+To construct an appropriate environment, we must find all the free variables in
+the body expression.
+
+> variables :: Expr a -> Machine [Symbol]
+> variables (Free (ASymbol s)) = return [s]
+>
+> variables (Free (AList xs)) = do
+>     listOfVarLists <- mapM variables xs
+>     vars           <- return $ nub $ concat listOfVarLists
+>     return vars
+>
+> variables (Free (AApply op args)) = do
+>     varList <- variables args
+>     return varList
+>
+> variables _   = return []
 
 Built-in operators
 ---
 
-As a final note, some symbols denote built-in operators (mostly involving
+Some symbols denote built-in operators (mostly involving
 arithmetic). The following function attempts to evaluate a built-in, returning
 (maybe) a `Machine Value`.
 
@@ -401,6 +325,8 @@ arithmetic). The following function attempts to evaluate a built-in, returning
 >                             in  return $ Just . VNum $ op l r
 >           numOp    op xs = return $ Just . VNum $ op (map unNum args)
 
+> builtin (Free (AInteger n)) _ = return $ Just . VNum $ n
+> builtin (Free (ABoolean b)) _ = return $ Just . VBool $ b
 > builtin _ _   = return Nothing
 
 [plai]: http://cs.brown.edu/~sk/Publications/Books/ProgLangs/

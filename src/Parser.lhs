@@ -105,7 +105,12 @@ an arbitrary expression value.
 >             <|> (try (char '`') >> parens parseUnquotable)
 >         return $ Free (AApply fun body))
 >     <|> (do
->         fst <- try parseSymbol <|> try (parens parseFn) <|> parens parseApp
+>         fst <-     try parseSymbol
+>                <|> try parseNumber
+>                <|> parseBoolean
+>                <|> try (parens parseFn)
+>                <|> parens parseApp
+
 >         optional whitespace
 >         rst <- fmap (Free . AList) $ parseExpr `sepBy` whitespace
 >         return $ Free (AApply fst rst))
