@@ -130,8 +130,12 @@ parseApp <span class="fu">=</span> <span class="kw">do</span>
             <span class="fu">&lt;|&gt;</span> (try (char <span class="ch">&#39;`&#39;</span>) <span class="fu">&gt;&gt;</span> parens parseUnquotable)
         return <span class="fu">$</span> <span class="dt">Free</span> (<span class="dt">AApply</span> fun body))
     <span class="fu">&lt;|&gt;</span> (<span class="kw">do</span>
-        fst <span class="ot">&lt;-</span> try parseSymbol <span class="fu">&lt;|&gt;</span> try (parens parseFn) <span class="fu">&lt;|&gt;</span> parens parseApp
-        optional whitespace
+        fst <span class="ot">&lt;-</span>     try parseSymbol
+               <span class="fu">&lt;|&gt;</span> try parseNumber
+               <span class="fu">&lt;|&gt;</span> parseBoolean
+               <span class="fu">&lt;|&gt;</span> try (parens parseFn)
+               <span class="fu">&lt;|&gt;</span> parens parseApp</code></pre>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell">        optional whitespace
         rst <span class="ot">&lt;-</span> fmap (<span class="dt">Free</span> <span class="fu">.</span> <span class="dt">AList</span>) <span class="fu">$</span> parseExpr <span class="ot">`sepBy`</span> whitespace
         return <span class="fu">$</span> <span class="dt">Free</span> (<span class="dt">AApply</span> fst rst))</code></pre>
 <p>Regular list created by the quote (') operator. Enters a state where everything is treated as a literal - no applications allowed.</p>
