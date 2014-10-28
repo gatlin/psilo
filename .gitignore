@@ -5,3 +5,4 @@ dist
 *.o
 *.hi
 *.swp
+*.swo
