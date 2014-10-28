@@ -205,7 +205,7 @@ Expression parser inside a quasiquoted list
 > type Parsed a = Either ParseError [Expr a]
 
 > parseFile :: String -> IO (Parsed a)
-> parseFile fname = parseFromFile topLevel fname
+> parseFile fname = parseFromFile (contents topLevel) fname
 
 > parseTopLevel :: String -> Parsed a
 > parseTopLevel s = parse (contents topLevel) "<stdin>" s

@@ -72,7 +72,8 @@ program.
 >                         return . Just $ store
 >                     _ -> return Nothing
 >             sto <- return $ mconcat . catMaybes $ defns
->             (sto':_) <- liftIO $ eval (Right (f xs)) sto
+>             (val,sto'):_ <- liftIO $ eval (Right (f xs)) sto
+>             putStrLn . show $ sto'
 >             return ()
 >    where f xs = filter (\x -> case x of
 >                                   Free (ADefine _ _) -> False

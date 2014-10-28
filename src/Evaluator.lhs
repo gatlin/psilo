@@ -82,7 +82,7 @@ values.
 >     show (VNum n)   = show n
 >     show (VBool b)  = if b then "#t" else "#f"
 >     show (VNil)     = "(nil)"
->     show (VClos _ _ _)  = "<function>"
+>     show (VClos _ _ e)  = "<function> { " ++ (show e) ++ " } "
 >     show (VList xs) = concat $ map show xs
 >     show (VDefine _)= "<definition>"
 >

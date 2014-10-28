@@ -1,24 +1,18 @@
-(= cons (\ (x y)
-  (\ (f g) (f x y))))
+
+(= List (\ (f) f))
+(= foldr (\ (xs c n)
+  ((xs c) n)))
+
+(= cons (\ (x xs)
+  (List (\ (c n)
+    (c x (foldr xs c (n)))))))
 
 (= nil (\ ()
-  (\ (f g) (g))))
+  (List (\ (c n) (n)))))
 
 (= car (\ (xs)
-  (xs (\ (x y) x))))
-
-(= cdr (\ (xs)
-  (xs (\ (x y) y))))
-
-(= length (\ (xs)
-  (let
-    ((length-h (\ (xs n)
-       (xs (\ (y ys) (length-h ys (+ n 1)))
-           (\ ()     n)))))
-    (length-h xs 0))))
-
-(= square (\ (x) (* x x)))
+  (foldr xs (\ (y ys) y) nil)))
 
 (let
-  ((list-1 (cons 1 (cons 2 (cons 3 (nil))))))
-  (print (square (length list-1))))
+  ((lst1 (cons 3 (cons 2 (cons 1 (nil))))))
+  (print (car lst1)))
