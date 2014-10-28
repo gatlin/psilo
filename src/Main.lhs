@@ -13,28 +13,28 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 >
 > import Control.Monad.Trans
 > import System.Console.Haskeline
+> import Control.Monad.Free
+> import Data.Monoid
+> import Data.Maybe
+> import Control.Monad (forM)
 >
 > import System.Environment
 > import System.IO
 > import Text.Parsec
 
-`eval` amounts to taking a line of code (a line in the repl, an expression
-otherwise), getting the `Expr` value from the parser and then running a
-`Machine` with said value.
+`eval` amounts to taking a list of parsed expressions and evaluating them in
+the context of a machine. The result is the state of the machine after it has been run.
 
-The result is the state of the machine after it has been run.
-
-> eval :: Either ParseError [Expr ()] -> MStore -> IO [MStore]
+> eval :: Either ParseError [Expr ()] -> MStore -> IO [(Value, MStore)]
 > eval res store = do
 >     case res of
->         Left err -> print err >> return [store]
+>         Left err -> print err >> return [(VNil, store)]
 >         Right ex -> mapM execute (ex :: [Expr ()]) >>= return
 >
 >     where execute v = do
->               (val, store') <- (runMachineWithState store ev') . interpret $ v
->               putStrLn . show $ val
->               return store'
->           ev' = case (mFinalEnv store) of
+>               res <- (runMachineWithState store ev') . interpret $ v
+>               return res
+>           ev' = case (mGlobalEnv store) of
 >                     Nothing -> initialEnv
 >                     Just  e -> MEnv e
 
@@ -50,17 +50,33 @@ The repl is nothing more than calling `eval` in an endless loop.
 >                 case input of
 >                     ":state" -> liftIO (putStrLn . show $ store) >> loop store
 >                     _        -> do
->                         (store':_) <- liftIO $ eval (parseTopLevel input) store
+>                         (val, store'):_ <- liftIO $ eval (parseTopLevel input) store
+>                         liftIO $ putStrLn . show $ val
 >                         loop store'
 
-If we gave psilo a file name we parse and evaluate it instead of starting the
-REPL.
+If we are given a filename then we parse the code into an AST and make two
+passes. The first to collect all the definitions so that we can initialize the
+environment and store correctly. The second is to actually evaluate the
+program.
 
 > execFile :: String -> IO ()
 > execFile fname = do
 >     parsed <- liftIO $ parseFile fname
->     eval parsed initialStore
->     return ()
+>     case parsed of
+>         Left err -> print err >> return ()
+>         Right xs -> do
+>             defns <- forM xs $ \ expr -> do
+>                 case expr of
+>                     Free (ADefine sym val) -> do
+>                         (_, store) <- runMachine . interpret $ expr
+>                         return . Just $ store
+>                     _ -> return Nothing
+>             sto <- return $ mconcat . catMaybes $ defns
+>             (sto':_) <- liftIO $ eval (Right (f xs)) sto
+>             return ()
+>    where f xs = filter (\x -> case x of
+>                                   Free (ADefine _ _) -> False
+>                                   _                  -> True) xs
 
 > main :: IO ()
 > main = do

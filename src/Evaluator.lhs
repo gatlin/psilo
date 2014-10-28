@@ -48,6 +48,7 @@ Imports and language extensions
 > import Data.Foldable (Foldable, fold)
 > import Data.Traversable (Traversable, sequence)
 > import Data.List (intersperse, nub)
+> import Data.Monoid
 >
 > import Parser
 > import Syntax
@@ -100,9 +101,28 @@ together in one data type.
 
 > data MStore = MStore { mStore :: Store
 >                      , mLoc   :: Int
->                      , mFinalEnv :: Maybe Environment
+>                      , mGlobalEnv :: Maybe Environment
 >                      }
 >     deriving Show
+
+> shiftKeysBy n m = IntMap.mapKeys (+n) m
+> shiftValsBy n m = Map.map (+n) m
+
+> instance Monoid (Map.Map Symbol Int) where
+>     mempty = Map.fromList []
+>     a `mappend` b = Map.union a (shiftValsBy (Map.size a) b)
+
+> instance Monoid (IntMap.IntMap Value) where
+>     mempty = IntMap.fromList []
+>     a `mappend` b = IntMap.union a (shiftKeysBy (IntMap.size a) b)
+
+> instance Monoid MStore where
+>     mempty = initialStore
+>     a `mappend` b = MStore {
+>         mStore = (mStore a) `mappend` (mStore b),
+>         mLoc   = (mLoc a) + (mLoc b),
+>         mGlobalEnv = (mGlobalEnv a) `mappend` (mGlobalEnv b)
+>     }
 
 I do the same thing with `Environment` defensively in case I need to store more
 data in the `ReaderT` in the future.
@@ -120,7 +140,7 @@ Behold: the `Machine` monad, a stack of monad transformers.
 > initialStore :: MStore
 > initialStore = MStore { mStore = emptyStore
 >                       , mLoc   = 1
->                       , mFinalEnv = Nothing
+>                       , mGlobalEnv = Nothing
 >                       }
 
 > initialEnv :: MEnv
@@ -168,18 +188,21 @@ Some common operations have been factored out into helper functions, viz:
 
 > lookup :: Symbol -> Machine Value
 > lookup sym = do
->     MEnv env <- ask
->     loc      <- return $ Map.lookup sym env
->     case loc of
->         Nothing -> do
->             return VNil
->         Just loc' -> do
->             mv       <- fetch loc'
->             case mv of
->                 Nothing -> do
->                     liftIO $ putStrLn $ "loc = " ++ show loc
->                     return VNil
->                 Just  v -> return v
+>     MEnv localEnv <- ask
+>     state <- get
+>     case (mGlobalEnv state) of
+>         Nothing -> lookup' sym localEnv
+>         Just  e -> lookup' sym (Map.union localEnv e)
+>     where
+>         lookup' sym env = do
+>             maybeLoc <- return $ Map.lookup sym env
+>             case maybeLoc of
+>                 Nothing -> return VNil
+>                 Just loc -> do
+>                     maybeVal <- fetch loc
+>                     case maybeVal of
+>                         Nothing -> return VNil
+>                         Just  v -> return v
 
 > store :: Location -> Value -> Machine ()
 > store loc val = do
@@ -200,12 +223,12 @@ Some common operations have been factored out into helper functions, viz:
 >     newLoc <- fresh
 >     store newLoc val
 >     state <- get
->     maybeGlobalEnv <- return $ mFinalEnv state
+>     maybeGlobalEnv <- return $ mGlobalEnv state
 >     globalEnv <- case maybeGlobalEnv of
 >         Nothing -> return $ Map.fromList []
 >         Just e  -> return e
 >     let globalEnv' = Map.union (Map.fromList [(sym,newLoc)]) globalEnv
->     put $ state { mFinalEnv = Just globalEnv' }
+>     put $ state { mGlobalEnv = Just globalEnv' }
 >     local (\_ -> MEnv globalEnv') next
 
 The function `interpret` handles the first part. You can even tell by its type:
@@ -266,23 +289,27 @@ built-in. If not, we must do the following:
 >     oldState <- get
 >     case res of
 >         Just v -> return v
->         Nothing -> do
->             (VClos syms body env) <- interpret op
->             closedEnv <- forM env $ \(s, val) -> do
->                 loc <- fresh
->                 store loc val
->                 return (s, loc)
->             closedEnv' <- return $ Map.fromList closedEnv
->             argEnv <- forM (zip syms args') $ \(sym, av) -> do
->                 loc <- fresh
->                 store loc av
->                 return (sym, loc)
->             argEnv' <- return $ Map.fromList argEnv
->             newEnv <- return $ Map.union argEnv' closedEnv'
->             retVal <- local (\(MEnv e) -> MEnv (Map.union newEnv e)) $
->                 interpret body
->             put oldState
->             return retVal
+>         Nothing -> (interpret op) >>= handle where
+>             handle (VClos syms body env) = do
+>                 closedEnv <- forM env $ \(s, val) -> do
+>                     loc <- fresh
+>                     store loc val
+>                     return (s, loc)
+>                 closedEnv' <- return $ Map.fromList closedEnv
+>                 argEnv <- forM (zip syms args') $ \(sym, av) -> do
+>                     loc <- fresh
+>                     store loc av
+>                     return (sym, loc)
+>                 argEnv' <- return $ Map.fromList argEnv
+>                 newEnv <- return $ Map.union argEnv' closedEnv'
+>                 retVal <- local (\(MEnv e) -> MEnv (Map.union newEnv e)) $
+>                     interpret body
+>                 put oldState
+>                 return retVal
+>             handle (VSym sym) =do
+>                 fn <- lookup sym
+>                 handle fn
+>             handle _  = return VNil
 
 Definitions are handled differently than other expressions because, really,
 they're not expressions. You can't meaningfully compose definitions. They are
@@ -327,12 +354,16 @@ arithmetic). The following function attempts to evaluate a built-in, returning
 >     | sym == "and"  = return $ Just . VBool $ and (map unBool args)
 >     | sym == "or"   = return $ Just . VBool $ or  (map unBool args)
 >     | sym == "not"  = return $ Just . VBool $ not (unBool . head $ args)
+>     | sym == "print" = doPrint args
 >     | otherwise     = return  Nothing
 >     where numBinOp op xs = let (VNum l) = xs !! 0
 >                                (VNum r) = xs !! 1
 >                             in  return $ Just . VNum $ op l r
 >           numOp    op xs = return $ Just . VNum $ op (map unNum args)
 >           boolIf xs = if (unBool (xs !! 0)) then (xs !! 1) else (xs !! 2)
+>           doPrint args = do
+>               liftIO . putStrLn . show $ args !! 0
+>               return . Just $ VNil
 
 > builtin (Free (AInteger n)) _ = return $ Just . VNum $ n
 > builtin (Free (ABoolean b)) _ = return $ Just . VBool $ b
