@@ -101,6 +101,12 @@ The psilo Virtual Machine
            <span class="fu">|</span> <span class="dt">VDefine</span> <span class="dt">Symbol</span>
            <span class="fu">|</span> <span class="dt">VNil</span>
 
+<span class="kw">instance</span> <span class="dt">Eq</span> <span class="dt">Value</span> <span class="kw">where</span>
+    (<span class="dt">VNum</span> a)  <span class="fu">==</span> (<span class="dt">VNum</span> b)   <span class="fu">=</span> a <span class="fu">==</span> b
+    (<span class="dt">VBool</span> a) <span class="fu">==</span> (<span class="dt">VBool</span> b)  <span class="fu">=</span> a <span class="fu">==</span> b
+    (<span class="dt">VSym</span> a)  <span class="fu">==</span> (<span class="dt">VSym</span> b)   <span class="fu">=</span> a <span class="fu">==</span> b
+    _         <span class="fu">==</span> _          <span class="fu">=</span> <span class="dt">False</span>
+
 <span class="kw">instance</span> <span class="dt">Show</span> <span class="dt">Value</span> <span class="kw">where</span>
     show (<span class="dt">VSym</span> s)   <span class="fu">=</span> <span class="st">&quot;&#39;&quot;</span> <span class="fu">++</span> s
     show (<span class="dt">VNum</span> n)   <span class="fu">=</span> show n
@@ -278,6 +284,8 @@ builtin (<span class="dt">Free</span> (<span class="dt">ASymbol</span> sym)) arg
     <span class="fu">|</span> sym <span class="fu">==</span> <span class="st">&quot;*&quot;</span>    <span class="fu">=</span> numOp product args
     <span class="fu">|</span> sym <span class="fu">==</span> <span class="st">&quot;-&quot;</span>    <span class="fu">=</span> numBinOp ((<span class="fu">-</span>)) args
     <span class="fu">|</span> sym <span class="fu">==</span> <span class="st">&quot;/&quot;</span>    <span class="fu">=</span> numBinOp div   args
+    <span class="fu">|</span> sym <span class="fu">==</span> <span class="st">&quot;=?&quot;</span>   <span class="fu">=</span> return <span class="fu">$</span> <span class="dt">Just</span> <span class="fu">.</span> <span class="dt">VBool</span> <span class="fu">$</span> (args <span class="fu">!!</span> <span class="dv">0</span>) <span class="fu">==</span> (args <span class="fu">!!</span> <span class="dv">1</span>)
+    <span class="fu">|</span> sym <span class="fu">==</span> <span class="st">&quot;if&quot;</span>   <span class="fu">=</span> return <span class="fu">.</span> <span class="dt">Just</span> <span class="fu">$</span> boolIf args
     <span class="fu">|</span> sym <span class="fu">==</span> <span class="st">&quot;and&quot;</span>  <span class="fu">=</span> return <span class="fu">$</span> <span class="dt">Just</span> <span class="fu">.</span> <span class="dt">VBool</span> <span class="fu">$</span> and (map unBool args)
     <span class="fu">|</span> sym <span class="fu">==</span> <span class="st">&quot;or&quot;</span>   <span class="fu">=</span> return <span class="fu">$</span> <span class="dt">Just</span> <span class="fu">.</span> <span class="dt">VBool</span> <span class="fu">$</span> or  (map unBool args)
     <span class="fu">|</span> sym <span class="fu">==</span> <span class="st">&quot;not&quot;</span>  <span class="fu">=</span> return <span class="fu">$</span> <span class="dt">Just</span> <span class="fu">.</span> <span class="dt">VBool</span> <span class="fu">$</span> not (unBool <span class="fu">.</span> head <span class="fu">$</span> args)
@@ -285,7 +293,8 @@ builtin (<span class="dt">Free</span> (<span class="dt">ASymbol</span> sym)) arg
     <span class="kw">where</span> numBinOp op xs <span class="fu">=</span> <span class="kw">let</span> (<span class="dt">VNum</span> l) <span class="fu">=</span> xs <span class="fu">!!</span> <span class="dv">0</span>
                                (<span class="dt">VNum</span> r) <span class="fu">=</span> xs <span class="fu">!!</span> <span class="dv">1</span>
                             <span class="kw">in</span>  return <span class="fu">$</span> <span class="dt">Just</span> <span class="fu">.</span> <span class="dt">VNum</span> <span class="fu">$</span> op l r
-          numOp    op xs <span class="fu">=</span> return <span class="fu">$</span> <span class="dt">Just</span> <span class="fu">.</span> <span class="dt">VNum</span> <span class="fu">$</span> op (map unNum args)</code></pre>
+          numOp    op xs <span class="fu">=</span> return <span class="fu">$</span> <span class="dt">Just</span> <span class="fu">.</span> <span class="dt">VNum</span> <span class="fu">$</span> op (map unNum args)
+          boolIf xs <span class="fu">=</span> <span class="kw">if</span> (unBool (xs <span class="fu">!!</span> <span class="dv">0</span>)) <span class="kw">then</span> (xs <span class="fu">!!</span> <span class="dv">1</span>) <span class="kw">else</span> (xs <span class="fu">!!</span> <span class="dv">2</span>)</code></pre>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell">builtin (<span class="dt">Free</span> (<span class="dt">AInteger</span> n)) _ <span class="fu">=</span> return <span class="fu">$</span> <span class="dt">Just</span> <span class="fu">.</span> <span class="dt">VNum</span> <span class="fu">$</span> n
 builtin (<span class="dt">Free</span> (<span class="dt">ABoolean</span> b)) _ <span class="fu">=</span> return <span class="fu">$</span> <span class="dt">Just</span> <span class="fu">.</span> <span class="dt">VBool</span> <span class="fu">$</span> b
 builtin _ _   <span class="fu">=</span> return <span class="dt">Nothing</span></code></pre>
