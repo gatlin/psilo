@@ -110,7 +110,7 @@ an arbitrary expression value.
 >                <|> parseBoolean
 >                <|> try (parens parseFn)
 >                <|> parens parseApp
-
+>
 >         optional whitespace
 >         rst <- fmap (Free . AList) $ parseExpr `sepBy` whitespace
 >         return $ Free (AApply fst rst))
@@ -155,10 +155,18 @@ treated especially as strictly speaking they are not expressions.
 >     optional whitespace
 >     reserved "="
 >     optional whitespace
->     (Free (ASymbol sym)) <- parseSymbol
+>     Free (ASymbol sym) <- parseSymbol
 >     optional whitespace
->     val <- parseExpr
->     return $ Free $ ADefine sym val
+>     body <- parseFunDef <|> parseSimpleDef
+>     return $ Free $ ADefine sym body
+
+> parseSimpleDef = parseExpr
+
+> parseFunDef = try $ do
+>     Free (AList args) <- parens parseQuotedList
+>     optional whitespace
+>     body <- parseExpr
+>     return $ Free $ ALambda (expr2symlist args) body
 
 Top level expression parser
 

@@ -138,7 +138,7 @@ calling the various monad transformer `run` functions in succession.
 I define `Monoid` instances for my `Environment` and `Store` types for the
 benefit of the interpreter. For each `=` in the source code, I evaluate the
 statement to obtain a machine state containing the function definition. Once
-completed I merge the machine states together using `mconcat` from
+completed I merge the machine states together using `mconcat` fromsecond
 `Data.Monoid`.
 
 > shiftKeysBy n m = IntMap.mapKeys (+n) m

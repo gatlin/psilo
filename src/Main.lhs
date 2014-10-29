@@ -73,11 +73,12 @@ program.
 >                     _ -> return Nothing
 >             sto <- return $ mconcat . catMaybes $ defns
 >             (val,sto'):_ <- liftIO $ eval (Right (f xs)) sto
->             putStrLn . show $ sto'
 >             return ()
 >    where f xs = filter (\x -> case x of
 >                                   Free (ADefine _ _) -> False
 >                                   _                  -> True) xs
+
+For debugging purposes, we print the final state of the machine:
 
 > main :: IO ()
 > main = do
