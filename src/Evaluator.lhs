@@ -128,6 +128,8 @@ Behold: the `Machine` monad, a stack of monad transformers.
 > runMachineWithState :: MStore -> MEnv -> Machine a -> IO (a, MStore)
 > runMachineWithState st ev k = runStateT (runReaderT (runM k) ev) st where
 
+> runMachineWithStore st k = runStateT (runReaderT (runM k) initialEnv) st
+
 > runMachine :: Machine a -> IO (a, MStore)
 > runMachine k = runMachineWithState initialStore initialEnv k
 

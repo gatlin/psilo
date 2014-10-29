@@ -17,6 +17,7 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 > import Data.Monoid
 > import Data.Maybe
 > import Control.Monad (forM)
+> import Data.List (partition)
 >
 > import System.Environment
 > import System.IO
@@ -76,9 +77,7 @@ program.
 >             return ()
 >    where f xs = filter (\x -> case x of
 >                                   Free (ADefine _ _) -> False
->                                   _                  -> True) xs
-
-For debugging purposes, we print the final state of the machine:
+>                                   _ -> True) xs
 
 > main :: IO ()
 > main = do
