@@ -46,30 +46,40 @@ value.
 
 Here is some code the interpreter runs right now:
 
-    (= cons (\ (x y)
-      (\ (f g) (f x y))))
+    ; Basic untyped list definition and some functions
+    (= cons (x y)
+      (\ (c n) (c x y)))
 
-    (= nil (\ ()
-      (\ (f g) (g))))
+    (= nil ()
+      (\ (c n) (n)))
 
-    (= car (\ (xs)
-      (xs (\ (x y) x))))
+    (= car (xs)
+      (xs (\ (y ys) y)))
 
-    (= cdr (\ (xs)
-      (xs (\ (x y) y))))
+    (= cdr (xs)
+      (xs (\ (y ys) ys)))
 
-    (= length (\ (xs)
-      (let
-        ((length-h (\ (xs n)
-           (xs (\ (y ys) (length-h ys (+ n 1)))
-               (\ ()     n)))))
-        (length-h xs 0))))
+    (= foldr (xs a b)
+      (xs (\ (y ys) (a y (foldr ys a b)))
+          nil))
 
-    (= square (\ (x) (* x x)))
+    (= sum (xs)
+      (foldr xs (\ (x y) (+ x y)) 0))
+
+    ; this one is faulty
+    (= map (f xs)
+      (foldr xs
+        (\ (y ys) (cons (f y) ys))
+        nil))
+
+    (= length (xs)
+      (foldr xs (\ (y ys) (+ 1 ys)) 0))
+
+    (= square (x) (* x x))
 
     (let
-      ((list-1 (cons 1 (cons 2 (cons 3 (nil))))))
-      (print (square (length list-1))))
+      ((lst1 (cons 3 (cons 2 (cons 1 (nil))))))
+      (print (car (cdr (map square lst1)))))
 
 How to build
 ===
