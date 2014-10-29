@@ -113,7 +113,7 @@ The psilo Virtual Machine
     show (<span class="dt">VNum</span> n)   <span class="fu">=</span> show n
     show (<span class="dt">VBool</span> b)  <span class="fu">=</span> <span class="kw">if</span> b <span class="kw">then</span> <span class="st">&quot;#t&quot;</span> <span class="kw">else</span> <span class="st">&quot;#f&quot;</span>
     show (<span class="dt">VNil</span>)     <span class="fu">=</span> <span class="st">&quot;(nil)&quot;</span>
-    show (<span class="dt">VClos</span> _ _ _)  <span class="fu">=</span> <span class="st">&quot;&lt;function&gt;&quot;</span>
+    show (<span class="dt">VClos</span> _ _ e)  <span class="fu">=</span> <span class="st">&quot;&lt;function&gt; { &quot;</span> <span class="fu">++</span> (show e) <span class="fu">++</span> <span class="st">&quot; } &quot;</span>
     show (<span class="dt">VList</span> xs) <span class="fu">=</span> concat <span class="fu">$</span> map show xs
     show (<span class="dt">VDefine</span> _)<span class="fu">=</span> <span class="st">&quot;&lt;definition&gt;&quot;</span>
 
@@ -148,7 +148,7 @@ runMachineWithState st ev k <span class="fu">=</span> runStateT (runReaderT (run
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">runMachine ::</span> <span class="dt">Machine</span> a <span class="ot">-&gt;</span> <span class="dt">IO</span> (a, <span class="dt">MStore</span>)
 runMachine k <span class="fu">=</span> runMachineWithState initialStore initialEnv k</code></pre>
 <p>With the above default initial states for the environment and the store, I'm ready to define the mapping from a <code>Machine</code> to <code>IO</code>, which is essentially just calling the various monad transformer <code>run</code> functions in succession.</p>
-<p>I define <code>Monoid</code> instances for my <code>Environment</code> and <code>Store</code> types for the benefit of the interpreter. For each <code>=</code> in the source code, I evaluate the statement to obtain a machine state containing the function definition. Once completed I merge the machine states together using <code>mconcat</code> from <code>Data.Monoid</code>.</p>
+<p>I define <code>Monoid</code> instances for my <code>Environment</code> and <code>Store</code> types for the benefit of the interpreter. For each <code>=</code> in the source code, I evaluate the statement to obtain a machine state containing the function definition. Once completed I merge the machine states together using <code>mconcat</code> fromsecond <code>Data.Monoid</code>.</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell">shiftKeysBy n m <span class="fu">=</span> IntMap.mapKeys (<span class="fu">+</span>n) m
 shiftValsBy n m <span class="fu">=</span> Map.map (<span class="fu">+</span>n) m</code></pre>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">instance</span> <span class="dt">Monoid</span> (<span class="dt">Map.Map</span> <span class="dt">Symbol</span> <span class="dt">Int</span>) <span class="kw">where</span>

@@ -105,30 +105,40 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+e+'<\
 <p>Psilo is still being designed. I have written a really simple evaluator for prototyping and experimenting with the language which is actively being developed.</p>
 <p>While not production quality, the simple interpreter might be of educational value.</p>
 <p>Here is some code the interpreter runs right now:</p>
-<pre><code>(= cons (\ (x y)
-  (\ (f g) (f x y))))
+<pre><code>; Basic untyped list definition and some functions
+(= cons (x y)
+  (\ (c n) (c x y)))
 
-(= nil (\ ()
-  (\ (f g) (g))))
+(= nil ()
+  (\ (c n) (n)))
 
-(= car (\ (xs)
-  (xs (\ (x y) x))))
+(= car (xs)
+  (xs (\ (y ys) y)))
 
-(= cdr (\ (xs)
-  (xs (\ (x y) y))))
+(= cdr (xs)
+  (xs (\ (y ys) ys)))
 
-(= length (\ (xs)
-  (let
-    ((length-h (\ (xs n)
-       (xs (\ (y ys) (length-h ys (+ n 1)))
-           (\ ()     n)))))
-    (length-h xs 0))))
+(= foldr (xs a b)
+  (xs (\ (y ys) (a y (foldr ys a b)))
+      nil))
 
-(= square (\ (x) (* x x)))
+(= sum (xs)
+  (foldr xs (\ (x y) (+ x y)) 0))
+
+; this one is faulty
+(= map (f xs)
+  (foldr xs
+    (\ (y ys) (cons (f y) ys))
+    nil))
+
+(= length (xs)
+  (foldr xs (\ (y ys) (+ 1 ys)) 0))
+
+(= square (x) (* x x))
 
 (let
-  ((list-1 (cons 1 (cons 2 (cons 3 (nil))))))
-  (print (square (length list-1))))</code></pre>
+  ((lst1 (cons 3 (cons 2 (cons 1 (nil))))))
+  (print (car (cdr (map square lst1)))))</code></pre>
 <h1 id="how-to-build"><span class="header-section-number">4</span> How to build</h1>
 <p>You need the Glasgow Haskell Compiler and a number of libraries; I suggest starting off with <a href="http://haskell.org/platform">the Haskell platform</a>.</p>
 <p>Clone the repository:</p>
