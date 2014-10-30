@@ -1,18 +1,27 @@
-(= promise (x) (\ () x))
-(= Box (b) b)
+; Tests / scratchpad
+
+(= Box (x)
+  (\ (f) (f x)))
+
 (= unbox (b)
   (b (\ (x) x)))
 
-(= box (x)
-  (Box (\ (f) (f x))))
+(= map-box (f bx)
+  (Box (f (unbox bx))))
 
-(= map-box (f b)
-  (box (f (unbox b))))
+; Pairs
+(= unpair (p f)
+  (p f))
 
-(= add1 (x) (+ 1 x))
+(= Pair (f) f)
 
-(= a 1)
+(= pair (x y)
+  (Pair (\ (f) (f x y))))
 
-(let
-  ((b 2))
-  (print (+ a b)))
+(= fst (p)
+  (unpair p (\ (a b) a)))
+
+(= snd (p)
+  (unpair p (\ (a b) b)))
+
+
