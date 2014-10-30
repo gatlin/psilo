@@ -229,7 +229,9 @@ bind sym val next <span class="fu">=</span> <span class="kw">do</span>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell">interpret (<span class="dt">Free</span> (<span class="dt">AInteger</span> n)) <span class="fu">=</span> return <span class="fu">$</span> <span class="dt">VNum</span> n
 interpret (<span class="dt">Free</span> (<span class="dt">ABoolean</span> b)) <span class="fu">=</span> return <span class="fu">$</span> <span class="dt">VBool</span> b</code></pre>
 <p>Symbols are slightly more interesting. We must lookup the location of the symbol's value in the environment, and then its value using the location.</p>
-<pre class="sourceCode literate haskell"><code class="sourceCode haskell">interpret (<span class="dt">Free</span> (<span class="dt">ASymbol</span> s)) <span class="fu">=</span> lookup s <span class="fu">&gt;&gt;=</span> return</code></pre>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell">interpret (<span class="dt">Free</span> (<span class="dt">ASymbol</span> s)) <span class="fu">=</span> <span class="kw">do</span>
+    val <span class="ot">&lt;-</span> lookup s
+    lookup s <span class="fu">&gt;&gt;=</span> return</code></pre>
 <p>Lists are handled by iterating over the list of <code>Expr</code> values and constructing a list of <code>Value</code>s, which we wrap in <code>VList</code>.</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell">interpret (<span class="dt">Free</span> (<span class="dt">AList</span> xs)) <span class="fu">=</span> <span class="kw">do</span>
     vals <span class="ot">&lt;-</span> forM xs <span class="fu">$</span> \x <span class="ot">-&gt;</span> <span class="kw">do</span>
@@ -243,7 +245,6 @@ interpret (<span class="dt">Free</span> (<span class="dt">ABoolean</span> b)) <s
     vars&#39; <span class="ot">&lt;-</span> forM vars <span class="fu">$</span> \var <span class="ot">-&gt;</span> <span class="kw">do</span>
         val <span class="ot">&lt;-</span> lookup var
         return (var, val)
-    liftIO <span class="fu">$</span> putStrLn <span class="fu">.</span> show <span class="fu">$</span> vars&#39;
     return <span class="fu">$</span> <span class="dt">VClos</span> args body vars&#39;</code></pre>
 <p>Function application works by first checking to see if the operator is a built-in. If not, we must do the following:</p>
 <ol type="1">
@@ -259,9 +260,11 @@ interpret (<span class="dt">Free</span> (<span class="dt">ABoolean</span> b)) <s
     isBuiltin <span class="ot">&lt;-</span> builtin op args&#39;
     <span class="kw">case</span> isBuiltin <span class="kw">of</span>
         <span class="dt">Just</span> k <span class="ot">-&gt;</span>  return k
-        <span class="dt">Nothing</span> <span class="ot">-&gt;</span> (interpret op) <span class="fu">&gt;&gt;=</span> handle
+        <span class="dt">Nothing</span> <span class="ot">-&gt;</span> <span class="kw">do</span>
+            (interpret op) <span class="fu">&gt;&gt;=</span> handle
     <span class="kw">where</span>
       handle (<span class="dt">VClos</span> syms body closedEnv) <span class="fu">=</span> <span class="kw">do</span>
+          oldState <span class="ot">&lt;-</span> get
           closedEnv&#39; <span class="ot">&lt;-</span> forM closedEnv <span class="fu">$</span> \(s, val) <span class="ot">-&gt;</span> <span class="kw">do</span>
               loc <span class="ot">&lt;-</span> fresh
               store loc val
@@ -273,9 +276,10 @@ interpret (<span class="dt">Free</span> (<span class="dt">ABoolean</span> b)) <s
               store loc av
               return (sym, loc)
           argEnv&#39; <span class="ot">&lt;-</span> return <span class="fu">$</span> Map.fromList argEnv
-          newEnv <span class="ot">&lt;-</span> return <span class="fu">$</span> argEnv&#39; <span class="fu">&lt;&gt;</span> closure
+          newEnv <span class="ot">&lt;-</span> return <span class="fu">$</span> Map.union argEnv&#39; closure
           retVal <span class="ot">&lt;-</span> local (\(<span class="dt">MEnv</span> e) <span class="ot">-&gt;</span> <span class="dt">MEnv</span> (Map.union newEnv e)) <span class="fu">$</span>
               interpret body
+          put oldState
           return retVal
       handle (<span class="dt">VSym</span> sym) <span class="fu">=</span> lookup sym <span class="fu">&gt;&gt;=</span> handle
       handle _          <span class="fu">=</span> return <span class="dt">VNil</span></code></pre>

@@ -112,7 +112,6 @@ execFile fname <span class="fu">=</span> <span class="kw">do</span>
                         return <span class="fu">.</span> <span class="dt">Just</span> <span class="fu">$</span> store
                     _ <span class="ot">-&gt;</span> return <span class="dt">Nothing</span>
             sto <span class="ot">&lt;-</span> return <span class="fu">$</span> mconcat <span class="fu">.</span> catMaybes <span class="fu">$</span> defns
-            putStrLn <span class="fu">.</span> show <span class="fu">$</span> sto
             (val,sto&#39;)<span class="fu">:</span>_ <span class="ot">&lt;-</span> liftIO <span class="fu">$</span> eval (<span class="dt">Right</span> (f xs)) sto
             return ()
    <span class="kw">where</span> f xs <span class="fu">=</span> filter (\x <span class="ot">-&gt;</span> <span class="kw">case</span> x <span class="kw">of</span>
