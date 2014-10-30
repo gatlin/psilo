@@ -11,8 +11,8 @@
 
 (= add1 (x) (+ 1 x))
 
+(= a 1)
+
 (let
-  ((b1 (box 1)))
-  (let
-    ((b2 (map-box add1 b1)))
-    (print (unbox b2))))
+  ((b 2))
+  (print (+ a b)))

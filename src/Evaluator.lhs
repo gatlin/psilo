@@ -77,6 +77,10 @@ values.
 >     (VSym a)  == (VSym b)   = a == b
 >     _         == _          = False
 >
+> instance Ord Value where
+>     (VNum a) <= (VNum b) = a <= b
+>     _        <= _        = False
+>
 > instance Show Value where
 >     show (VSym s)   = "'" ++ s
 >     show (VNum n)   = show n
@@ -341,19 +345,41 @@ the body expression.
 Built-in operators
 ---
 
+There are a few operators which are not core to the language *per se* but which
+either we tend to take for granted as being in a language or which would be
+unreasonably difficult to actually write in psilo.
+
+For example: right now, by default all function arguments are evaluated before
+being passed to their respective functions. However, `if` must only evaluate
+one or the other of its operands, otherwise really bad things could happen if
+you depended on it for recursion.
+
+NB: this could be the foundation of a macro system now that I think about it,
+if this table could be extended by psilo code ...
+
 > builtin (Free (ASymbol sym)) xs
->     | sym == "+"  = numBinOp (+) xs
->     | sym == "*"  = numBinOp (*) xs
->     | sym == "-"  = numBinOp ((-)) xs
->     | sym == "/"  = numBinOp (div) xs
->     | sym == "=?" = boolEq xs
->     | sym == "if" = boolIf xs
+>     | sym == "+"   = numsOp sum xs
+>     | sym == "*"   = numsOp product xs
+>     | sym == "-"   = numBinOp ((-)) xs
+>     | sym == "/"   = numBinOp (div) xs
+>     | sym == "=?"  = boolEq xs
+>     | sym == "if"  = boolIf xs
+>     | sym == "<"   = boolBinOp (<) xs
+>     | sym == ">"   = boolBinOp (>) xs
+>     | sym == "<="  = boolBinOp (<=) xs
+>     | sym == ">="  = boolBinOp (>=) xs
+>     | sym == "and" = boolBinOp (\(VBool x) (VBool y) -> and [x,y]) xs
+>     | sym == "or"  = boolBinOp (\(VBool x) (VBool y) -> or  [x,y]) xs
+>     | sym == "not" = boolOp (\(VBool x) -> not x) xs
 >     | sym == "print" = do
 >           xs' <- mapM interpret xs
 >           liftIO $ forM_ xs' (putStrLn . show)
 >           return . Just $ VNil
 >     | otherwise   = return Nothing
 >    where
+>        numsOp op xs = do
+>            xs' <- mapM interpret xs
+>            return . Just . VNum $ op (map unNum xs')
 >        numBinOp op (l:r:_) = do
 >            VNum l' <- interpret l
 >            VNum r' <- interpret r
@@ -367,7 +393,16 @@ Built-in operators
 >            if cond
 >                then interpret t >>= return . Just
 >                else interpret e >>= return . Just
-
+>        boolOp op (x:_) = do
+>            x' <- interpret x
+>            return . Just . VBool $ op x'
+>        boolBinOp op (l:r:_) = do
+>            l' <- interpret l
+>            r' <- interpret r
+>            return . Just . VBool $ op l' r'
+> builtin (Free (AInteger n)) _ = return . Just . VNum $ n
+> builtin (Free (ABoolean b)) _ = return . Just . VBool $ b
+>
 > builtin _ _ = return Nothing
 
 Some symbols denote built-in operators (mostly involving

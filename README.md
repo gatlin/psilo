@@ -107,10 +107,11 @@ Here is some code the interpreter runs right now:
       (foldr xs (\ (y ys) (+ y ys)) (promise 0)))
 
     (= map-list (f xs)
-      (foldr xs (\ (y ys) (cons (f y) ys)) xs))
+      (foldr xs (\ (y ys) (cons (f y) ys)) (promise (nil))))
 
     ; Miscellaneous examples
     (= add1 (x) (+ 1 x))
+    (= square (x) (* x x))
     (= fact (x)
       (if (=? x 0)
           1
@@ -118,10 +119,8 @@ Here is some code the interpreter runs right now:
 
     (let
       ((lst1 (cons 3 (cons 2 (cons 1 (nil))))))
-      (print (fact (+ (sum lst1)
-                   (car (cdr lst1))))))
-
-    ; => 40320
+      (print (+ (sum (map-list add1 (map-list square lst1)))
+                (fact (car (cdr lst1))))))
 
 How to build
 ===
