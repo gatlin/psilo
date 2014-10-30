@@ -1,16 +1,18 @@
-(= Y
-  (\ (target)
-    ((\ (f)
-      (target (\ (arg) ((f f) arg))))
-     (\ (f)
-      (target (\ (arg) ((f f) arg)))))))
+(= promise (x) (\ () x))
+(= Box (b) b)
+(= unbox (b)
+  (b (\ (x) x)))
+
+(= box (x)
+  (Box (\ (f) (f x))))
+
+(= map-box (f b)
+  (box (f (unbox b))))
+
+(= add1 (x) (+ 1 x))
 
 (let
-  ((fact-sort-of (\ (k)
-     (\ (n)
-       (if (=? n 0)
-           1
-           (* n (k (- n 1))))))))
+  ((b1 (box 1)))
   (let
-    ((fact2 (Y fact-sort-of)))
-    (print (fact2 5))))
+    ((b2 (map-box add1 b1)))
+    (print (unbox b2))))
