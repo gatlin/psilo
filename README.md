@@ -46,40 +46,82 @@ value.
 
 Here is some code the interpreter runs right now:
 
-    ; Basic untyped list definition and some functions
-    (= cons (x y)
-      (\ (c n) (c x y)))
+    ; Utilities
+    (= promise (x) (\ () x))
+
+    ; Pairs
+    (= unpair (p f)
+      (p f))
+
+    (= Pair (f) f)
+
+    (= pair (x y)
+      (Pair (\ (f) (f x y))))
+
+    (= fst (p)
+      (unpair p (\ (a b) a)))
+
+    (= snd (p)
+      (unpair p (\ (a b) b)))
+
+    ; Options
+    (= maybe (o yes no)
+       (o yes no))
+
+    (= Option (x) x)
+
+    (= just (x)
+      (Option (\ (j n) (j x))))
+
+    (= none ()
+      (Option (\ (j n) (n))))
+
+    ; Lists
+    (= foldr (xs c n)
+      (xs c n))
+
+    (= List (l) l)
+
+    (= cons (x xs)
+      (List (\ (c n) (c x (foldr xs c n)))))
 
     (= nil ()
-      (\ (c n) (n)))
+      (List (\ (c n) (n))))
+
+    (= split (xs)
+      (let ((f (\ (y ys)
+                 (pair (just y)
+                       (List (\ (c n)
+                         (maybe (fst ys)
+                                (\ (x) (c x (foldr ((snd ys)) c n)))
+                                n)))))))
+      (foldr xs f (pair none nil))))
 
     (= car (xs)
-      (xs (\ (y ys) y)))
+      (maybe (fst (split xs)) (\ (x) x) (promise -1)))
 
     (= cdr (xs)
-      (xs (\ (y ys) ys)))
-
-    (= foldr (xs a b)
-      (xs (\ (y ys) (a y (foldr ys a b)))
-          nil))
+      (snd (split xs)))
 
     (= sum (xs)
-      (foldr xs (\ (x y) (+ x y)) 0))
+      (foldr xs (\ (y ys) (+ y ys)) (promise 0)))
 
-    ; this one is faulty
-    (= map (f xs)
-      (foldr xs
-        (\ (y ys) (cons (f y) ys))
-        nil))
+    (= map-list (f xs)
+      (foldr xs (\ (y ys) (cons (f y) ys)) xs))
 
-    (= length (xs)
-      (foldr xs (\ (y ys) (+ 1 ys)) 0))
-
-    (= square (x) (* x x))
+    ; Miscellaneous examples
+    (= add1 (x) (+ 1 x))
+    (= fact (x)
+      (if (=? x 0)
+          1
+          (* x (fact (- x 1)))))
 
     (let
       ((lst1 (cons 3 (cons 2 (cons 1 (nil))))))
-      (print (car (cdr (map square lst1)))))
+      (print (fact (+ (sum lst1)
+                   (car (cdr lst1))))))
+
+    ; => 40320
 
 How to build
 ===

@@ -248,7 +248,9 @@ Numbers and Booleans are easy enough to deal with:
 Symbols are slightly more interesting. We must lookup the location of the
 symbol's value in the environment, and then its value using the location.
 
-> interpret (Free (ASymbol s)) = lookup s >>= return
+> interpret (Free (ASymbol s)) = do
+>     val <- lookup s
+>     lookup s >>= return
 
 Lists are handled by iterating over the list of `Expr` values and constructing
 a list of `Value`s, which we wrap in `VList`.
@@ -270,7 +272,6 @@ evaluated.
 >     vars' <- forM vars $ \var -> do
 >         val <- lookup var
 >         return (var, val)
->     liftIO $ putStrLn . show $ vars'
 >     return $ VClos args body vars'
 
 Function application works by first checking to see if the operator is a
@@ -288,9 +289,11 @@ built-in. If not, we must do the following:
 >     isBuiltin <- builtin op args'
 >     case isBuiltin of
 >         Just k ->  return k
->         Nothing -> (interpret op) >>= handle
+>         Nothing -> do
+>             (interpret op) >>= handle
 >     where
 >       handle (VClos syms body closedEnv) = do
+>           oldState <- get
 >           closedEnv' <- forM closedEnv $ \(s, val) -> do
 >               loc <- fresh
 >               store loc val
@@ -302,9 +305,10 @@ built-in. If not, we must do the following:
 >               store loc av
 >               return (sym, loc)
 >           argEnv' <- return $ Map.fromList argEnv
->           newEnv <- return $ argEnv' <> closure
+>           newEnv <- return $ Map.union argEnv' closure
 >           retVal <- local (\(MEnv e) -> MEnv (Map.union newEnv e)) $
 >               interpret body
+>           put oldState
 >           return retVal
 >       handle (VSym sym) = lookup sym >>= handle
 >       handle _          = return VNil

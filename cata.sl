@@ -1,13 +1,14 @@
-; General utilities
-(= id (x) x)
+; Utilities
 (= promise (x) (\ () x))
 
-; Pairs!
+; Pairs
 (= unpair (p f)
-  ((p (\ (x y) (\ () (f x y))))))
+  (p f))
+
+(= Pair (f) f)
 
 (= pair (x y)
-  (\ (f) (f x y)))
+  (Pair (\ (f) (f x y))))
 
 (= fst (p)
   (unpair p (\ (a b) a)))
@@ -15,20 +16,59 @@
 (= snd (p)
   (unpair p (\ (a b) b)))
 
-(= pair-map (f p)
-  (unpair p (\ (a b) (pair a (f b)))))
+; Options
+(= maybe (o yes no)
+   (o yes no))
 
-; Option types!
-(= maybe (o y n)
-  ((o (\ (x) (\ () (y x)))
-      (\ ()  (n)))))
+(= Option (x) x)
 
 (= just (x)
-  (\ (j n) (j x)))
+  (Option (\ (j n) (j x))))
 
 (= none ()
-  (\ (j n) (n)))
+  (Option (\ (j n) (n))))
 
-(= opt-map (f o)
-  (maybe o (\ (x) (just (f x))) none))
+; Lists
+(= foldr (xs c n)
+  (xs c n))
 
+(= List (l) l)
+
+(= cons (x xs)
+  (List (\ (c n) (c x (foldr xs c n)))))
+
+(= nil ()
+  (List (\ (c n) (n))))
+
+(= split (xs)
+  (let ((f (\ (y ys)
+             (pair (just y)
+                   (List (\ (c n)
+                     (maybe (fst ys)
+                            (\ (x) (c x (foldr ((snd ys)) c n)))
+                            n)))))))
+  (foldr xs f (pair none nil))))
+
+(= car (xs)
+  (maybe (fst (split xs)) (\ (x) x) (promise -1)))
+
+(= cdr (xs)
+  (snd (split xs)))
+
+(= sum (xs)
+  (foldr xs (\ (y ys) (+ y ys)) (promise 0)))
+
+(= map-list (f xs)
+  (foldr xs (\ (y ys) (cons (f y) ys)) xs))
+
+; Miscellaneous examples
+(= add1 (x) (+ 1 x))
+(= fact (x)
+  (if (=? x 0)
+      1
+      (* x (fact (- x 1)))))
+
+(let
+  ((lst1 (cons 3 (cons 2 (cons 1 (nil))))))
+  (print (fact (+ (sum lst1)
+               (car (cdr lst1))))))
