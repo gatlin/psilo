@@ -73,6 +73,7 @@ program.
 >                         return . Just $ store
 >                     _ -> return Nothing
 >             sto <- return $ mconcat . catMaybes $ defns
+>             putStrLn . show $ sto
 >             (val,sto'):_ <- liftIO $ eval (Right (f xs)) sto
 >             return ()
 >    where f xs = filter (\x -> case x of

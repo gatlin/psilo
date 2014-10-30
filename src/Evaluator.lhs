@@ -216,13 +216,6 @@ Some common operations have been factored out into helper functions, viz:
 >     sto'  <- return $ IntMap.insert loc val sto
 >     put $ state { mStore = sto' }
 
-> delete :: Location -> Machine ()
-> delete loc = do
->     state <- get
->     sto   <- return $ mStore state
->     sto'  <- return $ IntMap.delete loc sto
->     put $ state { mStore = sto' }
-
 > bind :: Symbol -> Value -> Machine a -> Machine a
 > bind sym val next = do
 >     newLoc <- fresh
@@ -232,7 +225,7 @@ Some common operations have been factored out into helper functions, viz:
 >     globalEnv <- case maybeGlobalEnv of
 >         Nothing -> return $ Map.fromList []
 >         Just e  -> return e
->     let globalEnv' = Map.union (Map.fromList [(sym,newLoc)]) globalEnv
+>     let globalEnv' = (Map.fromList [(sym,newLoc)]) <> globalEnv
 >     put $ state { mGlobalEnv = Just globalEnv' }
 >     local (\_ -> MEnv globalEnv') next
 
@@ -277,6 +270,7 @@ evaluated.
 >     vars' <- forM vars $ \var -> do
 >         val <- lookup var
 >         return (var, val)
+>     liftIO $ putStrLn . show $ vars'
 >     return $ VClos args body vars'
 
 Function application works by first checking to see if the operator is a
@@ -289,32 +283,31 @@ built-in. If not, we must do the following:
 5. Return the value.
 
 > interpret (Free (AApply op args)) = do
->     VList args' <- interpret args
->     res   <- builtin op args'
->     oldState <- get
->     case res of
->         Just v -> return v
->         Nothing -> (interpret op) >>= handle where
->             handle (VClos syms body env) = do
->                 closedEnv <- forM env $ \(s, val) -> do
->                     loc <- fresh
->                     store loc val
->                     return (s, loc)
->                 closedEnv' <- return $ Map.fromList closedEnv
->                 argEnv <- forM (zip syms args') $ \(sym, av) -> do
->                     loc <- fresh
->                     store loc av
->                     return (sym, loc)
->                 argEnv' <- return $ Map.fromList argEnv
->                 newEnv <- return $ Map.union argEnv' closedEnv'
->                 retVal <- local (\(MEnv e) -> MEnv (Map.union newEnv e)) $
->                     interpret body
->                 put oldState
->                 return retVal
->             handle (VSym sym) =do
->                 fn <- lookup sym
->                 handle fn
->             handle _  = return VNil
+>     Free (AList args') <- return args
+>     Free op' <- return op
+>     isBuiltin <- builtin op args'
+>     case isBuiltin of
+>         Just k ->  return k
+>         Nothing -> (interpret op) >>= handle
+>     where
+>       handle (VClos syms body closedEnv) = do
+>           closedEnv' <- forM closedEnv $ \(s, val) -> do
+>               loc <- fresh
+>               store loc val
+>               return (s, loc)
+>           closure <- return $ Map.fromList closedEnv'
+>           VList args' <- interpret args
+>           argEnv <- forM (zip syms args') $ \(sym, av) -> do
+>               loc <- fresh
+>               store loc av
+>               return (sym, loc)
+>           argEnv' <- return $ Map.fromList argEnv
+>           newEnv <- return $ argEnv' <> closure
+>           retVal <- local (\(MEnv e) -> MEnv (Map.union newEnv e)) $
+>               interpret body
+>           return retVal
+>       handle (VSym sym) = lookup sym >>= handle
+>       handle _          = return VNil
 
 Definitions are handled differently than other expressions because, really,
 they're not expressions. You can't meaningfully compose definitions. They are
@@ -344,34 +337,38 @@ the body expression.
 Built-in operators
 ---
 
+> builtin (Free (ASymbol sym)) xs
+>     | sym == "+"  = numBinOp (+) xs
+>     | sym == "*"  = numBinOp (*) xs
+>     | sym == "-"  = numBinOp ((-)) xs
+>     | sym == "/"  = numBinOp (div) xs
+>     | sym == "=?" = boolEq xs
+>     | sym == "if" = boolIf xs
+>     | sym == "print" = do
+>           xs' <- mapM interpret xs
+>           liftIO $ forM_ xs' (putStrLn . show)
+>           return . Just $ VNil
+>     | otherwise   = return Nothing
+>    where
+>        numBinOp op (l:r:_) = do
+>            VNum l' <- interpret l
+>            VNum r' <- interpret r
+>            return . Just . VNum $ op l' r'
+>        boolEq (l:r:_) = do
+>            l' <- interpret l
+>            r' <- interpret r
+>            return . Just . VBool $ l' == r'
+>        boolIf (c:t:e:_) = do
+>            VBool cond <- interpret c
+>            if cond
+>                then interpret t >>= return . Just
+>                else interpret e >>= return . Just
+
+> builtin _ _ = return Nothing
+
 Some symbols denote built-in operators (mostly involving
 arithmetic). The following function attempts to evaluate a built-in, returning
 (maybe) a `Machine Value`.
 
-> --builtin :: Expr a -> [Value] -> Machine (Maybe Value)
-> builtin (Free (ASymbol sym)) args
->     | sym == "+"    = numOp sum args
->     | sym == "*"    = numOp product args
->     | sym == "-"    = numBinOp ((-)) args
->     | sym == "/"    = numBinOp div   args
->     | sym == "=?"   = return $ Just . VBool $ (args !! 0) == (args !! 1)
->     | sym == "if"   = return . Just $ boolIf args
->     | sym == "and"  = return $ Just . VBool $ and (map unBool args)
->     | sym == "or"   = return $ Just . VBool $ or  (map unBool args)
->     | sym == "not"  = return $ Just . VBool $ not (unBool . head $ args)
->     | sym == "print" = doPrint args
->     | otherwise     = return  Nothing
->     where numBinOp op xs = let (VNum l) = xs !! 0
->                                (VNum r) = xs !! 1
->                             in  return $ Just . VNum $ op l r
->           numOp    op xs = return $ Just . VNum $ op (map unNum args)
->           boolIf xs = if (unBool (xs !! 0)) then (xs !! 1) else (xs !! 2)
->           doPrint args = do
->               liftIO . putStrLn . show $ args !! 0
->               return . Just $ VNil
-
-> builtin (Free (AInteger n)) _ = return $ Just . VNum $ n
-> builtin (Free (ABoolean b)) _ = return $ Just . VBool $ b
-> builtin _ _   = return Nothing
 
 [plai]: http://cs.brown.edu/~sk/Publications/Books/ProgLangs/

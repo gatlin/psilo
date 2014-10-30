@@ -1,5 +1,5 @@
-(= square (x) (* x x))
-(= add1   (x) (+ x 1))
-(= add1ThenSquare (x) (square (add1 x)))
-
-(print (add1ThenSquare 10))
+(= fact (n)
+  (if (=? n 0)
+      1
+      (* n (fact (- n 1)))))
+(print (fact 5))
