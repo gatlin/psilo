@@ -44,7 +44,7 @@ Imports and language extensions
 > import qualified Data.IntMap.Strict as IntMap
 > import Data.Foldable (Foldable, fold)
 > import Data.Traversable (Traversable, sequence)
-> import Data.List (intersperse, nub)
+> import Data.List (intersperse, nub, (\\))
 > import Data.Monoid
 >
 > import Parser
@@ -323,6 +323,8 @@ simply a guarded mechanism for the programmer to modify the global environment.
 
 > interpret (Free (ADefine sym val)) = do
 >     val' <- interpret val
+>     liftIO . putStrLn $ "Defining <" ++ (show sym)
+>                      ++ "> = " ++ (show val')
 >     bind sym val' $ return $ VDefine sym
 
 To construct an appropriate environment, we must find all the free variables in
@@ -339,6 +341,10 @@ the body expression.
 > variables (Free (AApply op args)) = do
 >     varList <- variables args
 >     return varList
+>
+> variables (Free (ALambda syms body)) = do
+>     bodyVars <- variables body
+>     return $ bodyVars
 >
 > variables _   = return []
 

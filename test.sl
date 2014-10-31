@@ -1,19 +1,6 @@
-; Tests / scratchpad
-
-(= Box (x)
-  (\ (f) (f x)))
-
-(= unbox (b)
-  (b (\ (x) x)))
-
-(= map-box (f bx)
-  (Box (f (unbox bx))))
-
-; Pairs
+(= Pair (p) p)
 (= unpair (p f)
   (p f))
-
-(= Pair (f) f)
 
 (= pair (x y)
   (Pair (\ (f) (f x y))))
@@ -24,4 +11,11 @@
 (= snd (p)
   (unpair p (\ (a b) b)))
 
+(= map-pair (f p)
+  (unpair p (\ (a b) (pair a (f b)))))
 
+(= add1 (x) (+ 1 x))
+
+(let
+  ((p1 (pair 10 20)))
+  (print (fst (map-pair add1 p1))))
