@@ -83,7 +83,7 @@ The psilo Virtual Machine
 <span class="kw">import qualified</span> <span class="dt">Data.IntMap.Strict</span> <span class="kw">as</span> <span class="dt">IntMap</span>
 <span class="kw">import </span><span class="dt">Data.Foldable</span> (<span class="dt">Foldable</span>, fold)
 <span class="kw">import </span><span class="dt">Data.Traversable</span> (<span class="dt">Traversable</span>, sequence)
-<span class="kw">import </span><span class="dt">Data.List</span> (intersperse, nub)
+<span class="kw">import </span><span class="dt">Data.List</span> (intersperse, nub, (\\))
 <span class="kw">import </span><span class="dt">Data.Monoid</span>
 
 <span class="kw">import </span><span class="dt">Parser</span>
@@ -290,6 +290,8 @@ interpret (<span class="dt">Free</span> (<span class="dt">ABoolean</span> b)) <s
 <p>Definitions are handled differently than other expressions because, really, they're not expressions. You can't meaningfully compose definitions. They are simply a guarded mechanism for the programmer to modify the global environment.</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell">interpret (<span class="dt">Free</span> (<span class="dt">ADefine</span> sym val)) <span class="fu">=</span> <span class="kw">do</span>
     val&#39; <span class="ot">&lt;-</span> interpret val
+    liftIO <span class="fu">.</span> putStrLn <span class="fu">$</span> <span class="st">&quot;Defining &lt;&quot;</span> <span class="fu">++</span> (show sym)
+                     <span class="fu">++</span> <span class="st">&quot;&gt; = &quot;</span> <span class="fu">++</span> (show val&#39;)
     bind sym val&#39; <span class="fu">$</span> return <span class="fu">$</span> <span class="dt">VDefine</span> sym</code></pre>
 <p>To construct an appropriate environment, we must find all the free variables in the body expression.</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">variables ::</span> <span class="dt">Expr</span> a <span class="ot">-&gt;</span> <span class="dt">Machine</span> [<span class="dt">Symbol</span>]
@@ -303,6 +305,10 @@ variables (<span class="dt">Free</span> (<span class="dt">AList</span> xs)) <spa
 variables (<span class="dt">Free</span> (<span class="dt">AApply</span> op args)) <span class="fu">=</span> <span class="kw">do</span>
     varList <span class="ot">&lt;-</span> variables args
     return varList
+
+variables (<span class="dt">Free</span> (<span class="dt">ALambda</span> syms body)) <span class="fu">=</span> <span class="kw">do</span>
+    bodyVars <span class="ot">&lt;-</span> variables body
+    return <span class="fu">$</span> bodyVars
 
 variables _   <span class="fu">=</span> return []</code></pre>
 <h2 id="built-in-operators">Built-in operators</h2>
