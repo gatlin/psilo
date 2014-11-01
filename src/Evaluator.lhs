@@ -311,7 +311,11 @@ they're not expressions. You can't meaningfully compose definitions. They are
 simply a guarded mechanism for the programmer to modify the global environment.
 
 > eval (Free (ADefine sym val)) = do
->     val' <- eval val
+>     vars <- variables val
+>     bindings <- forM vars $ \var -> do
+>         val <- lookup var
+>         return (var, val)
+>     val' <- futz val
 >     bind sym val' $ do
 >         MEnv env <- ask
 >         state <- get
@@ -320,6 +324,11 @@ simply a guarded mechanism for the programmer to modify the global environment.
 >         globalEnv' <- return $ Map.insert sym loc globalEnv
 >         put $ state { mGlobalEnv = globalEnv' }
 >         return $ VDefine sym
+>     where
+>         futz expr@(Free (AApply op operands)) = do
+>             return $ VClos [] expr []
+>         futz nonLambda                  = do
+>             eval nonLambda
 
 To construct an appropriate environment, we must find all the free variables in
 the body expression.

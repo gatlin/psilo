@@ -60,12 +60,16 @@ The repl is nothing more than calling `eval` in an endless loop.
 >         Left err -> print err >> return ()
 >         Right xs -> do
 >             (defns, exprs) <- return $ partition isDefn xs
->             defMachines <- mapM (\x -> (runMachine . eval $ x) >>= (return . snd)) defns
->             initState <- return $ mconcat defMachines
->             evaluate (Right exprs) initState
+>             initState <- loop defns initialStore
+>             final <- evaluate (Right exprs) initState
 >             return ()
 >     where isDefn (Free (ADefine _ _)) = True
 >           isDefn _                    = False
+>           loop [] sto = return sto
+>           loop (d:ds) sto = do
+>               (_, sto') <- runMachine . eval $ d
+>               sto'' <- loop ds sto'
+>               return $ sto' <> sto''
 
 > main :: IO ()
 > main = do
