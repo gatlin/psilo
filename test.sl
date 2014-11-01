@@ -1,3 +1,12 @@
+(= Box (x)
+  (\ (f) (f x)))
+
+(= unbox (bx)
+  (bx (\ (x) x)))
+
+(= map-box (f bx)
+  (Box (f (unbox bx))))
+
 (= Pair (p) p)
 (= unpair (p f)
   (p f))
@@ -17,5 +26,6 @@
 (= add1 (x) (+ 1 x))
 
 (let
-  ((p1 (pair 10 20)))
-  (print (fst (map-pair add1 p1))))
+  ((p1 (pair 10 20))
+   (b1 (Box 5)))
+  (print (unbox (map-box add1 b1))))

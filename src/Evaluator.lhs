@@ -104,14 +104,14 @@ together in one data type.
 
 > data MStore = MStore { mStore :: Store
 >                      , mLoc   :: Int
->                      , mGlobalEnv :: Maybe Environment
+>                      , mGlobalEnv :: Environment
 >                      }
 >     deriving Show
 
 > initialStore :: MStore
 > initialStore = MStore { mStore = emptyStore
 >                       , mLoc   = 1
->                       , mGlobalEnv = Nothing
+>                       , mGlobalEnv = (Map.fromList [])
 >                       }
 
 
@@ -197,21 +197,15 @@ Some common operations have been factored out into helper functions, viz:
 
 > lookup :: Symbol -> Machine Value
 > lookup sym = do
->     MEnv localEnv <- ask
->     state <- get
->     case (mGlobalEnv state) of
->         Nothing -> lookup' sym localEnv
->         Just  e -> lookup' sym (Map.union localEnv e)
->     where
->         lookup' sym env = do
->             maybeLoc <- return $ Map.lookup sym env
->             case maybeLoc of
+>     MEnv env <- ask
+>     loc <- return $ Map.lookup sym env
+>     case loc of
+>         Nothing -> return VNil
+>         Just loc' -> do
+>             val <- fetch loc'
+>             case val of
 >                 Nothing -> return VNil
->                 Just loc -> do
->                     maybeVal <- fetch loc
->                     case maybeVal of
->                         Nothing -> return VNil
->                         Just  v -> return v
+>                 Just val' -> return val'
 
 > store :: Location -> Value -> Machine ()
 > store loc val = do
@@ -222,48 +216,38 @@ Some common operations have been factored out into helper functions, viz:
 
 > bind :: Symbol -> Value -> Machine a -> Machine a
 > bind sym val next = do
->     newLoc <- fresh
->     store newLoc val
->     state <- get
->     maybeGlobalEnv <- return $ mGlobalEnv state
->     globalEnv <- case maybeGlobalEnv of
->         Nothing -> return $ Map.fromList []
->         Just e  -> return e
->     let globalEnv' = (Map.fromList [(sym,newLoc)]) <> globalEnv
->     put $ state { mGlobalEnv = Just globalEnv' }
->     local (\_ -> MEnv globalEnv') next
+>     loc <- fresh
+>     store loc val
+>     local (\(MEnv env) -> MEnv $ Map.insert sym loc env) next
 
 The function `interpret` handles the first part. You can even tell by its type:
  `Expr a -> Machine Value`.
 
-> interpret :: Show a => Expr a -> Machine Value
+> eval :: Show a => Expr a -> Machine Value
 
 `Expr` is defined as `type Expr = Free AST`. Since `Expr` is a `Free` monad, as
 with `Op`, we handle the base case of being handed a `Pure` value. In this
 case, we return `NilV`.
 
-> interpret (Pure _) = return VNil
+> eval (Pure _) = return VNil
 
 Numbers and Booleans are easy enough to deal with:
 
-> interpret (Free (AInteger n)) = return $ VNum n
-> interpret (Free (ABoolean b)) = return $ VBool b
+> eval (Free (AInteger n)) = return $ VNum n
+> eval (Free (ABoolean b)) = return $ VBool b
 
 Symbols are slightly more interesting. We must lookup the location of the
 symbol's value in the environment, and then its value using the location.
 
-> interpret (Free (ASymbol s)) = do
+> eval (Free (ASymbol s)) = do
 >     val <- lookup s
 >     lookup s >>= return
 
 Lists are handled by iterating over the list of `Expr` values and constructing
 a list of `Value`s, which we wrap in `VList`.
 
-> interpret (Free (AList xs)) = do
->     vals <- forM xs $ \x -> do
->         x' <- return x
->         let v = interpret x'
->         v
+> eval (Free (AList xs)) = do
+>     vals <- mapM eval xs
 >     return $ VList vals
 
 Function abstraction amounts to creating a closure; that is to say, an
@@ -271,12 +255,17 @@ environment and a body expression. The environment is essentially a new frame
 that will be temporarily prepended to the main environment when the body is
 evaluated.
 
-> interpret (Free (ALambda args body)) = do
+> eval (Free (ALambda args body)) = do
 >     vars <- variables body
->     vars' <- forM vars $ \var -> do
+>     vars' <- return $ vars \\ args
+>     env <- forM vars $ \var -> do
 >         val <- lookup var
 >         return (var, val)
->     return $ VClos args body vars'
+>     env' <- return $ filter notNil env
+>     return $ VClos args body env
+>     where
+>         notNil (var, (VNil)) = False
+>         notNil _             = True
 
 Function application works by first checking to see if the operator is a
 built-in. If not, we must do the following:
@@ -287,45 +276,50 @@ built-in. If not, we must do the following:
 4. Roll back the changes to the environment.
 5. Return the value.
 
-> interpret (Free (AApply op args)) = do
+> eval (Free (AApply op args)) = do
 >     Free (AList args') <- return args
 >     Free op' <- return op
 >     isBuiltin <- builtin op args'
 >     case isBuiltin of
 >         Just k ->  return k
 >         Nothing -> do
->             (interpret op) >>= handle
+>             (eval op) >>= handle
 >     where
 >       handle (VClos syms body closedEnv) = do
->           oldState <- get
->           closedEnv' <- forM closedEnv $ \(s, val) -> do
->               loc <- fresh
->               store loc val
->               return (s, loc)
->           closure <- return $ Map.fromList closedEnv'
->           VList args' <- interpret args
->           argEnv <- forM (zip syms args') $ \(sym, av) -> do
->               loc <- fresh
->               store loc av
->               return (sym, loc)
->           argEnv' <- return $ Map.fromList argEnv
->           newEnv <- return $ Map.union argEnv' closure
->           retVal <- local (\(MEnv e) -> MEnv (Map.union newEnv e)) $
->               interpret body
+>           Free (AList args') <- return args
+>           oldState   <- get
+>           closedEnv' <- assocToEnv closedEnv
+>           argVals    <- mapM eval args'
+>           argEnv     <- assocToEnv $ zip syms argVals
+>           newEnv     <- return $ Map.union argEnv closedEnv'
+>           retVal <- local (\(MEnv env) -> MEnv $ Map.union newEnv env) $
+>               eval body
 >           put oldState
 >           return retVal
 >       handle (VSym sym) = lookup sym >>= handle
 >       handle _          = return VNil
+>       assocToEnv [] = return $ Map.fromList []
+>       assocToEnv xs = do
+>           xs' <- forM xs $ \(sym, av) -> do
+>               loc <- fresh
+>               store loc av
+>               return (sym, loc)
+>           return $ Map.fromList xs'
 
 Definitions are handled differently than other expressions because, really,
 they're not expressions. You can't meaningfully compose definitions. They are
 simply a guarded mechanism for the programmer to modify the global environment.
 
-> interpret (Free (ADefine sym val)) = do
->     val' <- interpret val
->     liftIO . putStrLn $ "Defining <" ++ (show sym)
->                      ++ "> = " ++ (show val')
->     bind sym val' $ return $ VDefine sym
+> eval (Free (ADefine sym val)) = do
+>     val' <- eval val
+>     bind sym val' $ do
+>         MEnv env <- ask
+>         state <- get
+>         Just loc <- return $ Map.lookup sym env
+>         globalEnv <- return $ mGlobalEnv state
+>         globalEnv' <- return $ Map.insert sym loc globalEnv
+>         put $ state { mGlobalEnv = globalEnv' }
+>         return $ VDefine sym
 
 To construct an appropriate environment, we must find all the free variables in
 the body expression.
@@ -341,7 +335,7 @@ the body expression.
 > variables (Free (AApply op args)) = do
 >     varList <- variables args
 >     return varList
->
+
 > variables (Free (ALambda syms body)) = do
 >     bodyVars <- variables body
 >     return $ bodyVars
@@ -378,33 +372,33 @@ if this table could be extended by psilo code ...
 >     | sym == "or"  = boolBinOp (\(VBool x) (VBool y) -> or  [x,y]) xs
 >     | sym == "not" = boolOp (\(VBool x) -> not x) xs
 >     | sym == "print" = do
->           xs' <- mapM interpret xs
+>           xs' <- mapM eval xs
 >           liftIO $ forM_ xs' (putStrLn . show)
 >           return . Just $ VNil
 >     | otherwise   = return Nothing
 >    where
 >        numsOp op xs = do
->            xs' <- mapM interpret xs
+>            xs' <- mapM eval xs
 >            return . Just . VNum $ op (map unNum xs')
 >        numBinOp op (l:r:_) = do
->            VNum l' <- interpret l
->            VNum r' <- interpret r
+>            VNum l' <- eval l
+>            VNum r' <- eval r
 >            return . Just . VNum $ op l' r'
 >        boolEq (l:r:_) = do
->            l' <- interpret l
->            r' <- interpret r
+>            l' <- eval l
+>            r' <- eval r
 >            return . Just . VBool $ l' == r'
 >        boolIf (c:t:e:_) = do
->            VBool cond <- interpret c
+>            VBool cond <- eval c
 >            if cond
->                then interpret t >>= return . Just
->                else interpret e >>= return . Just
+>                then eval t >>= return . Just
+>                else eval e >>= return . Just
 >        boolOp op (x:_) = do
->            x' <- interpret x
+>            x' <- eval x
 >            return . Just . VBool $ op x'
 >        boolBinOp op (l:r:_) = do
->            l' <- interpret l
->            r' <- interpret r
+>            l' <- eval l
+>            r' <- eval r
 >            return . Just . VBool $ op l' r'
 > builtin (Free (AInteger n)) _ = return . Just . VNum $ n
 > builtin (Free (ABoolean b)) _ = return . Just . VBool $ b
