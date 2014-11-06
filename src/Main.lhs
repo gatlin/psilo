@@ -16,7 +16,7 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 > import Control.Monad.Free
 > import Data.Monoid
 > import Data.Maybe
-> import Control.Monad (forM)
+> import Control.Monad (forM, forM_)
 > import Data.List (partition)
 >
 > import System.Environment
@@ -33,7 +33,7 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 
 > cmdLnOpts :: Parser CmdLnOpts
 > cmdLnOpts = CmdLnOpts
->     <$> switch ( long "repl" <> help "Initiate a REPL (default=TRUE)" )
+>     <$> switch ( long "repl" <> short 'r' <> help "Initiate a REPL (default=TRUE)" )
 >     <*> strOption ( long "file" <> short 'f' <> help "Execute a file"
 >         <> value "" )
 >     <*> switch ( long "console-log" <> short 'l'
@@ -79,16 +79,15 @@ The repl is nothing more than calling `eval` in an endless loop.
 >         Left err -> print err >> return ()
 >         Right xs -> do
 >             (defns, exprs) <- return $ partition isDefn xs
->             initState <- loop defns initialStore
+>             initState <- initializeState defns initialStore
 >             final <- evaluate (Right exprs) initState
 >             return ()
 >     where isDefn (Free (ADefine _ _)) = True
 >           isDefn _                    = False
->           loop [] sto = return sto
->           loop (d:ds) sto = do
->               ((_, log), sto') <- runMachine (eval d) doLog
->               sto'' <- loop ds sto'
->               return $ sto' <> sto''
+>           initializeState [] sto = return sto
+>           initializeState ds sto = do
+>               (_,r) <- (flip runMachine) doLog $ forM_ ds eval
+>               return r
 
 > main :: IO ()
 > main = execParser opts >>= start

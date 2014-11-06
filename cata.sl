@@ -69,7 +69,7 @@
       1
       (* x (fact (- x 1)))))
 
-(let
-  ((lst1 (cons 3 (cons 2 (cons 1 (nil))))))
-  (print (+ (sum (map-list add1 (map-list square lst1)))
-            (fact (car (cdr lst1))))))
+(= lst1 (cons 3 (cons 2 (cons 1 (nil)))))
+
+(print (+ (sum (map-list add1 (map-list square lst1)))
+          (fact (car (cdr (lst1))))))
