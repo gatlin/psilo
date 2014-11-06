@@ -105,6 +105,7 @@ together in one data type.
 > data MStore = MStore { mStore :: Store
 >                      , mLoc   :: Int
 >                      , mGlobalEnv :: Environment
+>                      , mConsoleLog :: Bool
 >                      }
 >     deriving Show
 
@@ -112,6 +113,7 @@ together in one data type.
 > initialStore = MStore { mStore = emptyStore
 >                       , mLoc   = 1
 >                       , mGlobalEnv = (Map.fromList [])
+>                       , mConsoleLog = False
 >                       }
 
 
@@ -136,8 +138,12 @@ Behold: the `Machine` monad, a stack of monad transformers.
 
 > runMachineWithStore st k = runStateT (runReaderT (runWriterT (runM k)) initialEnv) st
 
-> runMachine :: Machine a -> IO ((a,[String]), MStore)
-> runMachine k = runMachineWithState initialStore initialEnv k
+> runMachine :: Machine a -> Bool -> IO ((a,[String]), MStore)
+> runMachine k conLog = runMachineWithState (initialStore {
+>     mConsoleLog = conLog }) initialEnv k
+
+Note that the state also contains a boolean value controlling whether or not
+output is logged to the console and `runMachine` lets you control it.
 
 With the above default initial states for the environment and the store, I'm
 ready to define the mapping from a `Machine` to `IO`, which is essentially just
@@ -165,7 +171,8 @@ completed I merge the machine states together using `mconcat` fromsecond
 >     a `mappend` b = MStore {
 >         mStore = (mStore a) `mappend` (mStore b),
 >         mLoc   = (mLoc a) + (mLoc b),
->         mGlobalEnv = (mGlobalEnv a) `mappend` (mGlobalEnv b)
+>         mGlobalEnv = (mGlobalEnv a) `mappend` (mGlobalEnv b),
+>         mConsoleLog = (mConsoleLog a)
 >     }
 
 Now all that is left is a means of building a `Machine` from psilo code.
@@ -222,7 +229,18 @@ Some common operations have been factored out into helper functions, viz:
 >     store loc val
 >     local (\(MEnv env) -> MEnv $ Map.insert sym loc env) next
 
-The function `interpret` handles the first part. You can even tell by its type:
+Additionally, for logging purposes I'll add a convenience function that makes
+use of the `WriterT` monad transformer:
+
+> log msg = do
+>     state <- get
+>     if (mConsoleLog state)
+>         then do
+>             liftIO . putStrLn $ msg
+>             tell [msg]
+>         else tell [msg]
+
+The function `eval` handles the first part. You can even tell by its type:
  `Expr a -> Machine Value`.
 
 > eval :: Show a => Expr a -> Machine Value
@@ -231,18 +249,24 @@ The function `interpret` handles the first part. You can even tell by its type:
 with `Op`, we handle the base case of being handed a `Pure` value. In this
 case, we return `NilV`.
 
-> eval (Pure _) = return VNil
+> eval (Pure _) = (log "End of computation") >> return VNil
 
 Numbers and Booleans are easy enough to deal with:
 
-> eval (Free (AInteger n)) = return $ VNum n
-> eval (Free (ABoolean b)) = return $ VBool b
+> eval (Free (AInteger n)) = do
+>     log $ "<num>  = " ++ (show n)
+>     return $ VNum n
+> eval (Free (ABoolean b)) = do
+>     log $ "<bool> = " ++ (show b)
+>     return $ VBool b
 
 Symbols are slightly more interesting. We must lookup the location of the
 symbol's value in the environment, and then its value using the location.
 
 > eval (Free (ASymbol s)) = do
+>     log $ "Looking up symbol: " ++ (show s)
 >     val <- lookup s
+>     log $ "<sym> " ++ (show s) ++ " = " ++ (show val)
 >     lookup s >>= return
 
 Lists are handled by iterating over the list of `Expr` values and constructing
@@ -250,6 +274,7 @@ a list of `Value`s, which we wrap in `VList`.
 
 > eval (Free (AList xs)) = do
 >     vals <- mapM eval xs
+>     log $ "<list> = " ++ (show vals)
 >     return $ VList vals
 
 Function abstraction amounts to creating a closure; that is to say, an
@@ -264,7 +289,9 @@ evaluated.
 >         val <- lookup var
 >         return (var, val)
 >     env' <- return $ filter notNil env
->     return $ VClos args body env
+>     lam <- return $ VClos args body env
+>     log $ "<lambda> = " ++ (show lam)
+>     return lam
 >     where
 >         notNil (var, (VNil)) = False
 >         notNil _             = True
@@ -318,6 +345,7 @@ simply a guarded mechanism for the programmer to modify the global environment.
 >         val <- lookup var
 >         return (var, val)
 >     val' <- futz val
+>     log $ "binding " ++ (show sym) ++ " => " ++ (show val')
 >     bind sym val' $ do
 >         MEnv env <- ask
 >         state <- get

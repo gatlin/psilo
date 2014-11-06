@@ -49,7 +49,7 @@ The repl is nothing more than calling `eval` in an endless loop.
 >                 case input of
 >                     ":state" -> liftIO (putStrLn . show $ store) >> loop store
 >                     _        -> do
->                         (val, store'):_ <- liftIO $ evaluate (parseTopLevel input) store
+>                         ((val,log), store'):_ <- liftIO $ evaluate (parseTopLevel input) store
 >                         liftIO $ putStrLn . show $ val
 >                         loop store'
 
@@ -67,7 +67,7 @@ The repl is nothing more than calling `eval` in an endless loop.
 >           isDefn _                    = False
 >           loop [] sto = return sto
 >           loop (d:ds) sto = do
->               (_, sto') <- runMachine . eval $ d
+>               ((_, log), sto') <- runMachine (eval d) True
 >               sto'' <- loop ds sto'
 >               return $ sto' <> sto''
 
