@@ -11,6 +11,11 @@
 (= snd (p)
   (unpair p (\ (a b) b)))
 
+(= map-pair (f p)
+  (pair (fst p) (f (snd p))))
+
+(= square (x) (* x x))
+
 (let
   ((p1 (pair 1 2)))
-  (print (fst p1)))
+  (print (snd (map-pair square p1))))

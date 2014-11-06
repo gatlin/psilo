@@ -26,10 +26,10 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 `eval` amounts to taking a list of parsed expressions and evaluating them in
 the context of a machine. The result is the state of the machine after it has been run.
 
-> evaluate :: Either ParseError [Expr ()] -> MStore -> IO [(Value, MStore)]
+> evaluate :: Either ParseError [Expr ()] -> MStore -> IO [((Value,[String]), MStore)]
 > evaluate res store = do
 >     case res of
->         Left err -> print err >> return [(VNil, store)]
+>         Left err -> print err >> return [((VNil,[]), store)]
 >         Right ex -> mapM execute (ex :: [Expr ()]) >>= return
 >
 >     where execute v = do

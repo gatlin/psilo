@@ -40,6 +40,7 @@ Imports and language extensions
 > import Control.Monad.Free
 > import Control.Monad.Trans
 > import Control.Monad.Reader
+> import Control.Monad.Writer
 > import qualified Data.Map.Strict as Map
 > import qualified Data.IntMap.Strict as IntMap
 > import Data.Foldable (Foldable, fold)
@@ -49,7 +50,6 @@ Imports and language extensions
 >
 > import Parser
 > import Syntax
-
 
 The Machine
 ---
@@ -126,15 +126,17 @@ data in the `ReaderT` in the future.
 
 Behold: the `Machine` monad, a stack of monad transformers.
 
-> newtype Machine a = M { runM :: ReaderT MEnv (StateT MStore IO) a }
->     deriving (Monad, MonadIO, MonadState MStore, MonadReader MEnv)
+> newtype Machine a = M {
+>     runM :: WriterT [String] (ReaderT MEnv (StateT MStore IO)) a }
+>     deriving (Monad, MonadIO, MonadState MStore, MonadReader MEnv,
+>         MonadWriter [String])
 
-> runMachineWithState :: MStore -> MEnv -> Machine a -> IO (a, MStore)
-> runMachineWithState st ev k = runStateT (runReaderT (runM k) ev) st where
+> runMachineWithState :: MStore -> MEnv -> Machine a -> IO ((a,[String]), MStore)
+> runMachineWithState st ev k = runStateT (runReaderT (runWriterT (runM k)) ev) st where
 
-> runMachineWithStore st k = runStateT (runReaderT (runM k) initialEnv) st
+> runMachineWithStore st k = runStateT (runReaderT (runWriterT (runM k)) initialEnv) st
 
-> runMachine :: Machine a -> IO (a, MStore)
+> runMachine :: Machine a -> IO ((a,[String]), MStore)
 > runMachine k = runMachineWithState initialStore initialEnv k
 
 With the above default initial states for the environment and the store, I'm
