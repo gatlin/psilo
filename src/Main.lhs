@@ -40,7 +40,7 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 >               <> help "Log debug output to the console (default=FALSE)"
 >     )
 
-`eval` amounts to taking a list of parsed expressions and evaluating them in
+`evaluate` amounts to taking a list of parsed expressions and evaluating them in
 the context of a machine. The result is the state of the machine after it has been run.
 
 > evaluate :: Either Text.Parsec.ParseError [Expr ()]
