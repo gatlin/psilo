@@ -1,7 +1,7 @@
 name:                psilo
 version:             0.1.0.0
 synopsis:            psilo language implementation
-description:         A JIT compiler for the psilo programming language
+description:         A compiler for the psilo programming language
 homepage:            https://github.com/gatlin/psilo
 license:             MIT
 license-file:        LICENSE-MIT
@@ -33,3 +33,4 @@ executable preprocess
     , mtl
     , transformers
     , free
+    , optparse-applicative

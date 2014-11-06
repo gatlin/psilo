@@ -7,7 +7,7 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 
 > module Main where
 >
-> import Parser
+> import Parser (parseFile, parseTopLevel)
 > import Syntax
 > import Evaluator
 >
@@ -22,11 +22,30 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 > import System.Environment
 > import System.IO
 > import Text.Parsec
+>
+> import Options.Applicative
+
+> data CmdLnOpts = CmdLnOpts {
+>       optRepl   :: Bool
+>     , optFile   :: String
+>     , optConLog :: Bool
+> } deriving Show
+
+> cmdLnOpts :: Parser CmdLnOpts
+> cmdLnOpts = CmdLnOpts
+>     <$> switch ( long "repl" <> help "Initiate a REPL (default=TRUE)" )
+>     <*> strOption ( long "file" <> short 'f' <> help "Execute a file"
+>         <> value "" )
+>     <*> switch ( long "console-log" <> short 'l'
+>               <> help "Log debug output to the console (default=FALSE)"
+>     )
 
 `eval` amounts to taking a list of parsed expressions and evaluating them in
 the context of a machine. The result is the state of the machine after it has been run.
 
-> evaluate :: Either ParseError [Expr ()] -> MStore -> IO [((Value,[String]), MStore)]
+> evaluate :: Either Text.Parsec.ParseError [Expr ()]
+>          -> MStore
+>          -> IO [((Value,[String]), MStore)]
 > evaluate res store = do
 >     case res of
 >         Left err -> print err >> return [((VNil,[]), store)]
@@ -53,8 +72,8 @@ The repl is nothing more than calling `eval` in an endless loop.
 >                         liftIO $ putStrLn . show $ val
 >                         loop store'
 
-> execFile :: String -> IO ()
-> execFile fname = do
+> execFile :: String -> Bool -> IO ()
+> execFile fname doLog = do
 >     parsed <- parseFile fname
 >     case parsed of
 >         Left err -> print err >> return ()
@@ -67,13 +86,22 @@ The repl is nothing more than calling `eval` in an endless loop.
 >           isDefn _                    = False
 >           loop [] sto = return sto
 >           loop (d:ds) sto = do
->               ((_, log), sto') <- runMachine (eval d) True
+>               ((_, log), sto') <- runMachine (eval d) doLog
 >               sto'' <- loop ds sto'
 >               return $ sto' <> sto''
 
 > main :: IO ()
-> main = do
->     args <- getArgs
->     case args of
->         []      -> repl >> return ()
->         (fname:_) -> execFile fname >> return ()
+> main = execParser opts >>= start
+
+> start :: CmdLnOpts -> IO ()
+> start os = if doRepl then repl else case doFile of
+>     "" -> return ()
+>     fname -> execFile fname conLog
+>     where
+>         doRepl = optRepl os
+>         doFile = optFile os
+>         conLog = optConLog os
+
+> opts :: ParserInfo CmdLnOpts
+> opts = info (cmdLnOpts <**> helper)
+>     ( fullDesc <> progDesc "Run psilo programs" <> header "psilo" )
