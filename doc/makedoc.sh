@@ -15,8 +15,8 @@ if hash pandoc 2>/dev/null; then
     ###
     # readme
     pandoc -s -t latex -f markdown -o ./tex/readme.tex ../README.md
-    pandoc -t
-    html5+implicit_header_references+fenced_code_blocks+fenced_code_attributes \
+    pandoc \
+    -t html5+implicit_header_references+fenced_code_blocks+fenced_code_attributes \
     -f markdown \
     --template=templates/main.tmpl.html \
     --toc --toc-depth=4 \
