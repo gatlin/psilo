@@ -1,35 +1,17 @@
-; Utility - pairs
-(= unpair (p f)
-  (p f))
+;;;
+; This test file highlights a really subtle and really annoying problem
+; Environments are screwed up depending on whether a value is defined locally
+; or globally.
 
-(= Pair (f) f)
+; A simple wrapper around values
+(= Box (b) b)
+(= box (x) (Box (\ (f) (f x))))
+(= unbox (bx)
+  (bx (\ (x) x)))
 
-(= pair (x y)
-  (Pair (\ (f) (f x y))))
+(= b1 (Box 1))           ; Note which function is used here ...
 
-(= fst (p)
-  (unpair p (\ (a b) a)))
-
-(= snd (p)
-  (unpair p (\ (a b) b)))
-
-; Example data type: a Person
-(= Person (name age)
-  (\ (f) (f name age)))
-
-(= age (p)
-  (p (\ (p-name p-age) (pair p-age (\ (n-age) (Person p-name n-age))))))
-
-(= name (p)
-  (p (\ (p-name p-age) (pair p-name (\ (n-name) (Person n-name p-age))))))
-
-(= birthday (p)
-  (let ((age-lens (age p)))
-    (unpair age-lens (\ (a new-p)
-      (new-p (+ 1 a))))))
-
-(= g (Person 'gatlin 26))
-
-(let
-  ((g-older (birthday (g))))
-  (print (fst (age g-older))))
+(let ((b2 (box 2)))      ; ... versus here
+  (let ((x (unbox b1))   ; the values are unboxed the same way
+        (y (unbox b2)))
+    (print (+ x y))))
