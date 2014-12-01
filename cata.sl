@@ -1,6 +1,11 @@
 ; Utilities
 (= promise (x) (\ () x))
 
+; Boxes
+(= Box (b) b)
+(= unbox (bx)
+  (bx (\ (x) x)))
+
 ; Pairs
 (= unpair (p f)
   (p f))
@@ -73,3 +78,4 @@
 
 (print (+ (sum (map-list add1 (map-list square lst1)))
           (fact (car (cdr (lst1))))))
+

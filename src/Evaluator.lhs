@@ -283,6 +283,8 @@ that will be temporarily prepended to the main environment when the body is
 evaluated.
 
 > eval (Free (ALambda args body)) = do
+>     log $ "Received function (\\ (" ++ (show args) ++ ") ( "
+>         ++ (show body)
 >     vars <- variables body
 >     vars' <- return $ vars \\ args
 >     env <- forM vars $ \var -> do
@@ -306,6 +308,7 @@ built-in. If not, we must do the following:
 5. Return the value.
 
 > eval (Free (AApply op args)) = do
+>     log $ "Applying " ++ (show op) ++ " to args: " ++ (show args)
 >     Free (AList args') <- return args
 >     Free op' <- return op
 >     isBuiltin <- builtin op args'
@@ -344,7 +347,7 @@ simply a guarded mechanism for the programmer to modify the global environment.
 >     bindings <- forM vars $ \var -> do
 >         val <- lookup var
 >         return (var, val)
->     val' <- futz val
+>     val' <- eval' val
 >     log $ "binding " ++ (show sym) ++ " => " ++ (show val')
 >     bind sym val' $ do
 >         MEnv env <- ask
@@ -354,11 +357,10 @@ simply a guarded mechanism for the programmer to modify the global environment.
 >         globalEnv' <- return $ Map.insert sym loc globalEnv
 >         put $ state { mGlobalEnv = globalEnv' }
 >         return $ VDefine sym
->     where
->         futz expr@(Free (AApply op operands)) = do
->             return $ VClos [] expr []
->         futz nonLambda                  = do
->             eval nonLambda
+>    where
+>      eval' expr@(Free (AApply _ body)) = do
+>          return $ VClos [] expr []
+>      eval' other = eval other
 
 To construct an appropriate environment, we must find all the free variables in
 the body expression.

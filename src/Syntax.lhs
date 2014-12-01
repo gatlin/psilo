@@ -51,7 +51,7 @@ Not bad, huh?
 > data AST a
 >     = AInteger Integer
 >     | ABoolean Bool
->     | ASymbol { toSym :: Symbol }
+>     | ASymbol Symbol
 >     | ALambda [Symbol] a
 >     | AApply a a
 >     | AList [a]
