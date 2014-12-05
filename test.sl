@@ -9,9 +9,10 @@
 (= unbox (bx)
   (bx (\ (x) x)))
 
-(= b1 (Box 1))           ; Note which function is used here ...
+(= map-box (f bx)
+  (unbox bx (\ (x) (box (f x)))))
 
-(let ((b2 (box 2)))      ; ... versus here
-  (let ((x (unbox b1))   ; the values are unboxed the same way
-        (y (unbox b2)))
-    (print (+ x y))))
+(= square (x) (* x x))
+
+(let ((b1 (box 1)))
+  (print (unbox b1)))

@@ -21,6 +21,10 @@
 (= snd (p)
   (unpair p (\ (a b) b)))
 
+(= map-pair (f pr)
+  (unpair pr (\ (a b)
+    (pair a (f b)))))
+
 ; Options
 (= maybe (o yes no)
    (o yes no))
