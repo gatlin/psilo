@@ -49,8 +49,11 @@ The repl is nothing more than calling `eval` in an endless loop.
 >             Just input -> do
 >                 let Right ast = parseTopLevel input
 >                 let typed = typeTree $ cofreeMu (ast !! 0)
->                 liftIO $ putStrLn $ "Value: " ++ (show . fromJust $ typed)
->                 loop
+>                 case typed of
+>                     Nothing -> (liftIO $ putStrLn "Type error") >> loop
+>                     Just ty -> do
+>                       liftIO $ putStrLn $ "Value: " ++ (show ty)
+>                       loop
 
 > main :: IO ()
 > main = execParser opts >>= start
