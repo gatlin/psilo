@@ -8,6 +8,9 @@ preprocessor:
 psilo:
 	ghc $(OPTS) --make src/{Syntax,Lexer,Parser,Main}.lhs -o psilo
 
+typed:
+	ghc $(OPTS) --make src/*.lhs -o psilo
+
 clean: doc
 	rm psilo
 	rm src/*.{hi,o}

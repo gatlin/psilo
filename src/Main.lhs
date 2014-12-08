@@ -9,6 +9,7 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 >
 > import Parser (parseFile, parseTopLevel)
 > import Syntax
+> import Typechecker
 >
 > import Control.Monad.Trans
 > import System.Console.Haskeline
@@ -55,8 +56,8 @@ The repl is nothing more than calling `eval` in an endless loop.
 
 > start :: CmdLnOpts -> IO ()
 > start os = if doRepl then repl else return () where
->         doRepl = optRepl os
->         conLog = optConLog os
+>     doRepl = optRepl os
+>     conLog = optConLog os
 
 > opts :: ParserInfo CmdLnOpts
 > opts = info (cmdLnOpts <**> helper)
