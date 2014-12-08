@@ -53,10 +53,8 @@ Not bad, huh?
 >     | ABoolean Bool
 >     | ASymbol Symbol
 >     | ALambda [Symbol] a
->     | AApply a a
->     | AList [a]
+>     | AApply a [a]
 >     | ADefine Symbol a
->     | AHylo Symbol [Symbol] a
 >
 > deriving instance Show a => Show (AST a)
 > deriving instance Functor AST
