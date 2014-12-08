@@ -48,7 +48,8 @@ The repl is nothing more than calling `eval` in an endless loop.
 >             Nothing -> outputStrLn "Goodbye."
 >             Just input -> do
 >                 let Right ast = parseTopLevel input
->                 liftIO $ putStrLn . show $ (ast :: [Expr ()])
+>                 let typed = typeTree $ cofreeMu (ast !! 0)
+>                 liftIO $ putStrLn $ "Value: " ++ (show . fromJust $ typed)
 >                 loop
 
 > main :: IO ()

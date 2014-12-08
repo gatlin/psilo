@@ -6,7 +6,7 @@ preprocessor:
 	ghc $(OPTS) --make preprocessor.hs -o preprocessor
 
 psilo:
-	ghc $(OPTS) --make src/{Syntax,Lexer,Parser,Main}.lhs -o psilo
+	ghc $(OPTS) --make src/{Typechecker,Syntax,Lexer,Parser,Main}.lhs -o psilo
 
 typed:
 	ghc $(OPTS) --make src/*.lhs -o psilo
