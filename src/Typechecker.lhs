@@ -50,7 +50,6 @@ Our type language
 >     | TVar Int
 >     | TNumber
 >     | TBoolean
->     | TList [Type]
 >     | TVoid
 >
 > deriving instance Show Type
