@@ -92,6 +92,23 @@ in future deductions.
 >         , assumptions = assumptions a `mappend` assumptions b
 >         }
 
+State
+---
+
+During the execution of the algorithm, we want to keep track of two things:
+
+1. Type inferences we have already figured out;
+2. Fresh variable IDs.
+
+We don't want to repeat ourselves, especially in a large program. Values which
+are re-used a lot should only have their types inferred once. Hence, we
+*memoize* results and keep track of these memos.
+
+Similarly, the types of function arguments are not initially known and hence
+are variable. Each time we encounter a new symbol we want to create a new type
+variable; later on we will try to substitute a concrete type. To this end we
+will also keep track of *type variable IDs*.
+
 Stateful data to manage during algorithm execution
 
 > data TypeState t m = TypeState
@@ -99,11 +116,8 @@ Stateful data to manage during algorithm execution
 >     , memo  :: M.Map t m
 >     }
 
-Each node of our AST will return a type and a type result
-
-> type TypeCheck t = State (TypeState t (Type, TypeResult)) (Type, TypeResult)
-
-Retrieve the next fresh variable id
+This function will generate a new ID (a monotonically increasing integer) and
+store it.
 
 > freshVarId :: State (TypeState t m) Type
 > freshVarId = do
@@ -111,7 +125,14 @@ Retrieve the next fresh variable id
 >     modify $ \s -> s { varId = succ v }
 >     return $ TVar v
 
-We want to memoize the result of each step to avoid repeat inference
+The type of our `State`-based monad is getting a bit unwieldly so we'll use the
+following alias.
+
+> type TypeCheck t = State (TypeState t (Type, TypeResult)) (Type, TypeResult)
+
+We want to memoize the result of each step to avoid repeat inference. If we
+have not seen the value before, we will check it and store it. Other wise we
+will return what is already known.
 
 > memoizedTC :: Ord c
 >            => (c -> TypeCheck c)
@@ -123,12 +144,27 @@ We want to memoize the result of each step to avoid repeat inference
 >         modify $ \s -> s { memo = M.insert c r $ memo s }
 >         return r
 
-Convert the AST from its free monad rep to a cofree comonad
+Representing the AST
+---
 
-> --cofreeMu :: Functor f => Free f -> Cofree f ()
+An `Expr` value - dealt with in the Parser and Evaluator - is a free monad
+based on an `AST` value. The free monad representation allows for case-wise
+translation of a functor into some other value. In essence, it lets you break
+down a tree.
+
+The cofree comonad, however, allows you to annotate a tree recursively. It is a
+product type: the first element is a value of the stream in focus, and the
+second element is a functor which can be used to focus other values.
+
+The way we use the cofree comonad is to store our annotation of each node as
+the first value and its parents in the second value. Initially the untyped tree
+will simply use `()` as its annotation.
+
+> cofreeMu :: Functor f => Free f t -> Cofree f ()
 > cofreeMu (Free f) = () :< fmap cofreeMu f
 
-Run our typechecking algorithm down the tree, generating type attrs.
+Following from this, we can write a function to perform the traversal starting
+with an empty memoization map and an initial type variable ID of `0`.
 
 > attribute :: Cofree AST () -> Cofree AST (Type, TypeResult)
 > attribute c =
@@ -136,12 +172,27 @@ Run our typechecking algorithm down the tree, generating type attrs.
 >     in  evalState (sequence $ extend (memoizedTC generateConstraints) c)
 >                   initial
 
-The core of the algorithm. Generates type constraints.
+Constraint generation
+---
+
+We can now represent, traverse, and annotate a tree recursively, fluidly
+converting it from its free monad representation.
+
+Our algorithm is a bottom-up constraint satisfaction algorithm. Starting with
+the leaves, each value might constrain the types of functions in which they are
+bound or yield assumptions about the mappings from symbols to types. When the
+algorithm is complete either each symbol will map to a concrete type and it
+will all match, or there will be a type error.
 
 > generateConstraints :: Cofree AST () -> TypeCheck (Cofree AST ())
 
+Primitive literals are the easiest.
+
 > generateConstraints (() :< AInteger _) = return (TNumber, mempty)
 > generateConstraints (() :< ABoolean _) = return (TBoolean, mempty)
+
+Symbols on their own are each the single value of their own distinct types,
+until they are bound by constraints to a concrete type.
 
 > generateConstraints (() :< ASymbol s) = do
 >     var <- freshVarId
@@ -149,6 +200,9 @@ The core of the algorithm. Generates type constraints.
 >         { constraints = []
 >         , assumptions = M.singleton s [var]
 >         })
+
+Function abstraction takes each of its bound variables out of its body's
+assumption map and turns them into input constraints.
 
 > generateConstraints (() :< ALambda args b) = do
 >     argIds <- forM args $ \arg -> do
@@ -165,6 +219,10 @@ The core of the algorithm. Generates type constraints.
 >         , assumptions = mconcat $ mconcat as
 >         })
 
+Function application generates constraints and fresh type variables for each
+argument and the return value, along with a constraint that the function takes
+a number of arguments of certain types and returns the return type.
+
 > generateConstraints (() :< AApply a b) = do
 >     var <- freshVarId
 >     ar  <- memoizedTC generateConstraints a
@@ -174,6 +232,10 @@ The core of the algorithm. Generates type constraints.
 >         , assumptions = mempty
 >         })
 
+Definitions are a bit obtuse: they are declarative mutations to the static
+environment and thus do not compose or return anything useful. As a result,
+they are simply the type of whatever value stored in them.
+
 > generateConstraints (() :< ADefine sym val) = do
 >     valType <- memoizedTC generateConstraints val
 >     return (fst valType, TypeResult
@@ -181,7 +243,14 @@ The core of the algorithm. Generates type constraints.
 >         , assumptions = assumptions (snd valType)
 >         })
 
-Generate a type for the AST by solving all the generated constraints
+Constraint solving
+---
+
+We now have our tree, a means of traversing it, and a set of constraints and
+type assumptions. We now need to solve the generated constraints and type the
+whole program.
+
+Generate a type for the AST by solving all the generated constraints:
 
 > solveConstraints :: [Constraint] -> Maybe (M.Map Int Type)
 > solveConstraints =
@@ -190,7 +259,7 @@ Generate a type for the AST by solving all the generated constraints
 >             subs <- maybeSubs
 >             mostGeneralUnifier (substitute subs a) (substitute subs b)
 
-Given two types, get a map of substitutions if the types unify
+Given two types, get a map of substitutions if the types unify:
 
 > mostGeneralUnifier :: Type -> Type -> Maybe (M.Map Int Type)
 > mostGeneralUnifier (TVar i) b = Just $ M.singleton i b
@@ -206,11 +275,19 @@ Given two types, get a map of substitutions if the types unify
 >
 > mostGeneralUnifier _ _ = Nothing
 
+Actually substitute the mappings in the type, yielding a more specific type.
+
 > substitute :: M.Map Int Type -> Type -> Type
 > substitute subs v@(TVar i) = maybe v (substitute subs) $ M.lookup i subs
 > substitute subs (TLambda as b) = TLambda (map (substitute subs) as)
 >                                          (substitute subs b)
 > substitute _ t = t
+
+Putting it all together
+---
+
+Given a cofree comonad representation of an AST where each node is annotated
+with `()`, yield a new tree where each node is annotate with its type.
 
 > typeTree :: Cofree AST () -> Maybe (Cofree AST Type)
 > typeTree c =
