@@ -34,8 +34,7 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 > cmdLnOpts = CmdLnOpts
 >     <$> flag True True ( long "repl" <> short 'r' <> help "Initiate a REPL (default=TRUE)" )
 >     <*> switch ( long "console-log" <> short 'l'
->               <> help "Log debug output to the console (default=FALSE)"
->     )
+>               <> help "Log debug output to the console (default=FALSE)" )
 
 The repl is nothing more than calling `eval` in an endless loop.
 
