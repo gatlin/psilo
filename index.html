@@ -84,13 +84,14 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+e+'<\
 </script><noscript>&#x67;&#x61;&#116;&#108;&#x69;&#110;&#32;&#x61;&#116;&#32;&#110;&#x69;&#108;&#116;&#x61;&#x67;&#32;&#100;&#x6f;&#116;&#32;&#110;&#x65;&#116;</noscript></p>
 <h1 id="what-is-psilo"><span class="header-section-number">2</span> What is psilo?</h1>
 <p>psilo, like any lisp, will be a <strong>lis</strong>t <strong>p</strong>rocessor. However psilo will take advantage of a strong type system, linear types, and aggressive optimization techniques such as shortcut fusion. The goal is to make writing fast, resource-aware, parallelized stream processing programs as simple as possible.</p>
+<p>Its goals are not to make programming easier, but to widen what is safely expressible.</p>
 <p>It is also nowhere close to being finished; at the moment this is purely exploratory.</p>
 <p>Technical Features (planned):</p>
 <ul>
 <li>No run-time garbage collection necessary owing to uniqueness types</li>
 <li>Static typing for compile-time verification and optimization</li>
 <li>Malleable syntax with macros</li>
-<li>Dead-simple parallelism via pipelines and special list types</li>
+<li>Dead-simple parallelism, featuring special list types (<a href="http://en.wikipedia.org/wiki/SequenceL">à la sequenceL</a>).</li>
 <li>Monadic continuations and iteratee composition made dead simple</li>
 <li>Orthogonal core syntax and semantics for your performance and my sanity</li>
 </ul>
@@ -103,7 +104,8 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+e+'<\
 </ul>
 <h1 id="status"><span class="header-section-number">3</span> Status</h1>
 <p>Psilo is still being designed. I have written a really simple evaluator for prototyping and experimenting with the language which is actively being developed.</p>
-<p>While not production quality, the simple interpreter might be of educational value.</p>
+<p>It is not a psilo implementation - just a simple lisp to explore writing interpreters. While not production quality, it might be of some educational value right now.</p>
+<p>A type inference system is in the works, which is motivating an evaluator rewrite. When it works I can begin experimenting with psilo’s type system and the language proper.</p>
 <p>Here is some code the interpreter runs right now:</p>
 <pre class="sourceCode scheme"><code class="sourceCode scheme"><span class="co">; Utilities</span>
 (<span class="kw">=</span> promise (x) (\ () x))

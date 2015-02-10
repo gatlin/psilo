@@ -252,6 +252,8 @@ eval (<span class="dt">Free</span> (<span class="dt">ABoolean</span> b)) <span c
     return <span class="fu">$</span> <span class="dt">VList</span> vals</code></pre>
 <p>Function abstraction amounts to creating a closure; that is to say, an environment and a body expression. The environment is essentially a new frame that will be temporarily prepended to the main environment when the body is evaluated.</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell">eval (<span class="dt">Free</span> (<span class="dt">ALambda</span> args body)) <span class="fu">=</span> <span class="kw">do</span>
+    log <span class="fu">$</span> <span class="st">&quot;Received function (\\ (&quot;</span> <span class="fu">++</span> (show args) <span class="fu">++</span> <span class="st">&quot;) ( &quot;</span>
+        <span class="fu">++</span> (show body)
     vars <span class="ot">&lt;-</span> variables body
     vars&#39; <span class="ot">&lt;-</span> return <span class="fu">$</span> vars \\ args
     env <span class="ot">&lt;-</span> forM vars <span class="fu">$</span> \var <span class="ot">-&gt;</span> <span class="kw">do</span>
@@ -273,6 +275,7 @@ eval (<span class="dt">Free</span> (<span class="dt">ABoolean</span> b)) <span c
 <li>Return the value.</li>
 </ol>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell">eval (<span class="dt">Free</span> (<span class="dt">AApply</span> op args)) <span class="fu">=</span> <span class="kw">do</span>
+    log <span class="fu">$</span> <span class="st">&quot;Applying &quot;</span> <span class="fu">++</span> (show op) <span class="fu">++</span> <span class="st">&quot; to args: &quot;</span> <span class="fu">++</span> (show args)
     <span class="dt">Free</span> (<span class="dt">AList</span> args&#39;) <span class="ot">&lt;-</span> return args
     <span class="dt">Free</span> op&#39; <span class="ot">&lt;-</span> return op
     isBuiltin <span class="ot">&lt;-</span> builtin op args&#39;
@@ -307,7 +310,7 @@ eval (<span class="dt">Free</span> (<span class="dt">ABoolean</span> b)) <span c
     bindings <span class="ot">&lt;-</span> forM vars <span class="fu">$</span> \var <span class="ot">-&gt;</span> <span class="kw">do</span>
         val <span class="ot">&lt;-</span> lookup var
         return (var, val)
-    val&#39; <span class="ot">&lt;-</span> futz val
+    val&#39; <span class="ot">&lt;-</span> eval&#39; val
     log <span class="fu">$</span> <span class="st">&quot;binding &quot;</span> <span class="fu">++</span> (show sym) <span class="fu">++</span> <span class="st">&quot; =&gt; &quot;</span> <span class="fu">++</span> (show val&#39;)
     bind sym val&#39; <span class="fu">$</span> <span class="kw">do</span>
         <span class="dt">MEnv</span> env <span class="ot">&lt;-</span> ask
@@ -317,11 +320,10 @@ eval (<span class="dt">Free</span> (<span class="dt">ABoolean</span> b)) <span c
         globalEnv&#39; <span class="ot">&lt;-</span> return <span class="fu">$</span> Map.insert sym loc globalEnv
         put <span class="fu">$</span> state { mGlobalEnv <span class="fu">=</span> globalEnv&#39; }
         return <span class="fu">$</span> <span class="dt">VDefine</span> sym
-    <span class="kw">where</span>
-        futz expr<span class="fu">@</span>(<span class="dt">Free</span> (<span class="dt">AApply</span> op operands)) <span class="fu">=</span> <span class="kw">do</span>
-            return <span class="fu">$</span> <span class="dt">VClos</span> [] expr []
-        futz nonLambda                  <span class="fu">=</span> <span class="kw">do</span>
-            eval nonLambda</code></pre>
+   <span class="kw">where</span>
+     eval&#39; expr<span class="fu">@</span>(<span class="dt">Free</span> (<span class="dt">AApply</span> _ body)) <span class="fu">=</span> <span class="kw">do</span>
+         return <span class="fu">$</span> <span class="dt">VClos</span> [] expr []
+     eval&#39; other <span class="fu">=</span> eval other</code></pre>
 <p>To construct an appropriate environment, we must find all the free variables in the body expression.</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">variables ::</span> <span class="dt">Expr</span> a <span class="ot">-&gt;</span> <span class="dt">Machine</span> [<span class="dt">Symbol</span>]
 variables (<span class="dt">Free</span> (<span class="dt">ASymbol</span> s)) <span class="fu">=</span> return [s]

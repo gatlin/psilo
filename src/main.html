@@ -86,7 +86,7 @@ cmdLnOpts <span class="fu">=</span> <span class="dt">CmdLnOpts</span>
     <span class="fu">&lt;*&gt;</span> switch ( long <span class="st">&quot;console-log&quot;</span> <span class="fu">&lt;&gt;</span> short <span class="ch">&#39;l&#39;</span>
               <span class="fu">&lt;&gt;</span> help <span class="st">&quot;Log debug output to the console (default=FALSE)&quot;</span>
     )</code></pre>
-<p><code>eval</code> amounts to taking a list of parsed expressions and evaluating them in the context of a machine. The result is the state of the machine after it has been run.</p>
+<p><code>evaluate</code> amounts to taking a list of parsed expressions and evaluating them in the context of a machine. The result is the state of the machine after it has been run.</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">evaluate ::</span> <span class="dt">Either</span> <span class="dt">Text.Parsec.ParseError</span> [<span class="dt">Expr</span> ()]
          <span class="ot">-&gt;</span> <span class="dt">MStore</span>
          <span class="ot">-&gt;</span> <span class="dt">IO</span> [((<span class="dt">Value</span>,[<span class="dt">String</span>]), <span class="dt">MStore</span>)]
