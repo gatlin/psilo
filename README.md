@@ -15,6 +15,9 @@ optimization techniques such as shortcut fusion. The goal is to make writing
 fast, resource-aware, parallelized stream processing programs as simple as
 possible.
 
+Its goals are not to make programming easier, but to widen what is safely
+expressible.
+
 It is also nowhere close to being finished; at the moment this is purely
 exploratory.
 
@@ -23,7 +26,8 @@ Technical Features (planned):
 - No run-time garbage collection necessary owing to uniqueness types
 - Static typing for compile-time verification and optimization
 - Malleable syntax with macros
-- Dead-simple parallelism via pipelines and special list types
+- Dead-simple parallelism, featuring special list types ([à la
+  sequenceL][sequencel]).
 - Monadic continuations and iteratee composition made dead simple
 - Orthogonal core syntax and semantics for your performance and my sanity
 
@@ -41,8 +45,13 @@ Psilo is still being designed. I have written a really simple evaluator for
 prototyping and experimenting with the language which is actively being
 developed.
 
-While not production quality, the simple interpreter might be of educational
-value.
+It is not a psilo implementation - just a simple lisp to explore writing
+interpreters. While not production quality, it might be of some educational
+value right now.
+
+A type inference system is in the works, which is motivating an evaluator
+rewrite. When it works I can begin experimenting with psilo's type system and
+the language proper.
 
 Here is some code the interpreter runs right now:
 
@@ -161,3 +170,5 @@ http://debasishg.blogspot.com/2012/01/learning-type-level-fixpoint-combinator.ht
 [comonads]: http://brianmckenna.org/blog/type_annotation_cofree
 
 [haskellplatform]: http://haskell.org/platform
+
+[sequencel]: http://en.wikipedia.org/wiki/SequenceL
