@@ -40,7 +40,6 @@ The repl is nothing more than calling `eval` in an endless loop.
 
 > repl :: IO ()
 > repl = runInputT defaultSettings loop where
-> --    loop store = do
 >     loop = do
 >         minput <- getInputLine "psilo> "
 >         case minput of
