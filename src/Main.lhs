@@ -10,6 +10,7 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 > import Parser (parseFile, parseTopLevel)
 > import Syntax
 > import Typechecker
+> import Evaluator
 >
 > import Control.Monad.Trans
 > import System.Console.Haskeline
@@ -39,19 +40,23 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 The repl is nothing more than calling `eval` in an endless loop.
 
 > repl :: IO ()
-> repl = runInputT defaultSettings loop where
->     loop = do
+> repl = runInputT defaultSettings (loop newMachineState) where
+>     loop st = do
 >         minput <- getInputLine "psilo> "
 >         case minput of
 >             Nothing -> outputStrLn "Goodbye."
 >             Just input -> do
 >                 let Right ast = parseTopLevel input
->                 let typed = typeTree $ cofreeMu (ast !! 0)
+>                 let ast'      = (ast !! 0) :: Expr ()
+>                 let typed = typeTree $ cofreeMu ast'
 >                 case typed of
->                     Nothing -> (liftIO $ putStrLn "Type error") >> loop
+>                     Nothing -> (liftIO $ putStrLn "Type error") >> loop st
 >                     Just ty -> do
->                       liftIO $ putStrLn $ "Value: " ++ (show ty)
->                       loop
+>                       liftIO $ putStrLn $ "Type: " ++ (show ty)
+>                       (ret, st') <- liftIO $ runMachine st $ (eval ast')
+>                       liftIO . putStrLn $ "Result: " ++ (show ret)
+>                       liftIO . putStrLn $ "Machine: " ++ (show st')
+>                       loop st'
 
 > main :: IO ()
 > main = execParser opts >>= start

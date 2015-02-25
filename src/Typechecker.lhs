@@ -46,7 +46,7 @@ Our type language
 ---
 
 > data Type
->     = TLambda [Type] Type
+>     = [Type] :-> Type
 >     | TVar Int
 >     | TNumber
 >     | TBoolean
@@ -214,7 +214,7 @@ assumption map and turns them into input constraints.
 >                      (M.lookup arg . assumptions $ snd br)
 >         as = forM argIds $ \(arg,_) -> do
 >             return $ M.delete arg . assumptions $ snd br
->     return (TLambda (map snd argIds) (fst br), TypeResult
+>     return ((map snd argIds) :-> (fst br), TypeResult
 >         { constraints = constraints (snd br) `mappend` (mconcat (mconcat cs))
 >         , assumptions = mconcat $ mconcat as
 >         })
@@ -228,7 +228,7 @@ a number of arguments of certain types and returns the return type.
 >     ar  <- memoizedTC generateConstraints a
 >     br  <- mapM (memoizedTC generateConstraints) b
 >     return (var, snd ar `mappend` (mconcat (map snd br)) `mappend` TypeResult
->         { constraints = [EqualityConstraint (fst ar) $ TLambda (map fst br) var]
+>         { constraints = [EqualityConstraint (fst ar) $ (map fst br) :-> var]
 >         , assumptions = mempty
 >         })
 
@@ -268,7 +268,7 @@ Given two types, get a map of substitutions if the types unify:
 > mostGeneralUnifier TNumber TNumber = Just M.empty
 > mostGeneralUnifier TBoolean TBoolean = Just M.empty
 >
-> mostGeneralUnifier (TLambda as b) (TLambda cs d) = do
+> mostGeneralUnifier (as :-> b) (cs :-> d) = do
 >     s1s <- forM (zip as cs) $ \(a, c) -> mostGeneralUnifier a c
 >     mconcat $ map (\s1 -> liftM2 mappend (mostGeneralUnifier (substitute s1 b)
 >                                        (substitute s1 d)) $ Just s1) s1s
@@ -279,8 +279,8 @@ Actually substitute the mappings in the type, yielding a more specific type.
 
 > substitute :: M.Map Int Type -> Type -> Type
 > substitute subs v@(TVar i) = maybe v (substitute subs) $ M.lookup i subs
-> substitute subs (TLambda as b) = TLambda (map (substitute subs) as)
->                                          (substitute subs b)
+> substitute subs (as :-> b) = (map (substitute subs) as) :->
+>     (substitute subs b)
 > substitute _ t = t
 
 Putting it all together
