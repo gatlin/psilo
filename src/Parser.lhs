@@ -53,7 +53,6 @@ bind values in lambda abstractions.
 >     where chomped s = let s' = splitOn ":" s
 >                       in  return $ s' !! 0
 
-
 Lamba abstractions, or *functions*. A function definition is a list of symbols
 to bind to the elements of the argument list, and a psilo expression to
 evaluate in the context of the arguments.

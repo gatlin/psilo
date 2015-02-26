@@ -51,6 +51,7 @@ Imports and language extensions
 > import Prelude hiding (log)
 > import Control.Monad
 > import Control.Monad.State
+> import Control.Monad.Writer
 > import Control.Monad.Free
 > import Control.Monad.Trans
 > import qualified Data.IntMap.Strict as IntMap
@@ -105,8 +106,9 @@ strategy will be call-by-need.
 > newMachineState = MachineState (IntMap.empty) [] 0
 
 > newtype Machine a = M {
->     runM :: StateT MachineState IO a
-> } deriving (Monad, MonadIO, MonadState MachineState, Functor)
+>     runM :: WriterT [String] (StateT MachineState IO) a
+> } deriving (Monad, MonadIO, MonadState MachineState
+>            , MonadWriter [String], Functor)
 
 Haskell will soon consider `Monad`s which are not also `Applicative`s as
 errors, but fortunately we can handle this trivially:
@@ -115,8 +117,13 @@ errors, but fortunately we can handle this trivially:
 >     pure = return
 >     (<*>) = ap
 
-> runMachine :: MachineState -> Machine a -> IO (a, MachineState)
-> runMachine st k = runStateT (runM k) st
+> runMachine :: MachineState -> Machine a -> IO ((a, [String]), MachineState)
+> runMachine st k = runStateT (runWriterT (runM k)) st
+
+During the course of operation we will keep a log of various state values and
+internal events for debugging purposes.
+
+> log msg = tell [msg]
 
 Operating the `Machine`
 ---
@@ -181,6 +188,7 @@ state can then be reused in subsequent iterations.
 >     loc <- fresh
 >     store loc (VThunk defn [])
 >     bind sym loc
+>     log $ "defined " ++ sym
 >     return VNil
 
 Basic primitive values are handled with similar easePure:
@@ -194,11 +202,11 @@ corresponding location and evaluating it:
 > eval (Free (ASymbol s)) = do
 >     loc <- query s
 >     case loc of
->         Nothing -> return VNil
+>         Nothing -> log ("No such value: " ++ s) >> return VNil
 >         Just l' -> do
 >             val <- fetch l'
 >             case val of
->                 Nothing -> return VNil
+>                 Nothing -> log ("No such value: " ++ s) >> return VNil
 >                 Just v' -> strict v' >>= return
 
 A lambda abstraction amounts to updating the environment and the store

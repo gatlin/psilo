@@ -17,7 +17,7 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 > import Control.Monad.Free
 > import Data.Monoid
 > import Data.Maybe
-> import Control.Monad (forM, forM_)
+> import Control.Monad (forM, forM_, unless)
 > import Data.List (partition)
 >
 > import System.Environment
@@ -29,18 +29,24 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 > data CmdLnOpts = CmdLnOpts {
 >       optRepl   :: Bool
 >     , optConLog :: Bool
+>     , optState  :: Bool
 > } deriving Show
 
 > cmdLnOpts :: Parser CmdLnOpts
 > cmdLnOpts = CmdLnOpts
->     <$> flag True True ( long "repl" <> short 'r' <> help "Initiate a REPL (default=TRUE)" )
->     <*> switch ( long "console-log" <> short 'l'
+>     <$> flag True True (
+>         long "repl" <> short 'r' <> help "Initiate a REPL (default=TRUE)" )
+>     <*> switch (
+>         long "console-log" <> short 'l'
 >               <> help "Log debug output to the console (default=FALSE)" )
+>     <*> switch (
+>         long "show-state" <> short 's'
+>               <> help "Display the machine state after each execution" )
 
 The repl is nothing more than calling `eval` in an endless loop.
 
-> repl :: IO ()
-> repl = runInputT defaultSettings (loop newMachineState) where
+> repl :: Bool -> Bool -> IO ()
+> repl doLog showSt = runInputT defaultSettings (loop newMachineState) where
 >     loop st = do
 >         minput <- getInputLine "psilo> "
 >         case minput of
@@ -53,18 +59,25 @@ The repl is nothing more than calling `eval` in an endless loop.
 >                     Nothing -> (liftIO $ putStrLn "Type error") >> loop st
 >                     Just ty -> do
 >                       liftIO $ putStrLn $ "Type: " ++ (show ty)
->                       (ret, st') <- liftIO $ runMachine st $ (eval ast')
+>                       ((ret, log), st') <- liftIO $ runMachine st $ (eval ast')
 >                       liftIO . putStrLn $ "Result: " ++ (show ret)
->                       liftIO . putStrLn $ "Machine: " ++ (show st')
+>                       unless (doLog == False) $ do
+>                           liftIO . putStrLn $ "Log\n---"
+>                           displayLog log
+>                       unless (showSt == False) $
+>                           liftIO . putStrLn . show $ st'
 >                       loop st'
+
+> displayLog log = liftIO $ forM_ log putStrLn
 
 > main :: IO ()
 > main = execParser opts >>= start
 
 > start :: CmdLnOpts -> IO ()
-> start os = if doRepl then repl else return () where
+> start os = if doRepl then repl conLog showSt else return () where
 >     doRepl = optRepl os
 >     conLog = optConLog os
+>     showSt = optState os
 
 > opts :: ParserInfo CmdLnOpts
 > opts = info (cmdLnOpts <**> helper)
