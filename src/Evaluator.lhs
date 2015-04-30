@@ -30,6 +30,7 @@ Imports and language extensions
 > {-# LANGUAGE OverlappingInstances #-}
 > {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 > {-# LANGUAGE AllowAmbiguousTypes #-}
+> {-# LANGUAGE FlexibleContexts #-}
 >
 > module Evaluator
 >
@@ -108,14 +109,7 @@ strategy will be call-by-need.
 > newtype Machine a = M {
 >     runM :: WriterT [String] (StateT MachineState IO) a
 > } deriving (Monad, MonadIO, MonadState MachineState
->            , MonadWriter [String], Functor)
-
-Haskell will soon consider `Monad`s which are not also `Applicative`s as
-errors, but fortunately we can handle this trivially:
-
-> instance Applicative Machine where
->     pure = return
->     (<*>) = ap
+>            , MonadWriter [String], Functor, Applicative)
 
 > runMachine :: MachineState -> Machine a -> IO ((a, [String]), MachineState)
 > runMachine st k = runStateT (runWriterT (runM k)) st
@@ -327,4 +321,3 @@ closure.
 >     case val of
 >         Nothing -> return (var, VNil)
 >         Just v' -> return (var, v')
-
