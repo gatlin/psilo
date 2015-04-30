@@ -68,16 +68,20 @@ The repl is nothing more than calling `eval` in an endless loop.
 >                           liftIO . putStrLn . show $ st'
 >                       loop st'
 
+
 > displayLog log = liftIO $ forM_ log putStrLn
 
 > main :: IO ()
 > main = execParser opts >>= start
 
 > start :: CmdLnOpts -> IO ()
-> start os = if doRepl then repl conLog showSt else return () where
->     doRepl = optRepl os
->     conLog = optConLog os
->     showSt = optState os
+> start os = case doRepl of
+>     True      -> repl conLog showSt
+>     _         -> return ()
+>     where
+>         doRepl = optRepl os
+>         conLog = optConLog os
+>         showSt = optState os
 
 > opts :: ParserInfo CmdLnOpts
 > opts = info (cmdLnOpts <**> helper)

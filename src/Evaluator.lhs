@@ -104,7 +104,11 @@ strategy will be call-by-need.
 >     , mLoc   :: Location
 >     } deriving (Show)
 
-> newMachineState = MachineState (IntMap.empty) [] 0
+> newMachineState = MachineState defaultStorage defaultEnvironment $
+>                   length defaultEnvironment
+
+> defaultStorage = IntMap.empty
+> defaultEnvironment = []
 
 > newtype Machine a = M {
 >     runM :: WriterT [String] (StateT MachineState IO) a
