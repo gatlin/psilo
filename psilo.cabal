@@ -18,6 +18,24 @@ Source-Repository head
     Type: git
     Location: git@github.com:gatlin/psilo.git
 
+executable psilo
+  default-language:    Haskell2010
+  main-is: Main.lhs
+  hs-source-dirs: src
+  build-depends:       
+      base                 >= 4.6
+    , pandoc               >= 1.12
+    , ghc
+    , haskeline            >= 0.7
+    , mtl
+    , transformers
+    , free
+    , optparse-applicative
+    , comonad
+    , split
+    , parsec
+    , containers
+
 executable preprocess
   default-language:    Haskell2010
   main-is: preprocessor.hs
@@ -31,3 +49,4 @@ executable preprocess
     , optparse-applicative
     , comonad
     , split
+

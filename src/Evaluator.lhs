@@ -64,6 +64,7 @@ Imports and language extensions
 >
 > import Parser
 > import Syntax
+> import Typechecker
 
 The Machine
 ---
@@ -84,7 +85,14 @@ some ultimate result type onto which we can map our `Expr`s.
 >                , clBody :: (Expr ())
 >                , clEnv  :: ClosureEnv }
 >     | VThunk (Expr ()) ClosureEnv
->     deriving (Eq, Show)
+>     deriving (Eq)
+
+> instance Show Value where
+>     show VNil = "()"
+>     show (VBoolean b) = show b
+>     show (VInteger n) = show n
+>     show (VThunk   _ _) = "<thunk>"
+>     show (VClosure _ _ _) = "<closure>"
 
 To make the code more readable, an environment mapping `Symbol`s to `Expr ()`
 values is called a `ClosureEnv`:
@@ -242,13 +250,40 @@ expression along with sufficient environmental information to force evaluation
 later.
 
 > eval (Free (AApply op operands)) = do
->     fValue <- eval op >>= strict
->     ev <- gets mEnv >>= closed
->     case fValue of
->         VClosure args body env -> do
->             let env' = zip args (map (\x -> VThunk x env) operands)
->             evalWithContext (env' ++ ev) body
->         _                      ->  return fValue
+>     case op of
+>         (Free (ASymbol "+")) -> do
+>             operands' <- forM operands $ \(Free operand) -> do
+>                 case operand of
+>                     AInteger x -> return x
+>                     s          -> eval (Free s) >>= \(VInteger x) -> return x
+>             return $ VInteger $ sum operands'
+>         (Free (ASymbol "*")) -> do
+>             operands' <- forM operands $ \(Free operand) -> do
+>                 case operand of
+>                     AInteger x -> return x
+>                     s          -> eval (Free s) >>= \(VInteger x) -> return x
+>             return $ VInteger $ product operands'
+>         (Free (ASymbol "-")) -> do
+>             operands' <- forM operands $ \(Free operand) -> do
+>                 case operand of
+>                     AInteger x -> return x
+>                     s          -> eval (Free s) >>= \(VInteger x) -> return x
+>             return $ VInteger $ (operands' !! 0) - (operands' !! 1)
+>         (Free (ASymbol "/")) -> do
+>             operands' <- forM operands $ \(Free operand) -> do
+>                 case operand of
+>                     AInteger x -> return x
+>                     s          -> eval (Free s) >>= \(VInteger x) -> return x
+>             return $ VInteger $ (operands' !! 0) `div` (operands' !! 1)
+>         _ -> do
+>
+>             fValue <- eval op >>= strict
+>             ev <- gets mEnv >>= closed
+>             case fValue of
+>                 VClosure args body env -> do
+>                     let env' = zip args (map (\x -> VThunk x env) operands)
+>                     evalWithContext (env' ++ ev) body
+>                 _                      ->  return fValue
 
 Auxiliary functions
 ---

@@ -5,6 +5,8 @@ title: "psilo"
 This is the main program outline. If an argument is present on the command line
 then we execute the program in that file and halt. Otherwise we fire up a repl.
 
+> {-# LANGUAGE RecordWildCards #-}
+
 > module Main where
 >
 > import Parser (parseFile, parseTopLevel)
@@ -17,8 +19,9 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 > import Control.Monad.Free
 > import Data.Monoid
 > import Data.Maybe
-> import Control.Monad (forM, forM_, unless)
+> import Control.Monad (forM, forM_, when)
 > import Data.List (partition)
+> import Control.Comonad.Cofree
 >
 > import System.Environment
 > import System.IO
@@ -30,6 +33,7 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 >       optRepl   :: Bool
 >     , optConLog :: Bool
 >     , optState  :: Bool
+>     , optParsed :: Bool
 > } deriving Show
 
 > cmdLnOpts :: Parser CmdLnOpts
@@ -42,31 +46,42 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 >     <*> switch (
 >         long "show-state" <> short 's'
 >               <> help "Display the machine state after each execution" )
+>     <*> switch (
+>         long "parsed" <> short 'p'
+>               <> help "Show the parser output" )
 
 The repl is nothing more than calling `eval` in an endless loop.
 
-> repl :: Bool -> Bool -> IO ()
-> repl doLog showSt = runInputT defaultSettings (loop newMachineState) where
->     loop st = do
+> repl :: CmdLnOpts -> IO ()
+> repl os@CmdLnOpts{..} = runInputT defaultSettings (loop newMachineState []) where
+>     loop st types = do
 >         minput <- getInputLine "psilo> "
 >         case minput of
 >             Nothing -> outputStrLn "Goodbye."
->             Just input -> do
->                 let Right ast = parseTopLevel input
->                 let ast'      = (ast !! 0) :: Expr ()
->                 let typed = typeTree $ cofreeMu ast'
->                 case typed of
->                     Nothing -> (liftIO $ putStrLn "Type error") >> loop st
->                     Just ty -> do
->                       liftIO $ putStrLn $ "Type: " ++ (show ty)
->                       ((ret, log), st') <- liftIO $ runMachine st $ (eval ast')
->                       liftIO . putStrLn $ "Result: " ++ (show ret)
->                       unless (doLog == False) $ do
->                           liftIO . putStrLn $ "Log\n---"
->                           displayLog log
->                       unless (showSt == False) $
->                           liftIO . putStrLn . show $ st'
->                       loop st'
+>             Just input -> if (take 5 input == ":type")
+>                     then do
+>                         liftIO . putStrLn . show $ lookup (drop 6 input) types
+>                         loop st types
+>                     else do
+>                         let Right ast = parseTopLevel input
+>                         let ast'      = (ast !! 0) :: Expr ()
+>                         let typed = typeTree $ cofreeMu ast'
+>                         case typed of
+>                             Nothing -> (liftIO $ putStrLn "Type error") >>
+>                                 loop st types
+>                             Just ty -> do
+>                               when optParsed $ do
+>                                   liftIO . putStrLn . show $ ast'
+>                               ((ret, log), st') <- liftIO $ runMachine st $ (eval ast')
+>                               liftIO . putStrLn . show $ ret
+>                               when optConLog $ do
+>                                   liftIO . putStrLn $ "Log\n---"
+>                                   displayLog log
+>                               when optState $ do
+>                                   liftIO . putStrLn . show $ st'
+>                               loop st' $ types' ast' ty types
+>     types' (Free (ADefine sym _)) ty types = (sym, ty) : types
+>     types'  _                      _  types = types
 
 
 > displayLog log = liftIO $ forM_ log putStrLn
@@ -76,12 +91,10 @@ The repl is nothing more than calling `eval` in an endless loop.
 
 > start :: CmdLnOpts -> IO ()
 > start os = case doRepl of
->     True      -> repl conLog showSt
+>     True      -> repl os
 >     _         -> return ()
 >     where
 >         doRepl = optRepl os
->         conLog = optConLog os
->         showSt = optState os
 
 > opts :: ParserInfo CmdLnOpts
 > opts = info (cmdLnOpts <**> helper)
