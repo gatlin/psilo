@@ -44,6 +44,7 @@ Imports and language extensions
 > , eval
 > , strict
 > , evalWithContext
+> , variables
 > )
 >
 > where
@@ -74,6 +75,8 @@ Application and Interpretation][plai] the environment does not map symbols to
 values but to *locations* in the store. The store, then, maps location to
 values.
 
+[plai]:http://cs.brown.edu/~sk/Publications/Books/ProgLangs/2007-04-26/
+
 What is the result of evaluating an `Expr` with a `Machine`? There should be
 some ultimate result type onto which we can map our `Expr`s.
 
@@ -91,8 +94,12 @@ some ultimate result type onto which we can map our `Expr`s.
 >     show VNil = "()"
 >     show (VBoolean b) = show b
 >     show (VInteger n) = show n
->     show (VThunk   _ _) = "<thunk>"
->     show (VClosure _ _ _) = "<closure>"
+>     show (VThunk   e c) = "<thunk> { " ++ (show e) ++ " , " ++
+>                                           (show c) ++ " } "
+>     show (VClosure a b e) = "<closure> { args = " ++ (show a) ++
+>                             ", body = " ++ (show b) ++
+>                             ", env  = " ++ (show e) ++
+>                             " } "
 
 To make the code more readable, an environment mapping `Symbol`s to `Expr ()`
 values is called a `ClosureEnv`:

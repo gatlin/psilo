@@ -19,7 +19,7 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 > import Control.Monad.Free
 > import Data.Monoid
 > import Data.Maybe
-> import Control.Monad (forM, forM_, when)
+> import Control.Monad (forM, forM_, when )
 > import Data.List (partition)
 > import Control.Comonad.Cofree
 >
@@ -34,11 +34,12 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 >     , optConLog :: Bool
 >     , optState  :: Bool
 >     , optParsed :: Bool
+>     , optFile   :: String
 > } deriving Show
 
 > cmdLnOpts :: Parser CmdLnOpts
 > cmdLnOpts = CmdLnOpts
->     <$> flag True True (
+>     <$> flag False True (
 >         long "repl" <> short 'r' <> help "Initiate a REPL (default=TRUE)" )
 >     <*> switch (
 >         long "console-log" <> short 'l'
@@ -49,6 +50,11 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 >     <*> switch (
 >         long "parsed" <> short 'p'
 >               <> help "Show the parser output" )
+>     <*> strOption (
+>         long "input" <>
+>         short 'i' <>
+>         metavar "FILENAME" <>
+>         help "Execute a file" <> value "")
 
 The repl is nothing more than calling `eval` in an endless loop.
 
@@ -58,6 +64,7 @@ The repl is nothing more than calling `eval` in an endless loop.
 >         minput <- getInputLine "psilo> "
 >         case minput of
 >             Nothing -> outputStrLn "Goodbye."
+>             -- TODO ugly disgusting hack
 >             Just input -> if (take 5 input == ":type")
 >                     then do
 >                         liftIO . putStrLn . show $ lookup (drop 6 input) types
@@ -83,6 +90,21 @@ The repl is nothing more than calling `eval` in an endless loop.
 >     types' (Free (ADefine sym _)) ty types = (sym, ty) : types
 >     types'  _                      _  types = types
 
+> execFile :: CmdLnOpts -> IO ()
+> execFile os@CmdLnOpts{..} = do
+>     parsed <- parseFile optFile
+>     case parsed of
+>         Left err -> print err >> return ()
+>         Right xs -> do
+>             (defns, _) <- return $ partition isDefn xs
+>             defnsTypes <- forM defns $ \defn -> do
+>                 return $ typeTree $ cofreeMu defn
+>             if (length (filter isNothing defnsTypes)) > 0
+>                 then putStrLn "Type error"
+>                 else putStrLn "No type error"
+>    where
+>        isDefn (Free (ADefine _ _)) = True
+>        isDefn _                    = False
 
 > displayLog log = liftIO $ forM_ log putStrLn
 
@@ -90,11 +112,11 @@ The repl is nothing more than calling `eval` in an endless loop.
 > main = execParser opts >>= start
 
 > start :: CmdLnOpts -> IO ()
-> start os = case doRepl of
+> start os@CmdLnOpts{..} = case optRepl of
 >     True      -> repl os
->     _         -> return ()
->     where
->         doRepl = optRepl os
+>     _         -> case optFile of
+>         "" -> return ()
+>         fileName -> execFile os
 
 > opts :: ParserInfo CmdLnOpts
 > opts = info (cmdLnOpts <**> helper)
