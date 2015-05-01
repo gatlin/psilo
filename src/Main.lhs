@@ -29,6 +29,8 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 >
 > import Options.Applicative
 
+> import Test
+
 > data CmdLnOpts = CmdLnOpts {
 >       optRepl   :: Bool
 >     , optConLog :: Bool
@@ -121,3 +123,4 @@ The repl is nothing more than calling `eval` in an endless loop.
 > opts :: ParserInfo CmdLnOpts
 > opts = info (cmdLnOpts <**> helper)
 >     ( fullDesc <> progDesc "Run psilo programs" <> header "psilo" )
+

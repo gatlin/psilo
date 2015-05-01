@@ -10,7 +10,7 @@ psilo:
 	cp dist/build/psilo/psilo .
 
 typed:
-	ghc $(OPTS) --make src/*.lhs -o psilo
+	ghc $(OPTS) --make src/*.{hs, lhs} -o psilo
 
 clean: doc
 	rm psilo
