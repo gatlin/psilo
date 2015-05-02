@@ -48,6 +48,7 @@ Imports and language extensions
 > , load
 > , store
 > , eval
+> , variables
 > )
 >
 > where
@@ -290,6 +291,7 @@ be implemented in due time.
 
 > eval (Free (ALambda args body)) = do
 >     env <- gets mEnv
+>     vars <- variables body
 >     env' <- forM (concat env) $ \(sym, loc) -> do -- create a `Closed`
 >         Just val <- load sym
 >         return (sym, val)
@@ -312,9 +314,10 @@ expression but not its arguments and package them in a thunk.
 >             case fValue of
 >                 VClosure args body env -> do
 >                     let env' = zip args (map (\x -> VThunk x env) operands)
+
+THIS IS THE LINE THAT IS BROKEN OKTHX
 >                     evalWithContext (env' ++ ev) body
 >                 _                      -> return fValue
-
 
 Builtins
 ---
@@ -326,7 +329,7 @@ There are a few builtin operators and functions defined for convenience:
 >     operands' <- forM operands $ \(Free operand) -> do
 >         case operand of
 >             AInteger x -> return x
->             s          -> eval (Free s) >>= \(VInteger x) -> return x
+>             s          -> eval (Free s) >>= strict >>= \(VInteger x) -> return x
 >     return $ VInteger $ sum operands'
 
 > builtinMul :: [Expr ()] -> Machine Value
@@ -334,7 +337,7 @@ There are a few builtin operators and functions defined for convenience:
 >     operands' <- forM operands $ \(Free operand) -> do
 >         case operand of
 >             AInteger x -> return x
->             s          -> eval (Free s) >>= \(VInteger x) -> return x
+>             s          -> eval (Free s) >>= strict >>= \(VInteger x) -> return x
 >     return $ VInteger $ product operands'
 
 > builtinSubtract :: Expr () -> Expr () -> Machine Value
@@ -342,7 +345,7 @@ There are a few builtin operators and functions defined for convenience:
 >     (a':b':_) <- forM [a, b] $ \(Free operand) -> do
 >         case operand of
 >             AInteger x -> return x
->             s          -> eval (Free s) >>= \(VInteger x) -> return x
+>             s          -> eval (Free s) >>= strict >>= \(VInteger x) -> return x
 >     return $ VInteger $ a' - b'
 
 > builtinDiv :: Expr () -> Expr () -> Machine Value
@@ -350,7 +353,7 @@ There are a few builtin operators and functions defined for convenience:
 >     (a':b':_) <- forM [a, b] $ \(Free operand) -> do
 >         case operand of
 >             AInteger x -> return x
->             s          -> eval (Free s) >>= \(VInteger x) -> return x
+>             s          -> eval (Free s) >>= strict >>= \(VInteger x) -> return x
 >     return $ VInteger $ a' `div` b'
 
 Auxiliary functions
@@ -375,3 +378,13 @@ Auxiliary functions
 > close ev = forM ev $ \ (var, loc) -> do
 >     Just val <- load var
 >     return (var, val)
+
+> variables :: Expr a -> Machine [Symbol]
+> variables (Free (ASymbol s)) = return [s]
+> variables (Free (ALambda args body)) = do
+>     bodyVars <- variables body
+>     return bodyVars
+> variables (Free (AApply op args)) = do
+>     varList <- mapM variables args
+>     return $ concat varList
+> variables _ = return []

@@ -60,8 +60,8 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 
 The repl is nothing more than calling `eval` in an endless loop.
 
-> repl :: CmdLnOpts -> IO ()
-> repl os@CmdLnOpts{..} = runInputT defaultSettings (loop newMachineState []) where
+> repl :: CmdLnOpts -> MachineState -> IO ()
+> repl os@CmdLnOpts{..} st = runInputT defaultSettings (loop st []) where
 >     loop st types = do
 >         minput <- getInputLine "psilo> "
 >         case minput of
@@ -98,15 +98,27 @@ The repl is nothing more than calling `eval` in an endless loop.
 >     case parsed of
 >         Left err -> print err >> return ()
 >         Right xs -> do
->             (defns, _) <- return $ partition isDefn xs
+>             (defns, exprs) <- return $ partition isDefn xs
 >             defnsTypes <- forM defns $ \defn -> do
 >                 return $ typeTree $ cofreeMu defn
 >             if (length (filter isNothing defnsTypes)) > 0
 >                 then putStrLn "Type error"
->                 else putStrLn "No type error"
+>                 else do
+>                     st <- insertDefns defns newMachineState
+>                     case length exprs of
+>                         0 -> repl os st
+>                         _ -> do
+>                             let expr = exprs !! 0
+>                             ((ret, log), st') <- runMachine st $ eval expr
+>                             when optState $ do
+>                                 putStrLn . show $ st'
 >    where
 >        isDefn (Free (ADefine _ _)) = True
 >        isDefn _                    = False
+>        insertDefns [] st = return st
+>        insertDefns ds st = do
+>            (_, st') <- runMachine st $ forM_ ds eval
+>            return st'
 
 > displayLog log = liftIO $ forM_ log putStrLn
 
@@ -115,7 +127,7 @@ The repl is nothing more than calling `eval` in an endless loop.
 
 > start :: CmdLnOpts -> IO ()
 > start os@CmdLnOpts{..} = case optRepl of
->     True      -> repl os
+>     True      -> repl os newMachineState
 >     _         -> case optFile of
 >         "" -> return ()
 >         fileName -> execFile os
