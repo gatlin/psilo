@@ -45,6 +45,8 @@ Imports and language extensions
 > , pushFrame
 > , popFrame
 > , fresh
+> , load
+> , store
 > , eval
 > )
 >
@@ -60,7 +62,7 @@ Imports and language extensions
 > import qualified Data.IntMap.Strict as IntMap
 > import Data.Foldable (Foldable, fold)
 > import Data.Traversable (Traversable, sequence)
-> import Data.List (intersperse, nub, (\\))
+> import Data.List (intersperse, nub, (\\), concat)
 > import Data.Monoid
 > import Control.Applicative
 >
@@ -101,7 +103,6 @@ some ultimate result type onto which we can map our `Expr`s.
 >                             ", body = " ++ (show b) ++
 >                             ", env  = " ++ (show e) ++
 >                             " } "
-
 
 The Machine
 ---
@@ -203,6 +204,23 @@ corresponding values in the store:
 >         modify $ \st -> st { mSto = sto' }
 >     modify $ \st -> st { mEnv = frames }
 
+Because very often we will simply want to put a value in memory and refer to it
+later, the following two commands wrap up the process of loading and storing
+values:
+
+> load :: Symbol -> Machine (Maybe Value)
+> load sym = do
+>     maybeLoc <- query sym
+>     case maybeLoc of
+>         Just loc -> fetch loc >>= return
+>         Nothing  -> return Nothing
+>
+> store :: Symbol -> Value -> Machine ()
+> store sym val = do
+>     loc <- fresh
+>     update loc val
+>     pushFrame [(sym, loc)]
+
 As a convenience, it would also be nice to obtain fresh store locations on
 demand. Voici:
 
@@ -212,5 +230,148 @@ demand. Voici:
 >     modify $ \st -> st { mLoc = (loc + 1) }
 >     return loc
 
-> eval :: Expr () -> Machine ()
-> eval _ = return ()
+Evaluating expressions to values
+---
+
+The process of converting a set of psilo expressions into a final result value
+is *evaluation*. This evaluator implements *call-by-name* semantics: when a
+function is applied to its arguments, the expression is only evaluated to the
+outermost closure and stored as a *thunk*.
+
+This is in contrast to *call-by-value* semantics: when a function is applied to
+its arguments, the arguments are fully evaluated and then the function is fully
+evaluated.
+
+Both have their advantages and disadvantages. `Expr` is a free monad, meaning
+that you get to determine the strategy for tearing it down and converting it to
+something else. The upshot is, I could easily write a call-by-value evaluator
+for the same program. In fact I might!
+
+To begin, let's handle the type signature and the trivial case:
+
+> eval :: Expr () -> Machine Value
+> eval (Pure _) = return VNil
+
+Top-level definitions are a little strange because they aren't expressions -
+they are mutations to the machine's state (or "statements").
+
+Our evaluation strategy will be to store them as thunks bound to the name they
+were given.
+
+> eval (Free (ADefine sym defn)) = do
+>     store sym (VThunk defn [])
+>     log $ "Defined " ++ sym
+>     return VNil
+
+Basic primitive values are handled with similar ease:
+
+> eval (Free (AInteger n)) = return $ VInteger n
+> eval (Free (ABoolean b)) = return $ VBoolean b
+
+Evaluating a symbol amounts to looking up the value at the corresponding
+location and then evaluating it:
+
+> eval (Free (ASymbol s)) = do
+>     maybeValue <- load s
+>     case maybeValue of
+>         Nothing -> log ("No such value: " ++ s) >> return VNil
+>         Just val -> strict val >>= return
+
+What is `strict`? Strict takes any `Value` and, if that value is a thunk,
+forces its evaluation. It is defined in the following section.
+
+Lambdas are lists of symbols (the arguments), an expression into which the
+argument values will be substituted (the body), and the environment surrounding
+them at the time they are created (the closed environment).
+
+We will convert lambdas into `VClosure` values. The surrounding environment
+will be packaged up naively for now; more intelligent selection of values will
+be implemented in due time.
+
+> eval (Free (ALambda args body)) = do
+>     env <- gets mEnv
+>     env' <- forM (concat env) $ \(sym, loc) -> do -- create a `Closed`
+>         Just val <- load sym
+>         return (sym, val)
+>     return $ VClosure args body env'
+
+Application is the real tricky part of the evaluator. We will evaluate the
+expression but not its arguments and package them in a thunk.
+
+> eval (Free (AApply op operands)) = do
+>     case op of
+>         (Free (ASymbol "+")) -> builtinAdd operands
+>         (Free (ASymbol "*")) -> builtinMul operands
+>         (Free (ASymbol "-")) -> builtinSubtract (operands !! 0)
+>                                                 (operands !! 1)
+>         (Free (ASymbol "/")) -> builtinDiv (operands !! 0)
+>                                            (operands !! 1)
+>         _ -> do
+>             fValue <- eval op >>= strict
+>             ev <- gets mEnv >>= close . concat
+>             case fValue of
+>                 VClosure args body env -> do
+>                     let env' = zip args (map (\x -> VThunk x env) operands)
+>                     evalWithContext (env' ++ ev) body
+>                 _                      -> return fValue
+
+
+Builtins
+---
+
+There are a few builtin operators and functions defined for convenience:
+
+> builtinAdd :: [Expr ()] -> Machine Value
+> builtinAdd operands = do
+>     operands' <- forM operands $ \(Free operand) -> do
+>         case operand of
+>             AInteger x -> return x
+>             s          -> eval (Free s) >>= \(VInteger x) -> return x
+>     return $ VInteger $ sum operands'
+
+> builtinMul :: [Expr ()] -> Machine Value
+> builtinMul operands = do
+>     operands' <- forM operands $ \(Free operand) -> do
+>         case operand of
+>             AInteger x -> return x
+>             s          -> eval (Free s) >>= \(VInteger x) -> return x
+>     return $ VInteger $ product operands'
+
+> builtinSubtract :: Expr () -> Expr () -> Machine Value
+> builtinSubtract a b = do
+>     (a':b':_) <- forM [a, b] $ \(Free operand) -> do
+>         case operand of
+>             AInteger x -> return x
+>             s          -> eval (Free s) >>= \(VInteger x) -> return x
+>     return $ VInteger $ a' - b'
+
+> builtinDiv :: Expr () -> Expr () -> Machine Value
+> builtinDiv a b = do
+>     (a':b':_) <- forM [a, b] $ \(Free operand) -> do
+>         case operand of
+>             AInteger x -> return x
+>             s          -> eval (Free s) >>= \(VInteger x) -> return x
+>     return $ VInteger $ a' `div` b'
+
+Auxiliary functions
+---
+
+> strict :: Value -> Machine Value
+> strict (VThunk body env) = (evalWithContext env body) >>= strict
+> strict v                 = return v
+
+> evalWithContext :: Closed -> Expr () -> Machine Value
+> evalWithContext env expr = do
+>     newEv <- forM env $ \(var, val) -> do
+>         loc <- fresh
+>         update loc val
+>         return (var, loc)
+>     pushFrame newEv
+>     ret <- eval expr
+>     popFrame
+>     return ret
+
+> close :: Environment Location -> Machine Closed
+> close ev = forM ev $ \ (var, loc) -> do
+>     Just val <- load var
+>     return (var, val)

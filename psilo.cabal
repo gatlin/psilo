@@ -47,6 +47,5 @@ executable preprocess
     , transformers
     , free
     , optparse-applicative
-    , comonad
     , split
 
