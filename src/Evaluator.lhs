@@ -317,7 +317,7 @@ expression but not its arguments, and instead package them into thunks.
 >                     log $ "Evaluating a closure ..."
 >                     ev <- gets mEnv >>= close . concat
 >                     operands' <- forM operands $ \o -> return $ VThunk o ev
->                     evalWithContext ((zip args operands') ++ clEnv) body
+>                     evalWithContext (nub ((zip args operands') ++ clEnv)) body
 >                 _ -> do
 >                     log $ "Applying " ++ (show fValue)
 >                     return fValue
