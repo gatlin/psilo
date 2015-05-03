@@ -290,6 +290,7 @@ will be packaged up naively for now; more intelligent selection of values will
 be implemented in due time.
 
 > eval (Free (ALambda args body)) = do
+>     log "Evaluating a closure ..."
 >     env <- gets mEnv
 >     vars <- variables body
 >     env' <- forM (concat env) $ \(sym, loc) -> do -- create a `Closed`
@@ -298,9 +299,10 @@ be implemented in due time.
 >     return $ VClosure args body env'
 
 Application is the real tricky part of the evaluator. We will evaluate the
-expression but not its arguments and package them in a thunk.
+expression but not its arguments, and instead package them into thunks.
 
 > eval (Free (AApply op operands)) = do
+>     log $ "Applying " ++ (show op) ++ " to " ++ (show operands)
 >     case op of
 >         (Free (ASymbol "+")) -> builtinAdd operands
 >         (Free (ASymbol "*")) -> builtinMul operands
@@ -310,14 +312,15 @@ expression but not its arguments and package them in a thunk.
 >                                            (operands !! 1)
 >         _ -> do
 >             fValue <- eval op >>= strict
->             ev <- gets mEnv >>= close . concat
 >             case fValue of
->                 VClosure args body env -> do
->                     let env' = zip args (map (\x -> VThunk x env) operands)
-
-THIS IS THE LINE THAT IS BROKEN OKTHX
->                     evalWithContext (env' ++ ev) body
->                 _                      -> return fValue
+>                 (VClosure args body clEnv) -> do
+>                     log $ "Evaluating a closure ..."
+>                     ev <- gets mEnv >>= close . concat
+>                     operands' <- forM operands $ \o -> return $ VThunk o ev
+>                     evalWithContext ((zip args operands') ++ clEnv) body
+>                 _ -> do
+>                     log $ "Applying " ++ (show fValue)
+>                     return fValue
 
 Builtins
 ---
@@ -329,8 +332,12 @@ There are a few builtin operators and functions defined for convenience:
 >     operands' <- forM operands $ \(Free operand) -> do
 >         case operand of
 >             AInteger x -> return x
->             s          -> eval (Free s) >>= strict >>= \(VInteger x) -> return x
+>             s          -> eval (Free s) >>= strict >>= go
 >     return $ VInteger $ sum operands'
+>     where go (VInteger n) = return n
+>           go huh          = do
+>               log $ "[+] wtf : " ++ (show huh)
+>               return 0
 
 > builtinMul :: [Expr ()] -> Machine Value
 > builtinMul operands = do
