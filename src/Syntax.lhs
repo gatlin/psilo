@@ -37,6 +37,7 @@ Not bad, huh?
 > {-# LANGUAGE StandaloneDeriving #-}
 > {-# LANGUAGE TypeSynonymInstances #-}
 > {-# LANGUAGE FlexibleInstances #-}
+> {-# LANGUAGE FlexibleContexts #-}
 > {-# LANGUAGE OverlappingInstances #-}
 >
 > module Syntax where
@@ -53,10 +54,8 @@ Not bad, huh?
 >     | ABoolean Bool
 >     | ASymbol Symbol
 >     | ALambda [Symbol] a
->     | AApply a a
->     | AList [a]
+>     | AApply a [a]
 >     | ADefine Symbol a
->     | AHylo Symbol [Symbol] a
 >
 > deriving instance Show a => Show (AST a)
 > deriving instance Functor AST
@@ -70,6 +69,18 @@ Not bad, huh?
 > instance Show a => Show (Expr a) where
 >     show (Pure _)   = ""
 >     show (Free x) = " ( " ++ show x ++ " ) "
+
+> aInteger :: (MonadFree AST m) => Integer -> m ()
+> aInteger x = liftF $ AInteger x
+
+> aBoolean :: (MonadFree AST m) => Bool -> m ()
+> aBoolean x = liftF $ ABoolean x
+
+> aSymbol :: (MonadFree AST m) => Symbol -> m ()
+> aSymbol x = liftF $ ASymbol x
+
+> aLambda args body = liftF $ ALambda args body
+> aApply op erands = liftF $ AApply op erands
 
 The need occasionally arises to convert a list of `Free (ASymbol Symbol)`
 values to a list of `Symbol` values. This function serves that purpose:

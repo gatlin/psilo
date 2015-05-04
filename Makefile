@@ -6,8 +6,12 @@ preprocessor:
 	ghc $(OPTS) --make preprocessor.hs -o preprocessor
 
 psilo:
-	ghc $(OPTS) --make src/{Evaluator,Syntax,Lexer,Parser,Main}.lhs -o psilo
+	cabal build psilo
+	cp dist/build/psilo/psilo .
+
+typed:
+	ghc $(OPTS) --make src/*.{hs, lhs} -o psilo
 
 clean: doc
 	rm psilo
-	rm src/*.{hi,o}
+	cabal clean

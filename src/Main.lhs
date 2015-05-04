@@ -5,10 +5,13 @@ title: "psilo"
 This is the main program outline. If an argument is present on the command line
 then we execute the program in that file and halt. Otherwise we fire up a repl.
 
+> {-# LANGUAGE RecordWildCards #-}
+
 > module Main where
 >
 > import Parser (parseFile, parseTopLevel)
 > import Syntax
+> import Typechecker
 > import Evaluator
 >
 > import Control.Monad.Trans
@@ -16,8 +19,9 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 > import Control.Monad.Free
 > import Data.Monoid
 > import Data.Maybe
-> import Control.Monad (forM, forM_)
+> import Control.Monad (forM, forM_, when )
 > import Data.List (partition)
+> import Control.Comonad.Cofree
 >
 > import System.Environment
 > import System.IO
@@ -25,82 +29,96 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 >
 > import Options.Applicative
 
+> import Test
+
 > data CmdLnOpts = CmdLnOpts {
 >       optRepl   :: Bool
->     , optFile   :: String
 >     , optConLog :: Bool
+>     , optState  :: Bool
+>     , optParsed :: Bool
+>     , optFile   :: String
 > } deriving Show
 
 > cmdLnOpts :: Parser CmdLnOpts
 > cmdLnOpts = CmdLnOpts
->     <$> switch ( long "repl" <> short 'r' <> help "Initiate a REPL (default=TRUE)" )
->     <*> strOption ( long "file" <> short 'f' <> help "Execute a file"
->         <> value "" )
->     <*> switch ( long "console-log" <> short 'l'
->               <> help "Log debug output to the console (default=FALSE)"
->     )
-
-`evaluate` amounts to taking a list of parsed expressions and evaluating them in
-the context of a machine. The result is the state of the machine after it has been run.
-
-> evaluate :: Either Text.Parsec.ParseError [Expr ()]
->          -> MStore
->          -> IO [((Value,[String]), MStore)]
-> evaluate res store = do
->     case res of
->         Left err -> print err >> return [((VNil,[]), store)]
->         Right ex -> mapM execute (ex :: [Expr ()]) >>= return
->
->     where execute v = do
->               ev <- return $ mGlobalEnv store
->               res <- (runMachineWithState store (MEnv ev)) . eval $ v
->               return res
+>     <$> flag False True (
+>         long "repl" <> short 'r' <> help "Initiate a REPL (default=TRUE)" )
+>     <*> switch (
+>         long "console-log" <> short 'l'
+>               <> help "Log debug output to the console (default=FALSE)" )
+>     <*> switch (
+>         long "show-state" <> short 's'
+>               <> help "Display the machine state after each execution" )
+>     <*> switch (
+>         long "parsed" <> short 'p'
+>               <> help "Show the parser output" )
+>     <*> strOption (
+>         long "input" <>
+>         short 'i' <>
+>         metavar "FILENAME" <>
+>         help "Execute a file" <> value "")
 
 The repl is nothing more than calling `eval` in an endless loop.
 
-> repl :: IO ()
-> repl = runInputT defaultSettings (loop initialStore) where
->     loop store = do
+> repl :: CmdLnOpts -> MachineState -> IO ()
+> repl os@CmdLnOpts{..} st = runInputT defaultSettings (loop st) where
+>     loop st = do
 >         minput <- getInputLine "psilo> "
 >         case minput of
 >             Nothing -> outputStrLn "Goodbye."
 >             Just input -> do
->                 case input of
->                     ":state" -> liftIO (putStrLn . show $ store) >> loop store
->                     _        -> do
->                         ((val,log), store'):_ <- liftIO $ evaluate (parseTopLevel input) store
->                         liftIO $ putStrLn . show $ val
->                         loop store'
+>                 let Right ast = parseTopLevel input
+>                 let ast'      = (ast !! 0) :: Expr ()
+>                 when optParsed $ do
+>                     liftIO . putStrLn . show $ ast'
+>                 ((ret, log), st') <- liftIO $
+>                     runMachine st $ (eval ast') >>= strict
+>                 liftIO . putStrLn . show $ ret
+>                 when optConLog $ do
+>                     liftIO . putStrLn $ "Log\n---"
+>                     displayLog log
+>                 when optState $ do
+>                     liftIO . putStrLn . show $ st'
+>                 loop st'
 
-> execFile :: String -> Bool -> IO ()
-> execFile fname doLog = do
->     parsed <- parseFile fname
+> execFile :: CmdLnOpts -> IO ()
+> execFile os@CmdLnOpts{..} = do
+>     parsed <- parseFile optFile
 >     case parsed of
 >         Left err -> print err >> return ()
 >         Right xs -> do
 >             (defns, exprs) <- return $ partition isDefn xs
->             initState <- initializeState defns initialStore
->             final <- evaluate (Right exprs) initState
->             return ()
->     where isDefn (Free (ADefine _ _)) = True
->           isDefn _                    = False
->           initializeState [] sto = return sto
->           initializeState ds sto = do
->               (_,r) <- (flip runMachine) doLog $ forM_ ds eval
->               return r
+>             defnsTypes <- forM defns $ \defn -> do
+>                 return $ typeTree $ cofreeMu defn
+>             st <- insertDefns defns newMachineState
+>             case length exprs of
+>                 0 -> repl os st
+>                 _ -> do
+>                     let expr = exprs !! 0
+>                     ((ret, log), st') <- runMachine st $ eval expr
+>                     when optState $ do
+>                             putStrLn . show $ st'
+>    where
+>        isDefn (Free (ADefine _ _)) = True
+>        isDefn _                    = False
+>        insertDefns [] st = return st
+>        insertDefns ds st = do
+>            (_, st') <- runMachine st $ forM_ ds eval
+>            return st'
+
+> displayLog log = liftIO $ forM_ log putStrLn
 
 > main :: IO ()
 > main = execParser opts >>= start
 
 > start :: CmdLnOpts -> IO ()
-> start os = if doRepl then repl else case doFile of
->     "" -> return ()
->     fname -> execFile fname conLog
->     where
->         doRepl = optRepl os
->         doFile = optFile os
->         conLog = optConLog os
+> start os@CmdLnOpts{..} = case optRepl of
+>     True      -> repl os newMachineState
+>     _         -> case optFile of
+>         "" -> return ()
+>         fileName -> execFile os
 
 > opts :: ParserInfo CmdLnOpts
 > opts = info (cmdLnOpts <**> helper)
 >     ( fullDesc <> progDesc "Run psilo programs" <> header "psilo" )
+
