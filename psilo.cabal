@@ -35,6 +35,7 @@ executable psilo
     , split
     , parsec
     , containers
+    , comonad              >= 4.2.5
 
 executable preprocess
   default-language:    Haskell2010

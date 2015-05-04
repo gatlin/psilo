@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveFunctor #-}
+
 module Test where
 
 import Syntax
@@ -11,6 +13,7 @@ import qualified Data.IntMap.Strict as IntMap
 import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Control.Monad.Free
+import Control.Comonad
 
 testsym = "okay"
 
@@ -61,3 +64,8 @@ vars = freeVariables (Free (ALambda ["x"]
                                      [ Free (ASymbol "x")
                                      , Free (ASymbol "y") ]))))
 
+ast_1 = parseTopLevel "(cons 3 (cons 2 (nil)))"
+ast_2 = parseTopLevel "(cons 3 (cons 2 (cons 1 (nil))))"
+
+cm_1 = cofreeMu ast_1' where Right (ast_1':_) = ast_1
+cm_2 = cofreeMu ast_2' where Right (ast_2':_) = ast_2

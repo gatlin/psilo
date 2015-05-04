@@ -347,6 +347,18 @@ operator to use.
 >     "=?" -> Just $ \operands -> do
 >         operands' <- cleanse operands
 >         return $ VBoolean $ (operands' !! 0) == (operands' !! 1)
+>     "mod" -> Just $ \operands -> do
+>         operands' <- cleanse operands
+>         return $ VInteger $ (operands' !! 0) `mod` (operands' !! 1)
+>     "and" -> Just $ \operands -> do
+>         arg1 <- eval (operands !! 0) >>= strict
+>         if arg1 == (VBoolean False)
+>             then return arg1
+>             else do
+>                 arg2 <- eval (operands !! 0) >>= strict
+>                 if arg2 == (VBoolean False)
+>                     then return arg2 else return $ VBoolean True
+>         return $ VBoolean True
 >     "if" -> Just $ \operands -> do
 >         VBoolean c <- eval (operands !! 0) >>= strict
 >         if c then eval (operands !! 1) >>= strict

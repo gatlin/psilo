@@ -99,9 +99,20 @@
 (= filter (pred xs)
   (foldr xs (\ (y ys) (if (pred y) (cons y ys) ys)) nil))
 
+(= zero? (x) (=? 0 x))
+
+(= take
+  (fix (\ (f)
+    (\ (args) (unpair args (\ (n xs)
+      (if (zero? n) (nil)
+        (if (zero? (length xs)) (nil)
+          (cons (car xs) (f (pair (- n 1) (cdr xs))))))))))))
+
 ;; some useful functions for testing
 
 (= square (x) (* x x))
+
+(= even? (x) (=? 0 (mod x 2)))
 
 ; the gold standard test of any good fixpoint combinator
 (= fact
