@@ -107,11 +107,16 @@
      (\ (args) (unpair args (\ (n xs)
        (if (zero? n) (nil)
          (if (zero? (length xs)) (nil)
-           (cons (car xs) (f (pair (- n 1) (cdr xs)))))))))))))
+           ((\ (h t)
+              (cons h (f (pair (- n 1) t))))
+            (car xs) (cdr xs)))))))))))
+
+;           (cons (car xs) (f (pair (- n 1) (cdr xs)))))))))))))
 
 (= unfold (gen seed)
-  ((\ (next)
-     (cons next (unfold gen next)))))
+  ((\ (u) (u (pair gen seed)))
+   (fix (\ (u) (\ (args) (unpair args (\ (gen seed)
+     (cons seed (u (pair gen (gen seed)))))))))))
 
 ;; some useful functions for testing
 
@@ -133,3 +138,5 @@
   (foldl (\ (acc n) (+ acc n)) 0 xs))
 
 (= l1 (cons 1 (cons 2 (cons 3 (nil)))))
+
+(= powers-of-2 (unfold square 2))

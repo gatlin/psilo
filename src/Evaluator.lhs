@@ -253,13 +253,17 @@ The primitive types are simple enough, too:
 > eval (Free (ABoolean b)) = return $ VBoolean b
 
 Symbols require you to look up the value associated with the symbol and just
-return that.
+return that. At this juncture we enforce strictness. However, the first time
+the result is calculated it will 
 
 > eval (Free (ASymbol s)) = do
->     log $ "Looking up symbol " ++ (show s)
 >     maybeVal <- load s
 >     case maybeVal of
->         Just v -> strict v
+>         Just v -> do
+>             v' <- strict v
+>             Just loc <- query s
+>             update loc v'
+>             return v'
 >         Nothing -> error $ (show s) ++ " not found!"
 
 Lambdas are stored basically as-is, except all the free variables in their
