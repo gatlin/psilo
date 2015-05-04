@@ -47,17 +47,19 @@ code > span.er { font-weight: bold; }
 psilo
         </h1>
         <p class="lead">
-          <a href="../doc/pdf/main.pdf">Available in PDF</a>
+        <!--          <a href="../doc/pdf/main.pdf">Available in PDF</a> -->
         </p>
       </div>
       <div class="row">
         <div id="content" class="col-md-12 col-lg-10 col-lg-offset-1">
 
 <p>This is the main program outline. If an argument is present on the command line then we execute the program in that file and halt. Otherwise we fire up a repl.</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">{-# LANGUAGE RecordWildCards #-}</span></code></pre>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">module</span> <span class="dt">Main</span> <span class="kw">where</span>
 
 <span class="kw">import </span><span class="dt">Parser</span> (parseFile, parseTopLevel)
 <span class="kw">import </span><span class="dt">Syntax</span>
+<span class="kw">import </span><span class="dt">Typechecker</span>
 <span class="kw">import </span><span class="dt">Evaluator</span>
 
 <span class="kw">import </span><span class="dt">Control.Monad.Trans</span>
@@ -65,80 +67,96 @@ psilo
 <span class="kw">import </span><span class="dt">Control.Monad.Free</span>
 <span class="kw">import </span><span class="dt">Data.Monoid</span>
 <span class="kw">import </span><span class="dt">Data.Maybe</span>
-<span class="kw">import </span><span class="dt">Control.Monad</span> (forM, forM_)
+<span class="kw">import </span><span class="dt">Control.Monad</span> (forM, forM_, when )
 <span class="kw">import </span><span class="dt">Data.List</span> (partition)
+<span class="kw">import </span><span class="dt">Control.Comonad.Cofree</span>
 
 <span class="kw">import </span><span class="dt">System.Environment</span>
 <span class="kw">import </span><span class="dt">System.IO</span>
 <span class="kw">import </span><span class="dt">Text.Parsec</span>
 
 <span class="kw">import </span><span class="dt">Options.Applicative</span></code></pre>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">import </span><span class="dt">Test</span></code></pre>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">CmdLnOpts</span> <span class="fu">=</span> <span class="dt">CmdLnOpts</span> {
 <span class="ot">      optRepl   ::</span> <span class="dt">Bool</span>
-    ,<span class="ot"> optFile   ::</span> <span class="dt">String</span>
     ,<span class="ot"> optConLog ::</span> <span class="dt">Bool</span>
+    ,<span class="ot"> optState  ::</span> <span class="dt">Bool</span>
+    ,<span class="ot"> optParsed ::</span> <span class="dt">Bool</span>
+    ,<span class="ot"> optFile   ::</span> <span class="dt">String</span>
 } <span class="kw">deriving</span> <span class="dt">Show</span></code></pre>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">cmdLnOpts ::</span> <span class="dt">Parser</span> <span class="dt">CmdLnOpts</span>
 cmdLnOpts <span class="fu">=</span> <span class="dt">CmdLnOpts</span>
-    <span class="fu">&lt;$&gt;</span> switch ( long <span class="st">&quot;repl&quot;</span> <span class="fu">&lt;&gt;</span> short <span class="ch">&#39;r&#39;</span> <span class="fu">&lt;&gt;</span> help <span class="st">&quot;Initiate a REPL (default=TRUE)&quot;</span> )
-    <span class="fu">&lt;*&gt;</span> strOption ( long <span class="st">&quot;file&quot;</span> <span class="fu">&lt;&gt;</span> short <span class="ch">&#39;f&#39;</span> <span class="fu">&lt;&gt;</span> help <span class="st">&quot;Execute a file&quot;</span>
-        <span class="fu">&lt;&gt;</span> value <span class="st">&quot;&quot;</span> )
-    <span class="fu">&lt;*&gt;</span> switch ( long <span class="st">&quot;console-log&quot;</span> <span class="fu">&lt;&gt;</span> short <span class="ch">&#39;l&#39;</span>
-              <span class="fu">&lt;&gt;</span> help <span class="st">&quot;Log debug output to the console (default=FALSE)&quot;</span>
-    )</code></pre>
-<p><code>evaluate</code> amounts to taking a list of parsed expressions and evaluating them in the context of a machine. The result is the state of the machine after it has been run.</p>
-<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">evaluate ::</span> <span class="dt">Either</span> <span class="dt">Text.Parsec.ParseError</span> [<span class="dt">Expr</span> ()]
-         <span class="ot">-&gt;</span> <span class="dt">MStore</span>
-         <span class="ot">-&gt;</span> <span class="dt">IO</span> [((<span class="dt">Value</span>,[<span class="dt">String</span>]), <span class="dt">MStore</span>)]
-evaluate res store <span class="fu">=</span> <span class="kw">do</span>
-    <span class="kw">case</span> res <span class="kw">of</span>
-        <span class="dt">Left</span> err <span class="ot">-&gt;</span> print err <span class="fu">&gt;&gt;</span> return [((<span class="dt">VNil</span>,[]), store)]
-        <span class="dt">Right</span> ex <span class="ot">-&gt;</span> mapM execute (<span class="ot">ex ::</span> [<span class="dt">Expr</span> ()]) <span class="fu">&gt;&gt;=</span> return
-
-    <span class="kw">where</span> execute v <span class="fu">=</span> <span class="kw">do</span>
-              ev <span class="ot">&lt;-</span> return <span class="fu">$</span> mGlobalEnv store
-              res <span class="ot">&lt;-</span> (runMachineWithState store (<span class="dt">MEnv</span> ev)) <span class="fu">.</span> eval <span class="fu">$</span> v
-              return res</code></pre>
+    <span class="fu">&lt;$&gt;</span> flag <span class="dt">False</span> <span class="dt">True</span> (
+        long <span class="st">&quot;repl&quot;</span> <span class="fu">&lt;&gt;</span> short <span class="ch">&#39;r&#39;</span> <span class="fu">&lt;&gt;</span> help <span class="st">&quot;Initiate a REPL (default=TRUE)&quot;</span> )
+    <span class="fu">&lt;*&gt;</span> switch (
+        long <span class="st">&quot;console-log&quot;</span> <span class="fu">&lt;&gt;</span> short <span class="ch">&#39;l&#39;</span>
+              <span class="fu">&lt;&gt;</span> help <span class="st">&quot;Log debug output to the console (default=FALSE)&quot;</span> )
+    <span class="fu">&lt;*&gt;</span> switch (
+        long <span class="st">&quot;show-state&quot;</span> <span class="fu">&lt;&gt;</span> short <span class="ch">&#39;s&#39;</span>
+              <span class="fu">&lt;&gt;</span> help <span class="st">&quot;Display the machine state after each execution&quot;</span> )
+    <span class="fu">&lt;*&gt;</span> switch (
+        long <span class="st">&quot;parsed&quot;</span> <span class="fu">&lt;&gt;</span> short <span class="ch">&#39;p&#39;</span>
+              <span class="fu">&lt;&gt;</span> help <span class="st">&quot;Show the parser output&quot;</span> )
+    <span class="fu">&lt;*&gt;</span> strOption (
+        long <span class="st">&quot;input&quot;</span> <span class="fu">&lt;&gt;</span>
+        short <span class="ch">&#39;i&#39;</span> <span class="fu">&lt;&gt;</span>
+        metavar <span class="st">&quot;FILENAME&quot;</span> <span class="fu">&lt;&gt;</span>
+        help <span class="st">&quot;Execute a file&quot;</span> <span class="fu">&lt;&gt;</span> value <span class="st">&quot;&quot;</span>)</code></pre>
 <p>The repl is nothing more than calling <code>eval</code> in an endless loop.</p>
-<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">repl ::</span> <span class="dt">IO</span> ()
-repl <span class="fu">=</span> runInputT defaultSettings (loop initialStore) <span class="kw">where</span>
-    loop store <span class="fu">=</span> <span class="kw">do</span>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">repl ::</span> <span class="dt">CmdLnOpts</span> <span class="ot">-&gt;</span> <span class="dt">MachineState</span> <span class="ot">-&gt;</span> <span class="dt">IO</span> ()
+repl os<span class="fu">@</span><span class="dt">CmdLnOpts</span>{<span class="fu">..</span>} st <span class="fu">=</span> runInputT defaultSettings (loop st) <span class="kw">where</span>
+    loop st <span class="fu">=</span> <span class="kw">do</span>
         minput <span class="ot">&lt;-</span> getInputLine <span class="st">&quot;psilo&gt; &quot;</span>
         <span class="kw">case</span> minput <span class="kw">of</span>
             <span class="dt">Nothing</span> <span class="ot">-&gt;</span> outputStrLn <span class="st">&quot;Goodbye.&quot;</span>
             <span class="dt">Just</span> input <span class="ot">-&gt;</span> <span class="kw">do</span>
-                <span class="kw">case</span> input <span class="kw">of</span>
-                    <span class="st">&quot;:state&quot;</span> <span class="ot">-&gt;</span> liftIO (putStrLn <span class="fu">.</span> show <span class="fu">$</span> store) <span class="fu">&gt;&gt;</span> loop store
-                    _        <span class="ot">-&gt;</span> <span class="kw">do</span>
-                        ((val,log), store&#39;)<span class="fu">:</span>_ <span class="ot">&lt;-</span> liftIO <span class="fu">$</span> evaluate (parseTopLevel input) store
-                        liftIO <span class="fu">$</span> putStrLn <span class="fu">.</span> show <span class="fu">$</span> val
-                        loop store&#39;</code></pre>
-<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">execFile ::</span> <span class="dt">String</span> <span class="ot">-&gt;</span> <span class="dt">Bool</span> <span class="ot">-&gt;</span> <span class="dt">IO</span> ()
-execFile fname doLog <span class="fu">=</span> <span class="kw">do</span>
-    parsed <span class="ot">&lt;-</span> parseFile fname
+                <span class="kw">let</span> <span class="dt">Right</span> ast <span class="fu">=</span> parseTopLevel input
+                <span class="kw">let</span> ast&#39;      <span class="fu">=</span> (ast <span class="fu">!!</span> <span class="dv">0</span>)<span class="ot"> ::</span> <span class="dt">Expr</span> ()
+                when optParsed <span class="fu">$</span> <span class="kw">do</span>
+                    liftIO <span class="fu">.</span> putStrLn <span class="fu">.</span> show <span class="fu">$</span> ast&#39;
+                ((ret, log), st&#39;) <span class="ot">&lt;-</span> liftIO <span class="fu">$</span>
+                    runMachine st <span class="fu">$</span> (eval ast&#39;) <span class="fu">&gt;&gt;=</span> strict
+                liftIO <span class="fu">.</span> putStrLn <span class="fu">.</span> show <span class="fu">$</span> ret
+                when optConLog <span class="fu">$</span> <span class="kw">do</span>
+                    liftIO <span class="fu">.</span> putStrLn <span class="fu">$</span> <span class="st">&quot;Log\n---&quot;</span>
+                    displayLog log
+                when optState <span class="fu">$</span> <span class="kw">do</span>
+                    liftIO <span class="fu">.</span> putStrLn <span class="fu">.</span> show <span class="fu">$</span> st&#39;
+                loop st&#39;</code></pre>
+<p>Executing a whole file does some type checking, separates out the definitions, installs those definitions into a machine, and then hands over execution to <code>repl</code> if there is no main expression.</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">execFile ::</span> <span class="dt">CmdLnOpts</span> <span class="ot">-&gt;</span> <span class="dt">IO</span> ()
+execFile os<span class="fu">@</span><span class="dt">CmdLnOpts</span>{<span class="fu">..</span>} <span class="fu">=</span> <span class="kw">do</span>
+    parsed <span class="ot">&lt;-</span> parseFile optFile
     <span class="kw">case</span> parsed <span class="kw">of</span>
         <span class="dt">Left</span> err <span class="ot">-&gt;</span> print err <span class="fu">&gt;&gt;</span> return ()
         <span class="dt">Right</span> xs <span class="ot">-&gt;</span> <span class="kw">do</span>
             (defns, exprs) <span class="ot">&lt;-</span> return <span class="fu">$</span> partition isDefn xs
-            initState <span class="ot">&lt;-</span> initializeState defns initialStore
-            final <span class="ot">&lt;-</span> evaluate (<span class="dt">Right</span> exprs) initState
-            return ()
-    <span class="kw">where</span> isDefn (<span class="dt">Free</span> (<span class="dt">ADefine</span> _ _)) <span class="fu">=</span> <span class="dt">True</span>
-          isDefn _                    <span class="fu">=</span> <span class="dt">False</span>
-          initializeState [] sto <span class="fu">=</span> return sto
-          initializeState ds sto <span class="fu">=</span> <span class="kw">do</span>
-              (_,r) <span class="ot">&lt;-</span> (flip runMachine) doLog <span class="fu">$</span> forM_ ds eval
-              return r</code></pre>
+            defnsTypes <span class="ot">&lt;-</span> forM defns <span class="fu">$</span> \defn <span class="ot">-&gt;</span> <span class="kw">do</span>
+                return <span class="fu">$</span> typeTree <span class="fu">$</span> cofreeMu defn
+            st <span class="ot">&lt;-</span> insertDefns defns newMachineState
+            <span class="kw">case</span> length exprs <span class="kw">of</span>
+                <span class="dv">0</span> <span class="ot">-&gt;</span> repl os st
+                _ <span class="ot">-&gt;</span> <span class="kw">do</span>
+                    <span class="kw">let</span> expr <span class="fu">=</span> exprs <span class="fu">!!</span> <span class="dv">0</span>
+                    ((ret, log), st&#39;) <span class="ot">&lt;-</span> runMachine st <span class="fu">$</span> eval expr
+                    when optState <span class="fu">$</span> <span class="kw">do</span>
+                            putStrLn <span class="fu">.</span> show <span class="fu">$</span> st&#39;
+   <span class="kw">where</span>
+       isDefn (<span class="dt">Free</span> (<span class="dt">ADefine</span> _ _)) <span class="fu">=</span> <span class="dt">True</span>
+       isDefn _                    <span class="fu">=</span> <span class="dt">False</span>
+       insertDefns [] st <span class="fu">=</span> return st
+       insertDefns ds st <span class="fu">=</span> <span class="kw">do</span>
+           (_, st&#39;) <span class="ot">&lt;-</span> runMachine st <span class="fu">$</span> forM_ ds eval
+           return st&#39;</code></pre>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell">displayLog log <span class="fu">=</span> liftIO <span class="fu">$</span> forM_ log putStrLn</code></pre>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">main ::</span> <span class="dt">IO</span> ()
 main <span class="fu">=</span> execParser opts <span class="fu">&gt;&gt;=</span> start</code></pre>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">start ::</span> <span class="dt">CmdLnOpts</span> <span class="ot">-&gt;</span> <span class="dt">IO</span> ()
-start os <span class="fu">=</span> <span class="kw">if</span> doRepl <span class="kw">then</span> repl <span class="kw">else</span> <span class="kw">case</span> doFile <span class="kw">of</span>
-    <span class="st">&quot;&quot;</span> <span class="ot">-&gt;</span> return ()
-    fname <span class="ot">-&gt;</span> execFile fname conLog
-    <span class="kw">where</span>
-        doRepl <span class="fu">=</span> optRepl os
-        doFile <span class="fu">=</span> optFile os
-        conLog <span class="fu">=</span> optConLog os</code></pre>
+start os<span class="fu">@</span><span class="dt">CmdLnOpts</span>{<span class="fu">..</span>} <span class="fu">=</span> <span class="kw">case</span> optRepl <span class="kw">of</span>
+    <span class="dt">True</span>      <span class="ot">-&gt;</span> repl os newMachineState
+    _         <span class="ot">-&gt;</span> <span class="kw">case</span> optFile <span class="kw">of</span>
+        <span class="st">&quot;&quot;</span> <span class="ot">-&gt;</span> return ()
+        fileName <span class="ot">-&gt;</span> execFile os</code></pre>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">opts ::</span> <span class="dt">ParserInfo</span> <span class="dt">CmdLnOpts</span>
 opts <span class="fu">=</span> info (cmdLnOpts <span class="fu">&lt;**&gt;</span> helper)
     ( fullDesc <span class="fu">&lt;&gt;</span> progDesc <span class="st">&quot;Run psilo programs&quot;</span> <span class="fu">&lt;&gt;</span> header <span class="st">&quot;psilo&quot;</span> )</code></pre>

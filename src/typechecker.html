@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>Typechecker | psilo</title>
+
+    <!-- Bootstrap core CSS -->
+    <link href="../css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Custom styles for this template -->
+    <link href="../css/jumbotron-narrow.css" rel="stylesheet">
+
+    <!-- glyphicons -->
+    <link href="../css/bootstrap-glyphicons.css" rel="stylesheet">
+
+    <link href="../css/style.css" rel="stylesheet">
+  <style type="text/css">
+table.sourceCode, tr.sourceCode, td.lineNumbers, td.sourceCode {
+  margin: 0; padding: 0; vertical-align: baseline; border: none; }
+table.sourceCode { width: 100%; }
+td.lineNumbers { text-align: right; padding-right: 4px; padding-left: 4px; color: #aaaaaa; border-right: 1px solid #aaaaaa; }
+td.sourceCode { padding-left: 5px; }
+code > span.kw { color: #0000ff; }
+code > span.ch { color: #008080; }
+code > span.st { color: #008080; }
+code > span.co { color: #008000; }
+code > span.ot { color: #ff4000; }
+code > span.al { color: #ff0000; }
+code > span.er { font-weight: bold; }
+    code{white-space: pre;}
+  </style>
+  </head>
+
+  <body>
+
+    <div class="container">
+      <ol class="breadcrumb">
+          <li><a href="/">home</a></li>
+          <li><a href="/psilo/">psilo</a></li>
+      </ol>
+      <div class="page-header col-md-12 col-lg-10 col-lg-offset-1">
+        <h1>
+Typechecker
+        </h1>
+        <p class="lead">
+        <!--          <a href="../doc/pdf/typechecker.pdf">Available in PDF</a> -->
+        </p>
+      </div>
+      <div class="row">
+        <div id="content" class="col-md-12 col-lg-10 col-lg-offset-1">
+
+<p>This code is lovingly stolen from</p>
+<pre><code>http://brianmckenna.org/blog/type_annotation_cofree</code></pre>
+<p>Every value in psilo has a <em>type</em>. A type is a set of possible values. A value may be a member of more than one type but in any given computation one must be able to arrive at a single result before proceeding. By checking the types of function arguments and their operands one can catch programming mistakes before the program is executed.</p>
+<p>A <em>type system</em> is the set of rules for how to define types and how they relate to one another.</p>
+<p>psilo's type system is going to be its strongsuit. For now we implement a very basic type system which can be expanded upon later.</p>
+<h2 id="imports-and-language-extensions">Imports and Language Extensions</h2>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">{-# LANGUAGE DeriveFoldable #-}</span>
+<span class="ot">{-# LANGUAGE DeriveFunctor #-}</span>
+<span class="ot">{-# LANGUAGE DeriveTraversable #-}</span>
+<span class="ot">{-# LANGUAGE StandaloneDeriving #-}</span></code></pre>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">module</span> <span class="dt">Typechecker</span> <span class="kw">where</span>
+
+<span class="kw">import </span><span class="dt">Prelude</span> <span class="kw">hiding</span> (sequence)
+
+<span class="kw">import </span><span class="dt">Control.Comonad</span>
+<span class="kw">import </span><span class="dt">Control.Comonad.Cofree</span>
+<span class="kw">import </span><span class="dt">Control.Monad.Free</span>
+<span class="kw">import </span><span class="dt">Control.Monad.State</span> <span class="kw">hiding</span> (sequence)
+<span class="kw">import </span><span class="dt">Data.Foldable</span> (<span class="dt">Foldable</span>, fold)
+<span class="kw">import </span><span class="dt">Data.Maybe</span> (fromMaybe)
+<span class="kw">import </span><span class="dt">Data.Monoid</span>
+<span class="kw">import </span><span class="dt">Data.Traversable</span> (<span class="dt">Traversable</span>, sequence)
+<span class="kw">import qualified</span> <span class="dt">Data.Map</span> <span class="kw">as</span> <span class="dt">M</span>
+
+<span class="kw">import </span><span class="dt">Syntax</span></code></pre>
+<h2 id="our-type-language">Our type language</h2>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">Type</span>
+    <span class="fu">=</span> [<span class="dt">Type</span>] <span class="fu">:-&gt;</span> <span class="dt">Type</span>
+    <span class="fu">|</span> <span class="dt">TVar</span> <span class="dt">Int</span>
+    <span class="fu">|</span> <span class="dt">TNumber</span>
+    <span class="fu">|</span> <span class="dt">TBoolean</span>
+    <span class="fu">|</span> <span class="dt">TVoid</span>
+
+<span class="kw">deriving</span> <span class="kw">instance</span> <span class="dt">Show</span> <span class="dt">Type</span></code></pre>
+<h2 id="constraints">Constraints</h2>
+<p>A type constraint is a means by which to narrow down the possible types for a given value.</p>
+<p>For now, there's only one kind of type constraint: the <em>equality constraint</em>. An equality constraint means that two values which correspond - say, an argument symbol and the value passed in - must have equal types.</p>
+<p>There are other kinds of type constraints. This code is designed to be easy to extend when the time comes.</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">Constraint</span> <span class="fu">=</span> <span class="dt">EqualityConstraint</span> <span class="dt">Type</span> <span class="dt">Type</span>
+<span class="kw">deriving</span> <span class="kw">instance</span> <span class="dt">Show</span> <span class="dt">Constraint</span></code></pre>
+<h2 id="results">Results</h2>
+<p>A <code>TypeResult</code> is the result of each step of the algorithm. It consists of <em>constraints</em> deduced by the syntax tree and <em>assumptions</em> which will be used in future deductions.</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">TypeResult</span> <span class="fu">=</span> <span class="dt">TypeResult</span>
+    {<span class="ot"> constraints ::</span> [<span class="dt">Constraint</span>]
+    ,<span class="ot"> assumptions ::</span> <span class="dt">M.Map</span> <span class="dt">String</span> [<span class="dt">Type</span>]
+    }
+
+<span class="kw">deriving</span> <span class="kw">instance</span> <span class="dt">Show</span> <span class="dt">TypeResult</span>
+
+<span class="kw">instance</span> <span class="dt">Monoid</span> <span class="dt">TypeResult</span> <span class="kw">where</span>
+    mempty <span class="fu">=</span> <span class="dt">TypeResult</span> { constraints <span class="fu">=</span> mempty
+                        , assumptions <span class="fu">=</span> mempty }
+    mappend a b <span class="fu">=</span> <span class="dt">TypeResult</span>
+        { constraints <span class="fu">=</span> constraints a <span class="ot">`mappend`</span> constraints b
+        , assumptions <span class="fu">=</span> assumptions a <span class="ot">`mappend`</span> assumptions b
+        }</code></pre>
+<h2 id="state">State</h2>
+<p>During the execution of the algorithm, we want to keep track of two things:</p>
+<ol type="1">
+<li>Type inferences we have already figured out;</li>
+<li>Fresh variable IDs.</li>
+</ol>
+<p>We don't want to repeat ourselves, especially in a large program. Values which are re-used a lot should only have their types inferred once. Hence, we <em>memoize</em> results and keep track of these memos.</p>
+<p>Similarly, the types of function arguments are not initially known and hence are variable. Each time we encounter a new symbol we want to create a new type variable; later on we will try to substitute a concrete type. To this end we will also keep track of <em>type variable IDs</em>.</p>
+<p>Stateful data to manage during algorithm execution</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">TypeState</span> t m <span class="fu">=</span> <span class="dt">TypeState</span>
+    {<span class="ot"> varId ::</span> <span class="dt">Int</span>
+    ,<span class="ot"> memo  ::</span> <span class="dt">M.Map</span> t m
+    }</code></pre>
+<p>This function will generate a new ID (a monotonically increasing integer) and store it.</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">freshVarId ::</span> <span class="dt">State</span> (<span class="dt">TypeState</span> t m) <span class="dt">Type</span>
+freshVarId <span class="fu">=</span> <span class="kw">do</span>
+    v <span class="ot">&lt;-</span> gets varId
+    modify <span class="fu">$</span> \s <span class="ot">-&gt;</span> s { varId <span class="fu">=</span> succ v }
+    return <span class="fu">$</span> <span class="dt">TVar</span> v</code></pre>
+<p>The type of our <code>State</code>-based monad is getting a bit unwieldly so we'll use the following alias.</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">type</span> <span class="dt">TypeCheck</span> t <span class="fu">=</span> <span class="dt">State</span> (<span class="dt">TypeState</span> t (<span class="dt">Type</span>, <span class="dt">TypeResult</span>)) (<span class="dt">Type</span>, <span class="dt">TypeResult</span>)</code></pre>
+<p>We want to memoize the result of each step to avoid repeat inference. If we have not seen the value before, we will check it and store it. Other wise we will return what is already known.</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">memoizedTC ::</span> <span class="dt">Ord</span> c
+           <span class="ot">=&gt;</span> (c <span class="ot">-&gt;</span> <span class="dt">TypeCheck</span> c)
+           <span class="ot">-&gt;</span> c
+           <span class="ot">-&gt;</span> <span class="dt">TypeCheck</span> c
+memoizedTC f c <span class="fu">=</span> gets memo <span class="fu">&gt;&gt;=</span> maybe memoize return <span class="fu">.</span> M.lookup c <span class="kw">where</span>
+    memoize <span class="fu">=</span> <span class="kw">do</span>
+        r <span class="ot">&lt;-</span> f c
+        modify <span class="fu">$</span> \s <span class="ot">-&gt;</span> s { memo <span class="fu">=</span> M.insert c r <span class="fu">$</span> memo s }
+        return r</code></pre>
+<h2 id="representing-the-ast">Representing the AST</h2>
+<p>An <code>Expr</code> value - dealt with in the Parser and Evaluator - is a free monad based on an <code>AST</code> value. The free monad representation allows for case-wise translation of a functor into some other value. In essence, it lets you break down a tree.</p>
+<p>The cofree comonad, however, allows you to annotate a tree recursively. It is a product type: the first element is a value of the stream in focus, and the second element is a functor which can be used to focus other values.</p>
+<p>The way we use the cofree comonad is to store our annotation of each node as the first value and its parents in the second value. Initially the untyped tree will simply use <code>()</code> as its annotation.</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">cofreeMu ::</span> <span class="dt">Functor</span> f <span class="ot">=&gt;</span> <span class="dt">Free</span> f t <span class="ot">-&gt;</span> <span class="dt">Cofree</span> f ()
+cofreeMu (<span class="dt">Free</span> f) <span class="fu">=</span> () <span class="fu">:&lt;</span> fmap cofreeMu f</code></pre>
+<p>Following from this, we can write a function to perform the traversal starting with an empty memoization map and an initial type variable ID of <code>0</code>.</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">attribute ::</span> <span class="dt">Cofree</span> <span class="dt">AST</span> () <span class="ot">-&gt;</span> <span class="dt">Cofree</span> <span class="dt">AST</span> (<span class="dt">Type</span>, <span class="dt">TypeResult</span>)
+attribute c <span class="fu">=</span>
+    <span class="kw">let</span> initial <span class="fu">=</span> <span class="dt">TypeState</span> { memo <span class="fu">=</span> M.empty, varId <span class="fu">=</span> <span class="dv">0</span> }
+    <span class="kw">in</span>  evalState (sequence <span class="fu">$</span> extend (memoizedTC generateConstraints) c)
+                  initial</code></pre>
+<h2 id="constraint-generation">Constraint generation</h2>
+<p>We can now represent, traverse, and annotate a tree recursively, fluidly converting it from its free monad representation.</p>
+<p>Our algorithm is a bottom-up constraint satisfaction algorithm. Starting with the leaves, each value might constrain the types of functions in which they are bound or yield assumptions about the mappings from symbols to types. When the algorithm is complete either each symbol will map to a concrete type and it will all match, or there will be a type error.</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">generateConstraints ::</span> <span class="dt">Cofree</span> <span class="dt">AST</span> () <span class="ot">-&gt;</span> <span class="dt">TypeCheck</span> (<span class="dt">Cofree</span> <span class="dt">AST</span> ())</code></pre>
+<p>Primitive literals are the easiest.</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell">generateConstraints (() <span class="fu">:&lt;</span> <span class="dt">AInteger</span> _) <span class="fu">=</span> return (<span class="dt">TNumber</span>, mempty)
+generateConstraints (() <span class="fu">:&lt;</span> <span class="dt">ABoolean</span> _) <span class="fu">=</span> return (<span class="dt">TBoolean</span>, mempty)</code></pre>
+<p>Symbols on their own are each the single value of their own distinct types, until they are bound by constraints to a concrete type.</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell">generateConstraints (() <span class="fu">:&lt;</span> <span class="dt">ASymbol</span> s) <span class="fu">=</span> <span class="kw">do</span>
+    var <span class="ot">&lt;-</span> freshVarId
+    return (var, <span class="dt">TypeResult</span>
+        { constraints <span class="fu">=</span> []
+        , assumptions <span class="fu">=</span> M.singleton s [var]
+        })</code></pre>
+<p>Function abstraction takes each of its bound variables out of its body's assumption map and turns them into input constraints.</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell">generateConstraints (() <span class="fu">:&lt;</span> <span class="dt">ALambda</span> args b) <span class="fu">=</span> <span class="kw">do</span>
+    argIds <span class="ot">&lt;-</span> forM args <span class="fu">$</span> \arg <span class="ot">-&gt;</span> <span class="kw">do</span>
+        var <span class="ot">&lt;-</span> freshVarId
+        return (arg, var)
+    br  <span class="ot">&lt;-</span> memoizedTC generateConstraints b
+    <span class="kw">let</span> cs <span class="fu">=</span> forM argIds <span class="fu">$</span> \(arg,var) <span class="ot">-&gt;</span> <span class="kw">do</span>
+            return <span class="fu">$</span> maybe [] (map <span class="fu">$</span> <span class="dt">EqualityConstraint</span> var)
+                     (M.lookup arg <span class="fu">.</span> assumptions <span class="fu">$</span> snd br)
+        as <span class="fu">=</span> forM argIds <span class="fu">$</span> \(arg,_) <span class="ot">-&gt;</span> <span class="kw">do</span>
+            return <span class="fu">$</span> M.delete arg <span class="fu">.</span> assumptions <span class="fu">$</span> snd br
+    return ((map snd argIds) <span class="fu">:-&gt;</span> (fst br), <span class="dt">TypeResult</span>
+        { constraints <span class="fu">=</span> constraints (snd br) <span class="ot">`mappend`</span> (mconcat (mconcat cs))
+        , assumptions <span class="fu">=</span> mconcat <span class="fu">$</span> mconcat as
+        })</code></pre>
+<p>Function application generates constraints and fresh type variables for each argument and the return value, along with a constraint that the function takes a number of arguments of certain types and returns the return type.</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell">generateConstraints (() <span class="fu">:&lt;</span> <span class="dt">AApply</span> a b) <span class="fu">=</span> <span class="kw">do</span>
+    var <span class="ot">&lt;-</span> freshVarId
+    ar  <span class="ot">&lt;-</span> memoizedTC generateConstraints a
+    br  <span class="ot">&lt;-</span> mapM (memoizedTC generateConstraints) b
+    return (var, snd ar <span class="ot">`mappend`</span> (mconcat (map snd br)) <span class="ot">`mappend`</span> <span class="dt">TypeResult</span>
+        { constraints <span class="fu">=</span> [<span class="dt">EqualityConstraint</span> (fst ar) <span class="fu">$</span> (map fst br) <span class="fu">:-&gt;</span> var]
+        , assumptions <span class="fu">=</span> mempty
+        })</code></pre>
+<p>Definitions are a bit obtuse: they are declarative mutations to the static environment and thus do not compose or return anything useful. As a result, they are simply the type of whatever value stored in them.</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell">generateConstraints (() <span class="fu">:&lt;</span> <span class="dt">ADefine</span> sym val) <span class="fu">=</span> <span class="kw">do</span>
+    valType <span class="ot">&lt;-</span> memoizedTC generateConstraints val
+    return (fst valType, <span class="dt">TypeResult</span>
+        { constraints <span class="fu">=</span> constraints (snd valType)
+        , assumptions <span class="fu">=</span> assumptions (snd valType)
+        })</code></pre>
+<h2 id="constraint-solving">Constraint solving</h2>
+<p>We now have our tree, a means of traversing it, and a set of constraints and type assumptions. We now need to solve the generated constraints and type the whole program.</p>
+<p>Generate a type for the AST by solving all the generated constraints:</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">solveConstraints ::</span> [<span class="dt">Constraint</span>] <span class="ot">-&gt;</span> <span class="dt">Maybe</span> (<span class="dt">M.Map</span> <span class="dt">Int</span> <span class="dt">Type</span>)
+solveConstraints <span class="fu">=</span>
+    foldl (\b a <span class="ot">-&gt;</span> liftM2 mappend (solve b a) b) <span class="fu">$</span> <span class="dt">Just</span> M.empty <span class="kw">where</span>
+        solve maybeSubs (<span class="dt">EqualityConstraint</span> a b) <span class="fu">=</span> <span class="kw">do</span>
+            subs <span class="ot">&lt;-</span> maybeSubs
+            mostGeneralUnifier (substitute subs a) (substitute subs b)</code></pre>
+<p>Given two types, get a map of substitutions if the types unify:</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">mostGeneralUnifier ::</span> <span class="dt">Type</span> <span class="ot">-&gt;</span> <span class="dt">Type</span> <span class="ot">-&gt;</span> <span class="dt">Maybe</span> (<span class="dt">M.Map</span> <span class="dt">Int</span> <span class="dt">Type</span>)
+mostGeneralUnifier (<span class="dt">TVar</span> i) b <span class="fu">=</span> <span class="dt">Just</span> <span class="fu">$</span> M.singleton i b
+mostGeneralUnifier a (<span class="dt">TVar</span> i) <span class="fu">=</span> <span class="dt">Just</span> <span class="fu">$</span> M.singleton i a
+
+mostGeneralUnifier <span class="dt">TNumber</span> <span class="dt">TNumber</span> <span class="fu">=</span> <span class="dt">Just</span> M.empty
+mostGeneralUnifier <span class="dt">TBoolean</span> <span class="dt">TBoolean</span> <span class="fu">=</span> <span class="dt">Just</span> M.empty
+
+mostGeneralUnifier (as <span class="fu">:-&gt;</span> b) (cs <span class="fu">:-&gt;</span> d) <span class="fu">=</span> <span class="kw">do</span>
+    s1s <span class="ot">&lt;-</span> forM (zip as cs) <span class="fu">$</span> \(a, c) <span class="ot">-&gt;</span> mostGeneralUnifier a c
+    mconcat <span class="fu">$</span> map (\s1 <span class="ot">-&gt;</span> liftM2 mappend (mostGeneralUnifier (substitute s1 b)
+                                       (substitute s1 d)) <span class="fu">$</span> <span class="dt">Just</span> s1) s1s
+
+mostGeneralUnifier _ _ <span class="fu">=</span> <span class="dt">Nothing</span></code></pre>
+<p>Actually substitute the mappings in the type, yielding a more specific type.</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">substitute ::</span> <span class="dt">M.Map</span> <span class="dt">Int</span> <span class="dt">Type</span> <span class="ot">-&gt;</span> <span class="dt">Type</span> <span class="ot">-&gt;</span> <span class="dt">Type</span>
+substitute subs v<span class="fu">@</span>(<span class="dt">TVar</span> i) <span class="fu">=</span> maybe v (substitute subs) <span class="fu">$</span> M.lookup i subs
+substitute subs (as <span class="fu">:-&gt;</span> b) <span class="fu">=</span> (map (substitute subs) as) <span class="fu">:-&gt;</span>
+    (substitute subs b)
+substitute _ t <span class="fu">=</span> t</code></pre>
+<h2 id="putting-it-all-together">Putting it all together</h2>
+<p>Given a cofree comonad representation of an AST where each node is annotated with <code>()</code>, yield a new tree where each node is annotate with its type.</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">typeTree ::</span> <span class="dt">Cofree</span> <span class="dt">AST</span> () <span class="ot">-&gt;</span> <span class="dt">Maybe</span> (<span class="dt">Cofree</span> <span class="dt">AST</span> <span class="dt">Type</span>)
+typeTree c <span class="fu">=</span>
+    <span class="kw">let</span> result <span class="fu">=</span> attribute c
+        (r <span class="fu">:&lt;</span> _) <span class="fu">=</span> result
+        maybeSubs <span class="fu">=</span> solveConstraints <span class="fu">.</span> constraints <span class="fu">$</span> snd r
+    <span class="kw">in</span>  fmap (\subs <span class="ot">-&gt;</span> fmap (substitute subs <span class="fu">.</span> fst) result) maybeSubs</code></pre>
+
+        </div><!-- content -->
+    </div><!-- row -->
+
+      <div class="footer">
+        <p>&copy; 2013-2014. Theme lovingly stolen from other people.</p>
+      </div>
+
+    </div> <!-- /container -->
+
+  </body>
+</html>

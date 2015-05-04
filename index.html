@@ -107,81 +107,125 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+e+'<\
 <p>It is not a psilo implementation - just a simple lisp to explore writing interpreters. While not production quality, it might be of some educational value right now.</p>
 <p>A type inference system is in the works, which is motivating an evaluator rewrite. When it works I can begin experimenting with psilo’s type system and the language proper.</p>
 <p>Here is some code the interpreter runs right now:</p>
-<pre class="sourceCode scheme"><code class="sourceCode scheme"><span class="co">; Utilities</span>
-(<span class="kw">=</span> promise (x) (\ () x))
+<pre class="sourceCode scheme"><code class="sourceCode scheme"><span class="co">;; psilo standard library</span>
 
-<span class="co">; Pairs</span>
-(<span class="kw">=</span> unpair (p f)
-  (p f))
+<span class="co">; identity function</span>
+(<span class="kw">=</span> id (x) x)
 
-(<span class="kw">=</span> Pair (f) f)
+<span class="co">; a (probably over-complicated) fixpoint combinator</span>
+(<span class="kw">=</span> fix
+  ((\ (t)
+     (t (\ (f fx)
+       (f (fx f fx)))))
+   (\ (f) (\ (n) (f n f)))))
 
-(<span class="kw">=</span> pair (x y)
-  (Pair (\ (f) (f x y))))
+<span class="co">; never evaluate this; this is only useful in certain awful situations</span>
+<span class="co">; because it can be assigned any type, and is thus a useful dummy value</span>
+(<span class="kw">=</span> diverge (\ () (fix id)))
 
-(<span class="kw">=</span> fst (p)
-  (unpair p (\ (a b) a)))
+<span class="co">; pairs are tensor products</span>
+(<span class="kw">=</span> Pair (p) p)
+(<span class="kw">=</span> unpair (pr f) (pr f))
+(<span class="kw">=</span> pair (a b)
+  (Pair (\ (f) (f a b))))
 
-(<span class="kw">=</span> snd (p)
-  (unpair p (\ (a b) b)))
+(<span class="kw">=</span> fst (pr) (unpair pr (\ (a b) a)))
+(<span class="kw">=</span> snd (pr) (unpair pr (\ (a b) b)))
 
-<span class="co">; Options</span>
-(<span class="kw">=</span> maybe (o yes no)
-   (o yes no))
+<span class="co">; mapping a function onto a pair just maps its second element, by convention</span>
+(<span class="kw">=</span> pair-map (f pr)
+  (unpair pr (\ (a b) (pair a (f b)))))
 
-(<span class="kw">=</span> Option (x) x)
+(<span class="kw">=</span> dup (x) (pair x x))
+
+<span class="co">; Optional values</span>
+(<span class="kw">=</span> Maybe (m) m)
+
+<span class="co">; similar to an if, except the truth carries another value</span>
+(<span class="kw">=</span> maybe (m j n) (m j n))
 
 (<span class="kw">=</span> just (x)
-  (Option (\ (j n) (j x))))
+  (Maybe (\ (j n) (j x))))
 
 (<span class="kw">=</span> none ()
-  (Option (\ (j n) (n))))
+  (Maybe (\ (j n) n)))
 
-<span class="co">; Lists</span>
-(<span class="kw">=</span> foldr (xs c n)
-  (xs c n))
+(<span class="kw">=</span> maybe-map (f mb)
+  (maybe mb (\ (x) (just (f x))) none))
 
+<span class="co">; Lazy lists</span>
 (<span class="kw">=</span> List (l) l)
+(<span class="kw">=</span> foldr (xs c n) (xs c n))
 
+<span class="co">; prepends an item to a list</span>
 (<span class="kw">=</span> <span class="kw">cons</span> (x xs)
   (List (\ (c n) (c x (foldr xs c n)))))
 
+<span class="co">; the empty list</span>
 (<span class="kw">=</span> nil ()
-  (List (\ (c n) (n))))
+  (List (\ (c n) n)))
 
+<span class="co">; map a function over every element in a list</span>
+(<span class="kw">=</span> list-map (f xs)
+  (foldr xs (\ (y ys) (<span class="kw">cons</span> (f y) ys)) (nil)))
+
+<span class="co">; Safely deconstructs a (potentially infinite) list into its</span>
+<span class="co">; head and tail, returning them as a pair. The head is returned</span>
+<span class="co">; in a `Maybe`</span>
 (<span class="kw">=</span> split (xs)
-  (<span class="kw">let</span> ((f (\ (y ys)
-             (pair (just y)
-                   (List (\ (c n)
-                     (maybe (fst ys)
-                            (\ (x) (c x (foldr ((snd ys)) c n)))
-                            n)))))))
-  (foldr xs f (pair none nil))))
+  ((\ (f)
+     (foldr xs f (pair none nil)))
+   (\ (y ys)
+     (pair (just y)
+           (List (\ (c n)
+             (maybe (fst ys)
+                    (\ (x) (c x (foldr (snd ys) c n)))
+                    n)))))))
 
+<span class="co">; extract the first item from the list</span>
 (<span class="kw">=</span> <span class="kw">car</span> (xs)
-  (maybe (fst (split xs)) (\ (x) x) (promise -<span class="dv">1</span>)))
+  (maybe (fst (split xs)) id diverge))
 
+<span class="co">; drop the first item from the list, returning the rest</span>
 (<span class="kw">=</span> <span class="kw">cdr</span> (xs)
   (snd (split xs)))
 
-(<span class="kw">=</span> sum (xs)
-  (foldr xs (\ (y ys) (<span class="kw">+</span> y ys)) (promise <span class="dv">0</span>)))
+<span class="co">; length of the list</span>
+(<span class="kw">=</span> <span class="kw">length</span> (xs) (foldr xs (\ (y ys) (<span class="kw">+</span> <span class="dv">1</span> ys)) <span class="dv">0</span>))
 
-(<span class="kw">=</span> map-list (f xs)
-  (foldr xs (\ (y ys) (<span class="kw">cons</span> (f y) ys)) (promise (nil))))
+<span class="co">; append two lists</span>
+(<span class="kw">=</span> <span class="kw">append</span> (xs ys) (foldr xs <span class="kw">cons</span> ys))
 
-<span class="co">; Miscellaneous examples</span>
-(<span class="kw">=</span> add1 (x) (<span class="kw">+</span> <span class="dv">1</span> x))
+<span class="co">; a left-fold. Useful for conserving memory in certain streaming</span>
+<span class="co">; applications.</span>
+(<span class="kw">=</span> foldl (f a xs)
+  ((foldr xs
+     (\ (b g)
+       (\ (x)
+         (g (f x b))))
+     (\ (x) x)) a))
+
+(<span class="kw">=</span> filter (pred xs)
+  (foldr xs (\ (y ys) (<span class="kw">if</span> (pred y) (<span class="kw">cons</span> y ys) ys)) nil))
+
+<span class="co">;; some useful functions for testing</span>
+
 (<span class="kw">=</span> square (x) (* x x))
-(<span class="kw">=</span> fact (x)
-  (<span class="kw">if</span> (=? x <span class="dv">0</span>)
-      <span class="dv">1</span>
-      (* x (fact (<span class="kw">-</span> x <span class="dv">1</span>)))))
 
-(<span class="kw">=</span> lst1 (<span class="kw">cons</span> <span class="dv">3</span> (<span class="kw">cons</span> <span class="dv">2</span> (<span class="kw">cons</span> <span class="dv">1</span> (nil)))))
+<span class="co">; the gold standard test of any good fixpoint combinator</span>
+(<span class="kw">=</span> fact
+  (fix (\ (f)
+    (\ (n)
+      (<span class="kw">if</span> (=? n <span class="dv">0</span>)
+          <span class="dv">1</span>
+          (* n (f (<span class="kw">-</span> n <span class="dv">1</span>))))))))
 
-(print (<span class="kw">+</span> (sum (map-list add1 (map-list square lst1)))
-          (fact (<span class="kw">car</span> (<span class="kw">cdr</span> (lst1))))))</code></pre>
+(<span class="kw">=</span> p1 (pair <span class="dv">1</span> <span class="dv">2</span>))
+
+(<span class="kw">=</span> sum (xs)
+  (foldl (\ (acc n) (<span class="kw">+</span> acc n)) <span class="dv">0</span> xs))
+
+(<span class="kw">=</span> l1 (<span class="kw">cons</span> <span class="dv">1</span> (<span class="kw">cons</span> <span class="dv">2</span> (<span class="kw">cons</span> <span class="dv">3</span> (nil)))))</code></pre>
 <h1 id="how-to-build"><span class="header-section-number">4</span> How to build</h1>
 <p>You need the Glasgow Haskell Compiler and a number of libraries; I suggest starting off with <a href="http://haskell.org/platform">the Haskell platform</a>.</p>
 <p>Clone the repository:</p>
