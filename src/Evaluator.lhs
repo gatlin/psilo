@@ -218,31 +218,74 @@ demand. Voici:
 Evaluating expressions to values
 ---
 
+Evaluation is the process of breaking down an `Expr ()` into a result value.
+Because `Expr` is a *free monad*, it does not constrain this process in any
+way, allowing you to write multiple evaluators for the same code.
+
+For instance, I could write an evaluator which produces assembly, or another
+intermediate language, or I could simply perform static analysis and check
+different properties of the program. Free monads are cool.
+
+The evaluation strategy I'm taking here is called *call-by-need*. The principle
+is simple: when I apply a function to its arguments, I defer evaluation of the
+arguments until they are strictly necessary.
+
+This is in contrast to the more popular *call-by-value* strategy, which first
+evaluates all arguments to a function before evaluating the function itself.
+
+The base case is trivial enough - code will never actually produce this:
+
 > eval :: Expr () -> Machine Value
 > eval (Pure _) = return VNil
+
+Definitions are weird because they aren't technically expressions. They are
+commands to alter the state of the machine (hence, *statements*). In this case
+the body of the definition is simply bound to the corresponding symbol.
 
 > eval (Free (ADefine sym defn)) = do
 >     v <- eval defn
 >     store sym v
 >     return VNil
 
+The primitive types are simple enough, too:
+
 > eval (Free (AInteger n)) = return $ VInteger n
 > eval (Free (ABoolean b)) = return $ VBoolean b
+
+Symbols require you to look up the value associated with the symbol and just
+return that.
 
 > eval (Free (ASymbol s)) = do
 >     log $ "Looking up symbol " ++ (show s)
 >     maybeVal <- load s
 >     case maybeVal of
 >         Just v -> strict v
->         Nothing -> do
->             log "value not found"
->             return $ VInteger 0
+>         Nothing -> error $ (show s) ++ " not found!"
+
+Lambdas are stored basically as-is, except all the free variables in their
+bodies are copied into an internal environment and stored with them.
 
 > eval (Free (ALambda args body)) = do
 >     ev <- gets mEnv
 >     let vars = freeVariables body
 >     let ev' = filter (\(sym, val) -> elem sym vars) ev
 >     return $ VClosure args body ev'
+
+Application is the meat of the evaluation function. If the operation is a
+builtin, then use the builtin and move on.
+
+Otherwise, we *strictly* evaluate the operator - basically we keep evaluating
+it until it is no longer a `VThunk` (our value for deferred computations).
+
+If the normalized value is a closure, we need to first ensure we were given the
+correct number of arguments. If not, we create a closure expecting the
+remainder and return it.
+
+If, however, the arguments are satisfied, we fiddle with the environment so
+that the closure's internal closed environment is prominent, and evaluate the
+body of the closure. Afterward we reset the environment.
+
+Finally, if the operator was something else, we just return that.
 
 > eval (Free (AApply op erands)) = case builtin op of
 >     Just op' -> op' erands
@@ -269,7 +312,12 @@ Evaluating expressions to values
 >                     result <- eval body
 >                     modify $ \st -> st { mEnv = ev }
 >                     return result
->             _ -> return VNil
+>             v -> return v
+
+Auxiliary functions
+---
+
+`strict` takes `Value`s and evaluates them until they aren't thunks.
 
 > strict :: Value -> Machine Value
 > strict (VThunk body cl) = do
@@ -279,6 +327,9 @@ Evaluating expressions to values
 >     modify $ \st -> st { mEnv = oldEnv }
 >     return result
 > strict v = return v
+
+This is a table of builtin operators. When queried it sends back a `Maybe`
+operator to use.
 
 > builtin (Free (ASymbol sym)) = case sym of
 >     "+" -> Just $ \operands -> do
@@ -309,6 +360,9 @@ Evaluating expressions to values
 >                       log $ "wtf, got " ++ (show other)
 >                       return 0
 > builtin _ = Nothing
+
+This function computes a list of all the free variables in an expression - in
+other words, all variables not bound as arguments to a lambda abstraction.
 
 > freeVariables :: Expr () -> [Symbol]
 > freeVariables (Free (ALambda args body)) = (freeVariables body) \\ args

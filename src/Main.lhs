@@ -81,6 +81,10 @@ The repl is nothing more than calling `eval` in an endless loop.
 >                     liftIO . putStrLn . show $ st'
 >                 loop st'
 
+Executing a whole file does some type checking, separates out the definitions,
+installs those definitions into a machine, and then hands over execution to
+`repl` if there is no main expression.
+
 > execFile :: CmdLnOpts -> IO ()
 > execFile os@CmdLnOpts{..} = do
 >     parsed <- parseFile optFile
