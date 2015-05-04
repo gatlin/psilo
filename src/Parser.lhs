@@ -47,7 +47,7 @@ bind values in lambda abstractions.
 
 > parseSymbol :: Parser (Expr a)
 > parseSymbol = do
->     sym <- operator <|> identifier
+>     sym <- operator <|> (optional (char '\'')) *> identifier
 >     sym' <- chomped sym
 >     return $ Free $ ASymbol sym'
 >     where chomped s = let s' = splitOn ":" s

@@ -17,6 +17,8 @@ import Control.Comonad
 
 testsym = "okay"
 
+getAst x = let Right (a:_) = parseTopLevel x in a
+
 dealloc :: Location -> Machine ()
 dealloc loc = do
     sto <- gets mSto

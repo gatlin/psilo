@@ -84,6 +84,7 @@ some ultimate result type onto which we can map our `Expr`s.
 >     = VNil
 >     | VInteger Integer
 >     | VBoolean Bool
+>     | VSymbol  Symbol
 >     | VClosure { clArgs :: [Symbol]
 >                , clBody :: (Expr ())
 >                , clEnv  :: Environment Location}
@@ -94,6 +95,7 @@ some ultimate result type onto which we can map our `Expr`s.
 >     show VNil = "()"
 >     show (VBoolean b) = show b
 >     show (VInteger n) = show n
+>     show (VSymbol  s) = '\'':s
 >     show (VThunk   e c) = "<thunk> { " ++ (show e) ++ " , " ++
 >                                           (show c) ++ " } "
 >     show (VClosure a b e) = "<closure> { args = " ++ (show a) ++
@@ -254,8 +256,20 @@ The primitive types are simple enough, too:
 
 Symbols require you to look up the value associated with the symbol and just
 return that. At this juncture we enforce strictness. However, the first time
-the result is calculated it will 
+the result is calculated it will be stored as such.
 
+> eval (Free (ASymbol s)) = do
+>     maybeLoc <- query s
+>     case maybeLoc of
+>         Just loc -> fetch loc >>= \maybeVal -> case maybeVal of
+>             Just v -> do
+>                 v' <- strict v
+>                 update loc v'
+>                 return v'
+>             Nothing -> return $ VSymbol s
+>         Nothing -> return $ VSymbol s
+
+> {-
 > eval (Free (ASymbol s)) = do
 >     maybeVal <- load s
 >     case maybeVal of
@@ -264,7 +278,8 @@ the result is calculated it will
 >             Just loc <- query s
 >             update loc v'
 >             return v'
->         Nothing -> error $ (show s) ++ " not found!"
+>         Nothing -> return $ VSymbol s
+> -}
 
 Lambdas are stored basically as-is, except all the free variables in their
 bodies are copied into an internal environment and stored with them.

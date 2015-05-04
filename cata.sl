@@ -3,6 +3,8 @@
 ; identity function
 (= id (x) x)
 
+(= compose (f g) (\ (x) (f (g x))))
+
 ; a (probably over-complicated) fixpoint combinator
 (= fix
   ((\ (t)
@@ -43,6 +45,28 @@
 
 (= maybe-map (f mb)
   (maybe mb (\ (x) (just (f x))) none))
+
+; Box, the identity functor
+(= Box (b) b)
+(= unbox (bx) (bx id))
+(= box (x) (Box (\ (f) (f x))))
+
+(= box-map (f bx)
+  ((\ (x) (box (f x)))
+   (unbox bx)))
+
+; Const, similar to Box but it does not mutate its contents when mapped over
+(= Const (c) c)
+(= const (x) (Const (\ (f) (x))))
+(= get-const (c) (c id))
+(= const-map (f c) c)
+
+; Lens utilities!
+(= over (l f s)
+  (unbox ((l (compose box f) s) box-map)))
+
+(= view (l s)
+  (get-const ((l Const s) const-map)))
 
 ; Lazy lists
 (= List (l) l)
@@ -111,7 +135,6 @@
               (cons h (f (pair (- n 1) t))))
             (car xs) (cdr xs)))))))))))
 
-;           (cons (car xs) (f (pair (- n 1) (cdr xs)))))))))))))
 
 (= unfold (gen seed)
   ((\ (u) (u (pair gen seed)))
@@ -121,8 +144,8 @@
 ;; some useful functions for testing
 
 (= square (x) (* x x))
-
 (= even? (x) (=? 0 (mod x 2)))
+(= add1 (x) (+ 1 x))
 
 ; the gold standard test of any good fixpoint combinator
 (= fact
@@ -140,3 +163,23 @@
 (= l1 (cons 1 (cons 2 (cons 3 (nil)))))
 
 (= powers-of-2 (unfold square 2))
+
+(= Person (p) p)
+(= person (name age) (Person (\ (f) (f name age))))
+
+(= name (f p)
+  (\ (mapper)
+    (p (\ (n a)
+      (mapper (\ (new-n) (person new-n a))
+              (f n))))))
+
+(= age (f p)
+  (\ (mapper)
+    (p (\ (n a)
+      (mapper (\ (new-a) (person n new-a))
+              (f a))))))
+
+(= george (person 'george-washington 283))
+
+(= birthday (p)
+  (over age add1 p))
