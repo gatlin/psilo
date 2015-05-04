@@ -109,6 +109,9 @@
          (if (zero? (length xs)) (nil)
            (cons (car xs) (f (pair (- n 1) (cdr xs)))))))))))))
 
+(= unfold (gen seed)
+  ((\ (next)
+     (cons next (unfold gen next)))))
 
 ;; some useful functions for testing
 
