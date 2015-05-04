@@ -71,3 +71,21 @@ ast_2 = parseTopLevel "(cons 3 (cons 2 (cons 1 (nil))))"
 
 cm_1 = cofreeMu ast_1' where Right (ast_1':_) = ast_1
 cm_2 = cofreeMu ast_2' where Right (ast_2':_) = ast_2
+
+add_ast = getAst "(\\ (x y) (+ x y))"
+mul_ast = getAst "((\\ (x y) (* x y)) 5 3)"
+foo_ast = getAst "(foo x y z w b)"
+
+toUnary :: Expr () -> Expr ()
+toUnary (Free (ALambda [] body)) = Free $ ALambda [] $ toUnary body
+toUnary (Free (ALambda (a:[]) body)) = Free $ ALambda [a] $ toUnary body
+toUnary (Free (ALambda (a:as) body)) = Free $ ALambda [a] $ toUnary $ Free $ ALambda as body
+
+toUnary (Free (AApply op [])) = Free $ AApply (toUnary op) []
+toUnary (Free (AApply op (e:[]))) = Free $ AApply (toUnary op) [toUnary e]
+toUnary (Free (AApply op es)) = Free $ AApply op' [toUnary e_last]
+    where e_init = init es
+          e_last = last es
+          op'    = Free $ AApply op e_init
+
+toUnary e = e
