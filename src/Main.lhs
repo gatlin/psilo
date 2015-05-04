@@ -75,19 +75,20 @@ The repl is nothing more than calling `eval` in an endless loop.
 >                         let ast'      = (ast !! 0) :: Expr ()
 >                         let maybeType = typeTree $ cofreeMu $ toUnary ast'
 >                         case maybeType of
->                             Just ty -> liftIO . putStrLn . show $ ty
->                             _       -> liftIO . putStrLn $ "Bad type"
->                         when optParsed $ do
->                             liftIO . putStrLn . show $ ast'
->                         ((ret, log), st') <- liftIO $
->                             runMachine st $ (eval ast') >>= strict
->                         liftIO . putStrLn . show $ ret
->                         when optConLog $ do
->                             liftIO . putStrLn $ "Log\n---"
->                             displayLog log
->                         when optState $ do
->                             liftIO . putStrLn . show $ st'
->                         loop st'
+>                             Nothing -> liftIO . putStrLn $ "Bad type"
+>                             Just ty -> do
+>                                 -- TODO: reuse the type constraints
+>                                 when optParsed $ do
+>                                     liftIO . putStrLn . show $ ast'
+>                                 ((ret, log), st') <- liftIO $
+>                                     runMachine st $ (eval ast') >>= strict
+>                                 liftIO . putStrLn . show $ ret
+>                                 when optConLog $ do
+>                                     liftIO . putStrLn $ "Log\n---"
+>                                     displayLog log
+>                                 when optState $ do
+>                                     liftIO . putStrLn . show $ st'
+>                                 loop st'
 
 Executing a whole file does some type checking, separates out the definitions,
 installs those definitions into a machine, and then hands over execution to
@@ -100,6 +101,9 @@ installs those definitions into a machine, and then hands over execution to
 >         Left err -> print err >> return ()
 >         Right xs -> do
 >             (defns, exprs) <- return $ partition isDefn xs
+>             defnsTypes <- forM defns $ \defn -> return $ typeTree $ cofreeMu $
+>                 toUnary defn
+>             -- todo: do something with type information
 >             st <- insertDefns defns newMachineState
 >             case length exprs of
 >                 0 -> repl os st
