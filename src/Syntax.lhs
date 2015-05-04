@@ -70,13 +70,13 @@ Not bad, huh?
 >     show (Pure _)   = ""
 >     show (Free x) = " ( " ++ show x ++ " ) "
 
-> aInteger :: (MonadFree AST m) => Integer -> m a
+> aInteger :: (MonadFree AST m) => Integer -> m ()
 > aInteger x = liftF $ AInteger x
 
-> aBoolean :: (MonadFree AST m) => Bool -> m a
+> aBoolean :: (MonadFree AST m) => Bool -> m ()
 > aBoolean x = liftF $ ABoolean x
 
-> aSymbol :: (MonadFree AST m) => Symbol -> m a
+> aSymbol :: (MonadFree AST m) => Symbol -> m ()
 > aSymbol x = liftF $ ASymbol x
 
 > aLambda args body = liftF $ ALambda args body

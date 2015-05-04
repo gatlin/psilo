@@ -1,48 +1,96 @@
 (= id (x) x)
 
-(= dup (x) (pair x x))
+(= turing
+  (\ (f)
+    (\ (n)
+      (f n f))))
+
+(= fix
+  (turing (\ (f fx)
+    (f (fx f fx)))))
+
+(= fact
+  (fix (\ (f)
+    (\ (n)
+      (if (=? n 0)
+          1
+          (* n (f (- n 1))))))))
+
+(= diverge (\ () (fix id)))
 
 (= const (x)
   (\ (y) x))
 
-(= if (c t e) (c t e))
-(= T (x y) x)
-(= F (x y) y)
-
 (= square (x) (* x x))
 
+(= Pair (p) p)
+(= unpair (pr f) (pr f))
 (= pair (a b)
-  (\ (f) (f a b)))
+  (Pair (\ (f) (f a b))))
 
-(= fst (pr)
-  (pr (\ (a b) a)))
-
-(= snd (pr)
-  (pr (\ (a b) b)))
+(= fst (pr) (unpair pr (\ (a b) a)))
+(= snd (pr) (unpair pr (\ (a b) b)))
 
 (= pair-map (f pr)
-  (pr (\ (a b) (pair a (f b)))))
+  (unpair pr (\ (a b) (pair a (f b)))))
 
-(= pair-1 (pair 1 2))
+(= p1 (pair 1 2))
 
-(= maybe (m r o) (m r o))
+(= dup (x) (pair x x))
 
-(= just (x) (\ (j n) (j x)))
-(= none ()  (\ (j n) n))
+(= Maybe (m) m)
+(= maybe (m j n) (m j n))
+
+(= just (x)
+  (Maybe (\ (j n) (j x))))
+
+(= none ()
+  (Maybe (\ (j n) n)))
 
 (= maybe-map (f mb)
   (maybe mb (\ (x) (just (f x))) none))
 
-(= j1 (just 1))
-
+(= List (l) l)
 (= foldr (xs c n) (xs c n))
 
-(= cons (x xs) (\ (c n) (c x (foldr xs c n))))
-(= nil  ()     (\ (k t) t))
+(= cons (x xs)
+  (List (\ (c n) (c x (foldr xs c n)))))
 
-(= lst-1 (cons 2 (cons 1 (nil))))
+(= nil ()
+  (List (\ (c n) n)))
 
-(= sum (xs) (foldr xs (\ (y ys) (+ y (ys))) 0))
+(= list-map (f xs)
+  (foldr xs (\ (y ys) (cons (f y) ys)) (nil)))
 
-(= add (a b) (+ a b))
+(= l1 (cons 1 (cons 2 (cons 3 (nil)))))
+
+(= split (xs)
+  ((\ (f)
+     (foldr xs f (pair none nil)))
+   (\ (y ys)
+     (pair (just y)
+           (List (\ (c n)
+             (maybe (fst ys)
+                    (\ (x) (c x (foldr (snd ys) c n)))
+                    n)))))))
+
+(= car (xs)
+  (maybe (fst (split xs)) id diverge))
+
+(= cdr (xs)
+  (snd (split xs)))
+
+(= length (xs) (foldr xs (\ (y ys) (+ 1 ys)) 0))
+
+(= append (xs ys) (foldr xs cons ys))
+
+(= foldl (f a xs)
+  ((foldr xs
+     (\ (b g)
+       (\ (x)
+         (g (f x b))))
+     (\ (x) x)) a))
+
+(= sum (xs)
+  (foldl (\ (acc n) (+ acc n)) 0 xs))
 

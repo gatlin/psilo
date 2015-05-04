@@ -66,33 +66,6 @@ evaluate in the context of the arguments.
 >     body <- parseExpr
 >     return $ Free $ ALambda (expr2symlist args) body
 
-`let` bindings are formally equivalent to wrapping an expression in an outer
-closure and immediately evaluating it, like so:
-
-> {-
-> parseLetBinding :: Parser (Expr a)
-> parseLetBinding = do
->     optional whitespace
->     sym <- parseSymbol
->     optional whitespace
->     val <- parseExpr
->     return $ Free . AList $ [sym, val]
->
-> parseLetBindings :: Parser (Expr a)
-> parseLetBindings = fmap (Free . AList) $ parens parseLetBinding `sepBy` whitespace
->
-> parseLet :: Parser (Expr a)
-> parseLet = do
->     reserved "let"
->     optional whitespace
->     (Free (AList assns)) <- parens parseLetBindings
->     body  <- parseExpr <|> return (Free (AList []))
->     (args,operands) <- (flip mapAndUnzipM) assns $ \(Free (AList (x:y:_))) -> return (x,y)
->     operands' <- return $ Free $ AList operands
->     fun <- return $ Free $ ALambda (expr2symlist args) body
->     return $ Free (AApply fun operands')
-> -}
-
 The application of a function to a list of arguments, a single symbol, or
 an arbitrary expression value.
 

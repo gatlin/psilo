@@ -61,36 +61,25 @@ then we execute the program in that file and halt. Otherwise we fire up a repl.
 The repl is nothing more than calling `eval` in an endless loop.
 
 > repl :: CmdLnOpts -> MachineState -> IO ()
-> repl os@CmdLnOpts{..} st = runInputT defaultSettings (loop st []) where
->     loop st types = do
+> repl os@CmdLnOpts{..} st = runInputT defaultSettings (loop st) where
+>     loop st = do
 >         minput <- getInputLine "psilo> "
 >         case minput of
 >             Nothing -> outputStrLn "Goodbye."
->             -- TODO ugly disgusting hack
->             Just input -> if (take 5 input == ":type")
->                     then do
->                         liftIO . putStrLn . show $ lookup (drop 6 input) types
->                         loop st types
->                     else do
->                         let Right ast = parseTopLevel input
->                         let ast'      = (ast !! 0) :: Expr ()
->                         let typed = typeTree $ cofreeMu ast'
->                         case typed of
->                             Nothing -> (liftIO $ putStrLn "Type error") >>
->                                 loop st types
->                             Just ty -> do
->                               when optParsed $ do
->                                   liftIO . putStrLn . show $ ast'
->                               ((ret, log), st') <- liftIO $ runMachine st $ (eval ast')
->                               liftIO . putStrLn . show $ ret
->                               when optConLog $ do
->                                   liftIO . putStrLn $ "Log\n---"
->                                   displayLog log
->                               when optState $ do
->                                   liftIO . putStrLn . show $ st'
->                               loop st' $ types' ast' ty types
->     types' (Free (ADefine sym _)) ty types = (sym, ty) : types
->     types'  _                      _  types = types
+>             Just input -> do
+>                 let Right ast = parseTopLevel input
+>                 let ast'      = (ast !! 0) :: Expr ()
+>                 when optParsed $ do
+>                     liftIO . putStrLn . show $ ast'
+>                 ((ret, log), st') <- liftIO $
+>                     runMachine st $ (eval ast') >>= strict
+>                 liftIO . putStrLn . show $ ret
+>                 when optConLog $ do
+>                     liftIO . putStrLn $ "Log\n---"
+>                     displayLog log
+>                 when optState $ do
+>                     liftIO . putStrLn . show $ st'
+>                 loop st'
 
 > execFile :: CmdLnOpts -> IO ()
 > execFile os@CmdLnOpts{..} = do
@@ -101,17 +90,14 @@ The repl is nothing more than calling `eval` in an endless loop.
 >             (defns, exprs) <- return $ partition isDefn xs
 >             defnsTypes <- forM defns $ \defn -> do
 >                 return $ typeTree $ cofreeMu defn
->             if (length (filter isNothing defnsTypes)) > 0
->                 then putStrLn "Type error"
->                 else do
->                     st <- insertDefns defns newMachineState
->                     case length exprs of
->                         0 -> repl os st
->                         _ -> do
->                             let expr = exprs !! 0
->                             ((ret, log), st') <- runMachine st $ eval expr
->                             when optState $ do
->                                 putStrLn . show $ st'
+>             st <- insertDefns defns newMachineState
+>             case length exprs of
+>                 0 -> repl os st
+>                 _ -> do
+>                     let expr = exprs !! 0
+>                     ((ret, log), st') <- runMachine st $ eval expr
+>                     when optState $ do
+>                             putStrLn . show $ st'
 >    where
 >        isDefn (Free (ADefine _ _)) = True
 >        isDefn _                    = False
