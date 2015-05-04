@@ -4,6 +4,12 @@ body {
   padding-bottom: 20px;
 }
 
+/* Use Merriweather by default for p tags */
+p, blockquote {
+  font-feature-settings: "liga", "onum", "kern";
+  font-family: "Merriweather",serif;
+  }
+
 /* Everything but the jumbotron gets side spacing for mobile-first views */
 .header,
 .marketing,
