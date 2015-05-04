@@ -132,9 +132,9 @@
        (if (zero? n) (nil)
          (if (zero? (length xs)) (nil)
            ((\ (h t)
-              (cons h (f (pair (- n 1) t))))
+              (List (\ (c e)
+                (c h (f (pair (- n 1) t ))))))
             (car xs) (cdr xs)))))))))))
-
 
 (= unfold (gen seed)
   ((\ (u) (u (pair gen seed)))

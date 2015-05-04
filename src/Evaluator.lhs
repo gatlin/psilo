@@ -96,12 +96,9 @@ some ultimate result type onto which we can map our `Expr`s.
 >     show (VBoolean b) = show b
 >     show (VInteger n) = show n
 >     show (VSymbol  s) = '\'':s
->     show (VThunk   e c) = "<thunk> { " ++ (show e) ++ " , " ++
->                                           (show c) ++ " } "
+>     show (VThunk   e c) = "<thunk> { " ++ (show e) ++ " } "
 >     show (VClosure a b e) = "<closure> { args = " ++ (show a) ++
->                             ", body = " ++ (show b) ++
->                             ", env  = " ++ (show e) ++
->                             " } "
+>                             ", body = " ++ (show b) ++ " } "
 
 The Machine
 ---
@@ -259,27 +256,19 @@ return that. At this juncture we enforce strictness. However, the first time
 the result is calculated it will be stored as such.
 
 > eval (Free (ASymbol s)) = do
->     maybeLoc <- query s
->     case maybeLoc of
->         Just loc -> fetch loc >>= \maybeVal -> case maybeVal of
->             Just v -> do
->                 v' <- strict v
->                 update loc v'
->                 return v'
->             Nothing -> return $ VSymbol s
->         Nothing -> return $ VSymbol s
-
-> {-
-> eval (Free (ASymbol s)) = do
->     maybeVal <- load s
->     case maybeVal of
->         Just v -> do
->             v' <- strict v
->             Just loc <- query s
->             update loc v'
->             return v'
->         Nothing -> return $ VSymbol s
-> -}
+>     case s of
+>         "#t" -> return $ VBoolean True
+>         "#f" -> return $ VBoolean False
+>         _ -> do
+>             maybeLoc <- query s
+>             case maybeLoc of
+>                 Just loc -> fetch loc >>= \maybeVal -> case maybeVal of
+>                     Just v -> do
+>                         v' <- strict v
+>                         update loc v'
+>                         return v'
+>                     Nothing -> return $ VSymbol s
+>                 Nothing -> return $ VSymbol s
 
 Lambdas are stored basically as-is, except all the free variables in their
 bodies are copied into an internal environment and stored with them.
@@ -372,12 +361,19 @@ operator to use.
 >     "and" -> Just $ \operands -> do
 >         arg1 <- eval (operands !! 0) >>= strict
 >         if arg1 == (VBoolean False)
+>             then return (VBoolean False)
+>             else do
+>                 arg2 <- eval (operands !! 1) >>= strict
+>                 if arg2 == (VBoolean False)
+>                     then return (VBoolean False) else return $ VBoolean True
+>     "or" -> Just $ \operands -> do
+>         arg1 <- eval (operands !! 0) >>= strict
+>         if arg1 == (VBoolean True)
 >             then return arg1
 >             else do
->                 arg2 <- eval (operands !! 0) >>= strict
->                 if arg2 == (VBoolean False)
->                     then return arg2 else return $ VBoolean True
->         return $ VBoolean True
+>                 arg2 <- eval (operands !! 1) >>= strict
+>                 if arg2 == (VBoolean True)
+>                     then return arg2 else return $ VBoolean False
 >     "if" -> Just $ \operands -> do
 >         VBoolean c <- eval (operands !! 0) >>= strict
 >         if c then eval (operands !! 1) >>= strict

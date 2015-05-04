@@ -35,7 +35,7 @@ Booleans are represented by the atoms `#t` and `#f`.
 
 > parseBoolean :: Parser (Expr a)
 > parseBoolean = do
->     char '#'
+>     reserved "#"
 >     b <- char 't' <|> char 'f'
 >     case b of
 >         't' -> return $ Free $ ABoolean True

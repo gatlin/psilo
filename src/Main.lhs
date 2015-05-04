@@ -67,19 +67,23 @@ The repl is nothing more than calling `eval` in an endless loop.
 >         case minput of
 >             Nothing -> outputStrLn "Goodbye."
 >             Just input -> do
->                 let Right ast = parseTopLevel input
->                 let ast'      = (ast !! 0) :: Expr ()
->                 when optParsed $ do
->                     liftIO . putStrLn . show $ ast'
->                 ((ret, log), st') <- liftIO $
->                     runMachine st $ (eval ast') >>= strict
->                 liftIO . putStrLn . show $ ret
->                 when optConLog $ do
->                     liftIO . putStrLn $ "Log\n---"
->                     displayLog log
->                 when optState $ do
->                     liftIO . putStrLn . show $ st'
->                 loop st'
+>                 let wtf = parseTopLevel input
+>                 case wtf of
+>                     Left fuckyou -> do
+>                         liftIO . putStrLn $ "wtf: " ++ (show fuckyou)
+>                     Right ast -> do
+>                         let ast'      = (ast !! 0) :: Expr ()
+>                         when optParsed $ do
+>                             liftIO . putStrLn . show $ ast'
+>                         ((ret, log), st') <- liftIO $
+>                             runMachine st $ (eval ast') >>= strict
+>                         liftIO . putStrLn . show $ ret
+>                         when optConLog $ do
+>                             liftIO . putStrLn $ "Log\n---"
+>                             displayLog log
+>                         when optState $ do
+>                             liftIO . putStrLn . show $ st'
+>                         loop st'
 
 Executing a whole file does some type checking, separates out the definitions,
 installs those definitions into a machine, and then hands over execution to
