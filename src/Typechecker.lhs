@@ -46,13 +46,35 @@ Our type language
 ---
 
 > data Type
->     = [Type] :-> Type
+>     = Type :-> Type
 >     | TVar Int
 >     | TNumber
 >     | TBoolean
 >     | TVoid
+>     | TError String
 >
 > deriving instance Show Type
+
+Note that the `:->` type constructor doesn't have lists anywhere. For now,
+because the author is tired and not very brilliant, all incoming syntax trees
+will be transformed into unary functions.
+
+To this end, I have written the following:
+
+> toUnary :: Expr () -> Expr ()
+> toUnary (Free (ALambda [] body)) = Free $ ALambda [] $ toUnary body
+> toUnary (Free (ALambda (a:[]) body)) = Free $ ALambda [a] $ toUnary body
+> toUnary (Free (ALambda (a:as) body)) = Free $ ALambda [a] $ toUnary $ Free $ ALambda as body
+> toUnary (Free (AApply op [])) = Free $ AApply (toUnary op) []
+> toUnary (Free (AApply op (e:[]))) = Free $ AApply (toUnary op) [toUnary e]
+> toUnary (Free (AApply op es)) = Free $ AApply op' [toUnary e_last]
+>     where e_init = init es
+>           e_last = last es
+>           op'    = toUnary $ Free $ AApply op e_init
+> toUnary (Free (ADefine sym val)) = Free $ ADefine sym (toUnary val)
+> toUnary e = e
+
+I am aware how horrible this is.
 
 Constraints
 ---
@@ -204,33 +226,31 @@ until they are bound by constraints to a concrete type.
 Function abstraction takes each of its bound variables out of its body's
 assumption map and turns them into input constraints.
 
-> generateConstraints (() :< ALambda args b) = do
->     argIds <- forM args $ \arg -> do
->         var <- freshVarId
->         return (arg, var)
->     br  <- memoizedTC generateConstraints b
->     let cs = forM argIds $ \(arg,var) -> do
->             return $ maybe [] (map $ EqualityConstraint var)
->                      (M.lookup arg . assumptions $ snd br)
->         as = forM argIds $ \(arg,_) -> do
->             return $ M.delete arg . assumptions $ snd br
->     return ((map snd argIds) :-> (fst br), TypeResult
->         { constraints = constraints (snd br) `mappend` (mconcat (mconcat cs))
->         , assumptions = mconcat $ mconcat as
->         })
+> generateConstraints (() :< ALambda [] b) = generateConstraints b
+
+> generateConstraints (() :< ALambda (arg:[]) b) = do
+>     var <- freshVarId
+>     br <- memoizedTC generateConstraints b
+>     let cs = maybe [] (map $ EqualityConstraint var) (M.lookup arg .
+>             assumptions $ snd br)
+>         as = M.delete arg . assumptions $ snd br
+>     return (var :-> (fst br), TypeResult {
+>         constraints = constraints (snd br) `mappend` cs,
+>         assumptions = as })
 
 Function application generates constraints and fresh type variables for each
 argument and the return value, along with a constraint that the function takes
 a number of arguments of certain types and returns the return type.
 
-> generateConstraints (() :< AApply a b) = do
+> generateConstraints (() :< AApply a []) = generateConstraints a
+
+> generateConstraints (() :< AApply a (b:[])) = do
 >     var <- freshVarId
->     ar  <- memoizedTC generateConstraints a
->     br  <- mapM (memoizedTC generateConstraints) b
->     return (var, snd ar `mappend` (mconcat (map snd br)) `mappend` TypeResult
->         { constraints = [EqualityConstraint (fst ar) $ (map fst br) :-> var]
->         , assumptions = mempty
->         })
+>     ar <- memoizedTC generateConstraints a
+>     br <- memoizedTC generateConstraints b
+>     return (var, snd ar `mappend` snd br `mappend` TypeResult {
+>         constraints = [EqualityConstraint (fst ar) $ (fst br) :-> var ],
+>         assumptions = mempty })
 
 Definitions are a bit obtuse: they are declarative mutations to the static
 environment and thus do not compose or return anything useful. As a result,
@@ -242,6 +262,9 @@ they are simply the type of whatever value stored in them.
 >         { constraints = constraints (snd valType)
 >         , assumptions = assumptions (snd valType)
 >         })
+
+> generateConstraints blah = do
+>     return (TError (show blah), mempty)
 
 Constraint solving
 ---
@@ -268,10 +291,10 @@ Given two types, get a map of substitutions if the types unify:
 > mostGeneralUnifier TNumber TNumber = Just M.empty
 > mostGeneralUnifier TBoolean TBoolean = Just M.empty
 >
-> mostGeneralUnifier (as :-> b) (cs :-> d) = do
->     s1s <- forM (zip as cs) $ \(a, c) -> mostGeneralUnifier a c
->     mconcat $ map (\s1 -> liftM2 mappend (mostGeneralUnifier (substitute s1 b)
->                                        (substitute s1 d)) $ Just s1) s1s
+> mostGeneralUnifier (a :-> b) (c :-> d) = do
+>     s1 <- mostGeneralUnifier a c
+>     liftM2 mappend (mostGeneralUnifier (substitute s1 b) (substitute s1 d)) $
+>         Just s1
 >
 > mostGeneralUnifier _ _ = Nothing
 
@@ -279,8 +302,7 @@ Actually substitute the mappings in the type, yielding a more specific type.
 
 > substitute :: M.Map Int Type -> Type -> Type
 > substitute subs v@(TVar i) = maybe v (substitute subs) $ M.lookup i subs
-> substitute subs (as :-> b) = (map (substitute subs) as) :->
->     (substitute subs b)
+> substitute subs (a :-> b) = (substitute subs a) :-> (substitute subs b)
 > substitute _ t = t
 
 Putting it all together

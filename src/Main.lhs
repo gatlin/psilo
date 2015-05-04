@@ -73,6 +73,10 @@ The repl is nothing more than calling `eval` in an endless loop.
 >                         liftIO . putStrLn $ "wtf: " ++ (show fuckyou)
 >                     Right ast -> do
 >                         let ast'      = (ast !! 0) :: Expr ()
+>                         let maybeType = typeTree $ cofreeMu $ toUnary ast'
+>                         case maybeType of
+>                             Just ty -> liftIO . putStrLn . show $ ty
+>                             _       -> liftIO . putStrLn $ "Bad type"
 >                         when optParsed $ do
 >                             liftIO . putStrLn . show $ ast'
 >                         ((ret, log), st') <- liftIO $
@@ -96,8 +100,6 @@ installs those definitions into a machine, and then hands over execution to
 >         Left err -> print err >> return ()
 >         Right xs -> do
 >             (defns, exprs) <- return $ partition isDefn xs
->             defnsTypes <- forM defns $ \defn -> do
->                 return $ typeTree $ cofreeMu defn
 >             st <- insertDefns defns newMachineState
 >             case length exprs of
 >                 0 -> repl os st
