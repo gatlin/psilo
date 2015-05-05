@@ -33,22 +33,19 @@ This is probably sub-optimal; parsec is a harsh master.
 
 Booleans are represented by the atoms `#t` and `#f`.
 
-> parseBoolean :: Parser (Expr a)
-> parseBoolean = do
->     atom <- identifier <|> operator
->     case atom of
->         "#t" -> return $ Free $ ABoolean True
->         "#f" -> return $ Free $ ABoolean False
-
 Symbols are like "atoms" in other lisps or Erlang. They are equivalent
 only to themselves and have no intrinsic value. They are mostly used to
-bind values in lambda abstractions.
+bind values in lambda abstractions. The symbols `#t` and `#f` are special, as
+they denote Boolean truth and false values.
 
 > parseSymbol :: Parser (Expr a)
 > parseSymbol = do
->     sym <- operator <|> (optional (char '\'')) *> identifier
+>     sym <- operator <|> (optional (char '\'')) *> identifier <|> operator
 >     sym' <- chomped sym
->     return $ Free $ ASymbol sym'
+>     case sym' of
+>         "#t" -> return $ Free $ ABoolean True
+>         "#f" -> return $ Free $ ABoolean False
+>         otherwise -> return $ Free $ ASymbol sym'
 >     where chomped s = let s' = splitOn ":" s
 >                       in  return $ s' !! 0
 
@@ -72,7 +69,6 @@ an arbitrary expression value.
 > parseApp = do
 >     fst <- ( try parseSymbol
 >          <|> try parseNumber
->          <|> parseBoolean
 >          <|> try (parens parseFn)
 >          <|> parens parseApp )
 >     optional whitespace
@@ -103,8 +99,7 @@ treated especially as strictly speaking they are not expressions.
 Top level expression parser
 
 > parseExpr :: Parser (Expr a)
-> parseExpr = parseBoolean
->         <|> parseSymbol
+> parseExpr = parseSymbol
 >         <|> parseNumber
 >         <|> parens ( parseDefn <|> parseFn <|> parseApp )
 
