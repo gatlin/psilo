@@ -33,8 +33,8 @@ The main purpose of this module is to remove some clutter from `Parser`.
 >                     , Tok.identLetter = idLetters
 >                     , Tok.opStart = opStarts
 >                     , Tok.opLetter = opLetters
->                     , Tok.commentStart = "/*"
->                     , Tok.commentEnd = "*/"
+>                     , Tok.commentStart = "{-"
+>                     , Tok.commentEnd = "-}"
 >           }
 >
 > integer :: Parser Integer
