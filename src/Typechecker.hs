@@ -92,22 +92,28 @@ generateConstraints (() :< ASymbol s) = do
         , assumptions = M.singleton s [var]
         })
 
-generateConstraints (() :< ALambda arg b) = do
+generateConstraints (() :< ALambda (Free (ASymbol s)) b) = do
     var <- freshVarId
     br <- memoizedTC generateConstraints b
-    let cs = maybe [] (map $ EqualityConstraint var) (M.lookup arg .
-            assumptions $ snd br)
-        as = M.delete arg . assumptions $ snd br
+    let cs = maybe [] (map $ EqualityConstraint var)
+                      (M.lookup s . assumptions $ snd br)
+        as = M.delete s . assumptions $ snd br
     return (var :-> (fst br), TypeResult {
-        constraints = constraints (snd br) `mappend` cs,
+        constraints = constraints (snd br) <> cs,
         assumptions = as })
 
 generateConstraints (() :< AApply a b) = do
     var <- freshVarId
     ar <- memoizedTC generateConstraints a
     br <- memoizedTC generateConstraints b
-    return (var, snd ar `mappend` snd br `mappend` TypeResult {
-        constraints = [EqualityConstraint (fst ar) $ (fst br) :-> var ],
+    return (var, snd ar <> snd br <> TypeResult {
+        constraints = [EqualityConstraint (fst ar) $ (fst br) :-> var],
+        assumptions = mempty })
+
+generateConstraints (() :< AList items) = do
+    var <- freshVarId
+    return (var, TypeResult {
+        constraints = mempty,
         assumptions = mempty })
 
 generateConstraints (() :< ADefine sym val) = do
@@ -117,8 +123,7 @@ generateConstraints (() :< ADefine sym val) = do
         , assumptions = assumptions (snd valType)
         })
 
-generateConstraints blah = do
-    return (TError (show blah), mempty)
+generateConstraints blah = return (TError (show blah), mempty)
 
 solveConstraints :: [Constraint] -> Maybe (M.Map Int Type)
 solveConstraints =

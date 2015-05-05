@@ -22,7 +22,7 @@ data AST a
     | AInteger Integer
     | ABoolean Bool
     | ASymbol Symbol
-    | ALambda a a
+    | ALambda Symbol a
     | AApply a a
     | ADefine Symbol a
 

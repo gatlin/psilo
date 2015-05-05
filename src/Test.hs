@@ -5,6 +5,7 @@ module Test where
 import Syntax
 import Parser
 import Evaluator
+import Typechecker
 
 import Control.Monad.Trans
 import Control.Monad.State
@@ -20,3 +21,5 @@ getAst x = case parseTopLevel x of
     Left err -> error $ "wtf: " ++ (show err)
     Right (a:_)  -> a
 
+square_ast = getAst "(= square (x) (* x x))"
+square_mu  = cofreeMu square_ast
