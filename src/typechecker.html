@@ -80,13 +80,29 @@ Typechecker
 <span class="kw">import </span><span class="dt">Syntax</span></code></pre>
 <h2 id="our-type-language">Our type language</h2>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="kw">data</span> <span class="dt">Type</span>
-    <span class="fu">=</span> [<span class="dt">Type</span>] <span class="fu">:-&gt;</span> <span class="dt">Type</span>
+    <span class="fu">=</span> <span class="dt">Type</span> <span class="fu">:-&gt;</span> <span class="dt">Type</span>
     <span class="fu">|</span> <span class="dt">TVar</span> <span class="dt">Int</span>
     <span class="fu">|</span> <span class="dt">TNumber</span>
     <span class="fu">|</span> <span class="dt">TBoolean</span>
     <span class="fu">|</span> <span class="dt">TVoid</span>
+    <span class="fu">|</span> <span class="dt">TError</span> <span class="dt">String</span>
 
 <span class="kw">deriving</span> <span class="kw">instance</span> <span class="dt">Show</span> <span class="dt">Type</span></code></pre>
+<p>Note that the <code>:-&gt;</code> type constructor doesn't have lists anywhere. For now, because the author is tired and not very brilliant, all incoming syntax trees will be transformed into unary functions.</p>
+<p>To this end, I have written the following:</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">toUnary ::</span> <span class="dt">Expr</span> () <span class="ot">-&gt;</span> <span class="dt">Expr</span> ()
+toUnary (<span class="dt">Free</span> (<span class="dt">ALambda</span> [] body)) <span class="fu">=</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">ALambda</span> [] <span class="fu">$</span> toUnary body
+toUnary (<span class="dt">Free</span> (<span class="dt">ALambda</span> (a<span class="fu">:</span>[]) body)) <span class="fu">=</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">ALambda</span> [a] <span class="fu">$</span> toUnary body
+toUnary (<span class="dt">Free</span> (<span class="dt">ALambda</span> (a<span class="fu">:</span>as) body)) <span class="fu">=</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">ALambda</span> [a] <span class="fu">$</span> toUnary <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">ALambda</span> as body
+toUnary (<span class="dt">Free</span> (<span class="dt">AApply</span> op [])) <span class="fu">=</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">AApply</span> (toUnary op) []
+toUnary (<span class="dt">Free</span> (<span class="dt">AApply</span> op (e<span class="fu">:</span>[]))) <span class="fu">=</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">AApply</span> (toUnary op) [toUnary e]
+toUnary (<span class="dt">Free</span> (<span class="dt">AApply</span> op es)) <span class="fu">=</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">AApply</span> op&#39; [toUnary e_last]
+    <span class="kw">where</span> e_init <span class="fu">=</span> init es
+          e_last <span class="fu">=</span> last es
+          op&#39;    <span class="fu">=</span> toUnary <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">AApply</span> op e_init
+toUnary (<span class="dt">Free</span> (<span class="dt">ADefine</span> sym val)) <span class="fu">=</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">ADefine</span> sym (toUnary val)
+toUnary e <span class="fu">=</span> e</code></pre>
+<p>I am aware how horrible this is.</p>
 <h2 id="constraints">Constraints</h2>
 <p>A type constraint is a means by which to narrow down the possible types for a given value.</p>
 <p>For now, there's only one kind of type constraint: the <em>equality constraint</em>. An equality constraint means that two values which correspond - say, an argument symbol and the value passed in - must have equal types.</p>
@@ -167,29 +183,25 @@ generateConstraints (() <span class="fu">:&lt;</span> <span class="dt">ABoolean<
         , assumptions <span class="fu">=</span> M.singleton s [var]
         })</code></pre>
 <p>Function abstraction takes each of its bound variables out of its body's assumption map and turns them into input constraints.</p>
-<pre class="sourceCode literate haskell"><code class="sourceCode haskell">generateConstraints (() <span class="fu">:&lt;</span> <span class="dt">ALambda</span> args b) <span class="fu">=</span> <span class="kw">do</span>
-    argIds <span class="ot">&lt;-</span> forM args <span class="fu">$</span> \arg <span class="ot">-&gt;</span> <span class="kw">do</span>
-        var <span class="ot">&lt;-</span> freshVarId
-        return (arg, var)
-    br  <span class="ot">&lt;-</span> memoizedTC generateConstraints b
-    <span class="kw">let</span> cs <span class="fu">=</span> forM argIds <span class="fu">$</span> \(arg,var) <span class="ot">-&gt;</span> <span class="kw">do</span>
-            return <span class="fu">$</span> maybe [] (map <span class="fu">$</span> <span class="dt">EqualityConstraint</span> var)
-                     (M.lookup arg <span class="fu">.</span> assumptions <span class="fu">$</span> snd br)
-        as <span class="fu">=</span> forM argIds <span class="fu">$</span> \(arg,_) <span class="ot">-&gt;</span> <span class="kw">do</span>
-            return <span class="fu">$</span> M.delete arg <span class="fu">.</span> assumptions <span class="fu">$</span> snd br
-    return ((map snd argIds) <span class="fu">:-&gt;</span> (fst br), <span class="dt">TypeResult</span>
-        { constraints <span class="fu">=</span> constraints (snd br) <span class="ot">`mappend`</span> (mconcat (mconcat cs))
-        , assumptions <span class="fu">=</span> mconcat <span class="fu">$</span> mconcat as
-        })</code></pre>
-<p>Function application generates constraints and fresh type variables for each argument and the return value, along with a constraint that the function takes a number of arguments of certain types and returns the return type.</p>
-<pre class="sourceCode literate haskell"><code class="sourceCode haskell">generateConstraints (() <span class="fu">:&lt;</span> <span class="dt">AApply</span> a b) <span class="fu">=</span> <span class="kw">do</span>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell">generateConstraints (() <span class="fu">:&lt;</span> <span class="dt">ALambda</span> [] b) <span class="fu">=</span> generateConstraints b</code></pre>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell">generateConstraints (() <span class="fu">:&lt;</span> <span class="dt">ALambda</span> (arg<span class="fu">:</span>[]) b) <span class="fu">=</span> <span class="kw">do</span>
     var <span class="ot">&lt;-</span> freshVarId
-    ar  <span class="ot">&lt;-</span> memoizedTC generateConstraints a
-    br  <span class="ot">&lt;-</span> mapM (memoizedTC generateConstraints) b
-    return (var, snd ar <span class="ot">`mappend`</span> (mconcat (map snd br)) <span class="ot">`mappend`</span> <span class="dt">TypeResult</span>
-        { constraints <span class="fu">=</span> [<span class="dt">EqualityConstraint</span> (fst ar) <span class="fu">$</span> (map fst br) <span class="fu">:-&gt;</span> var]
-        , assumptions <span class="fu">=</span> mempty
-        })</code></pre>
+    br <span class="ot">&lt;-</span> memoizedTC generateConstraints b
+    <span class="kw">let</span> cs <span class="fu">=</span> maybe [] (map <span class="fu">$</span> <span class="dt">EqualityConstraint</span> var) (M.lookup arg <span class="fu">.</span>
+            assumptions <span class="fu">$</span> snd br)
+        as <span class="fu">=</span> M.delete arg <span class="fu">.</span> assumptions <span class="fu">$</span> snd br
+    return (var <span class="fu">:-&gt;</span> (fst br), <span class="dt">TypeResult</span> {
+        constraints <span class="fu">=</span> constraints (snd br) <span class="ot">`mappend`</span> cs,
+        assumptions <span class="fu">=</span> as })</code></pre>
+<p>Function application generates constraints and fresh type variables for each argument and the return value, along with a constraint that the function takes a number of arguments of certain types and returns the return type.</p>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell">generateConstraints (() <span class="fu">:&lt;</span> <span class="dt">AApply</span> a []) <span class="fu">=</span> generateConstraints a</code></pre>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell">generateConstraints (() <span class="fu">:&lt;</span> <span class="dt">AApply</span> a (b<span class="fu">:</span>[])) <span class="fu">=</span> <span class="kw">do</span>
+    var <span class="ot">&lt;-</span> freshVarId
+    ar <span class="ot">&lt;-</span> memoizedTC generateConstraints a
+    br <span class="ot">&lt;-</span> memoizedTC generateConstraints b
+    return (var, snd ar <span class="ot">`mappend`</span> snd br <span class="ot">`mappend`</span> <span class="dt">TypeResult</span> {
+        constraints <span class="fu">=</span> [<span class="dt">EqualityConstraint</span> (fst ar) <span class="fu">$</span> (fst br) <span class="fu">:-&gt;</span> var ],
+        assumptions <span class="fu">=</span> mempty })</code></pre>
 <p>Definitions are a bit obtuse: they are declarative mutations to the static environment and thus do not compose or return anything useful. As a result, they are simply the type of whatever value stored in them.</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell">generateConstraints (() <span class="fu">:&lt;</span> <span class="dt">ADefine</span> sym val) <span class="fu">=</span> <span class="kw">do</span>
     valType <span class="ot">&lt;-</span> memoizedTC generateConstraints val
@@ -197,6 +209,8 @@ generateConstraints (() <span class="fu">:&lt;</span> <span class="dt">ABoolean<
         { constraints <span class="fu">=</span> constraints (snd valType)
         , assumptions <span class="fu">=</span> assumptions (snd valType)
         })</code></pre>
+<pre class="sourceCode literate haskell"><code class="sourceCode haskell">generateConstraints blah <span class="fu">=</span> <span class="kw">do</span>
+    return (<span class="dt">TError</span> (show blah), mempty)</code></pre>
 <h2 id="constraint-solving">Constraint solving</h2>
 <p>We now have our tree, a means of traversing it, and a set of constraints and type assumptions. We now need to solve the generated constraints and type the whole program.</p>
 <p>Generate a type for the AST by solving all the generated constraints:</p>
@@ -214,17 +228,16 @@ mostGeneralUnifier a (<span class="dt">TVar</span> i) <span class="fu">=</span> 
 mostGeneralUnifier <span class="dt">TNumber</span> <span class="dt">TNumber</span> <span class="fu">=</span> <span class="dt">Just</span> M.empty
 mostGeneralUnifier <span class="dt">TBoolean</span> <span class="dt">TBoolean</span> <span class="fu">=</span> <span class="dt">Just</span> M.empty
 
-mostGeneralUnifier (as <span class="fu">:-&gt;</span> b) (cs <span class="fu">:-&gt;</span> d) <span class="fu">=</span> <span class="kw">do</span>
-    s1s <span class="ot">&lt;-</span> forM (zip as cs) <span class="fu">$</span> \(a, c) <span class="ot">-&gt;</span> mostGeneralUnifier a c
-    mconcat <span class="fu">$</span> map (\s1 <span class="ot">-&gt;</span> liftM2 mappend (mostGeneralUnifier (substitute s1 b)
-                                       (substitute s1 d)) <span class="fu">$</span> <span class="dt">Just</span> s1) s1s
+mostGeneralUnifier (a <span class="fu">:-&gt;</span> b) (c <span class="fu">:-&gt;</span> d) <span class="fu">=</span> <span class="kw">do</span>
+    s1 <span class="ot">&lt;-</span> mostGeneralUnifier a c
+    liftM2 mappend (mostGeneralUnifier (substitute s1 b) (substitute s1 d)) <span class="fu">$</span>
+        <span class="dt">Just</span> s1
 
 mostGeneralUnifier _ _ <span class="fu">=</span> <span class="dt">Nothing</span></code></pre>
 <p>Actually substitute the mappings in the type, yielding a more specific type.</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">substitute ::</span> <span class="dt">M.Map</span> <span class="dt">Int</span> <span class="dt">Type</span> <span class="ot">-&gt;</span> <span class="dt">Type</span> <span class="ot">-&gt;</span> <span class="dt">Type</span>
 substitute subs v<span class="fu">@</span>(<span class="dt">TVar</span> i) <span class="fu">=</span> maybe v (substitute subs) <span class="fu">$</span> M.lookup i subs
-substitute subs (as <span class="fu">:-&gt;</span> b) <span class="fu">=</span> (map (substitute subs) as) <span class="fu">:-&gt;</span>
-    (substitute subs b)
+substitute subs (a <span class="fu">:-&gt;</span> b) <span class="fu">=</span> (substitute subs a) <span class="fu">:-&gt;</span> (substitute subs b)
 substitute _ t <span class="fu">=</span> t</code></pre>
 <h2 id="putting-it-all-together">Putting it all together</h2>
 <p>Given a cofree comonad representation of an AST where each node is annotated with <code>()</code>, yield a new tree where each node is annotate with its type.</p>

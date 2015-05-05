@@ -80,8 +80,8 @@ lexer <span class="fu">=</span> Tok.makeTokenParser style
                     , Tok.identLetter <span class="fu">=</span> idLetters
                     , Tok.opStart <span class="fu">=</span> opStarts
                     , Tok.opLetter <span class="fu">=</span> opLetters
-                    , Tok.commentStart <span class="fu">=</span> <span class="st">&quot;/*&quot;</span>
-                    , Tok.commentEnd <span class="fu">=</span> <span class="st">&quot;*/&quot;</span>
+                    , Tok.commentStart <span class="fu">=</span> <span class="st">&quot;{-&quot;</span>
+                    , Tok.commentEnd <span class="fu">=</span> <span class="st">&quot;-}&quot;</span>
           }
 
 <span class="ot">integer ::</span> <span class="dt">Parser</span> <span class="dt">Integer</span>
@@ -106,7 +106,10 @@ reservedOp <span class="fu">=</span> Tok.reservedOp lexer
 identifier <span class="fu">=</span> Tok.identifier lexer
 
 <span class="ot">operator ::</span> <span class="dt">Parser</span> <span class="dt">String</span>
-operator <span class="fu">=</span> Tok.operator lexer</code></pre>
+operator <span class="fu">=</span> Tok.operator lexer
+
+<span class="ot">symbolLetter ::</span> <span class="dt">Parser</span> <span class="dt">Char</span>
+symbolLetter <span class="fu">=</span> oneOf <span class="st">&quot;!$%&amp;|*+-/:&lt;=&gt;?@^_~#&quot;</span></code></pre>
 
         </div><!-- content -->
     </div><!-- row -->

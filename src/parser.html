@@ -76,19 +76,15 @@ parseNumber <span class="fu">=</span> try ( <span class="kw">do</span> { n <span
                        ; return <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">AInteger</span> n
                        } )</code></pre>
 <p>Booleans are represented by the atoms <code>#t</code> and <code>#f</code>.</p>
-<pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">parseBoolean ::</span> <span class="dt">Parser</span> (<span class="dt">Expr</span> a)
-parseBoolean <span class="fu">=</span> <span class="kw">do</span>
-    char <span class="ch">&#39;#&#39;</span>
-    b <span class="ot">&lt;-</span> char <span class="ch">&#39;t&#39;</span> <span class="fu">&lt;|&gt;</span> char <span class="ch">&#39;f&#39;</span>
-    <span class="kw">case</span> b <span class="kw">of</span>
-        <span class="ch">&#39;t&#39;</span> <span class="ot">-&gt;</span> return <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">ABoolean</span> <span class="dt">True</span>
-        <span class="ch">&#39;f&#39;</span> <span class="ot">-&gt;</span> return <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">ABoolean</span> <span class="dt">False</span></code></pre>
-<p>Symbols are like &quot;atoms&quot; in other lisps or Erlang. They are equivalent only to themselves and have no intrinsic value. They are mostly used to bind values in lambda abstractions.</p>
+<p>Symbols are like &quot;atoms&quot; in other lisps or Erlang. They are equivalent only to themselves and have no intrinsic value. They are mostly used to bind values in lambda abstractions. The symbols <code>#t</code> and <code>#f</code> are special, as they denote Boolean truth and false values.</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">parseSymbol ::</span> <span class="dt">Parser</span> (<span class="dt">Expr</span> a)
 parseSymbol <span class="fu">=</span> <span class="kw">do</span>
-    sym <span class="ot">&lt;-</span> operator <span class="fu">&lt;|&gt;</span> identifier
+    sym <span class="ot">&lt;-</span> operator <span class="fu">&lt;|&gt;</span> (optional (char <span class="ch">&#39;\&#39;&#39;</span>)) <span class="fu">*&gt;</span> identifier <span class="fu">&lt;|&gt;</span> operator
     sym&#39; <span class="ot">&lt;-</span> chomped sym
-    return <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">ASymbol</span> sym&#39;
+    <span class="kw">case</span> sym&#39; <span class="kw">of</span>
+        <span class="st">&quot;#t&quot;</span> <span class="ot">-&gt;</span> return <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">ABoolean</span> <span class="dt">True</span>
+        <span class="st">&quot;#f&quot;</span> <span class="ot">-&gt;</span> return <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">ABoolean</span> <span class="dt">False</span>
+        otherwise <span class="ot">-&gt;</span> return <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">ASymbol</span> sym&#39;
     <span class="kw">where</span> chomped s <span class="fu">=</span> <span class="kw">let</span> s&#39; <span class="fu">=</span> splitOn <span class="st">&quot;:&quot;</span> s
                       <span class="kw">in</span>  return <span class="fu">$</span> s&#39; <span class="fu">!!</span> <span class="dv">0</span></code></pre>
 <p>Lamba abstractions, or <em>functions</em>. A function definition is a list of symbols to bind to the elements of the argument list, and a psilo expression to evaluate in the context of the arguments.</p>
@@ -105,7 +101,6 @@ parseFn <span class="fu">=</span> <span class="kw">do</span>
 parseApp <span class="fu">=</span> <span class="kw">do</span>
     fst <span class="ot">&lt;-</span> ( try parseSymbol
          <span class="fu">&lt;|&gt;</span> try parseNumber
-         <span class="fu">&lt;|&gt;</span> parseBoolean
          <span class="fu">&lt;|&gt;</span> try (parens parseFn)
          <span class="fu">&lt;|&gt;</span> parens parseApp )
     optional whitespace
@@ -129,8 +124,7 @@ parseDefn <span class="fu">=</span> <span class="kw">do</span>
     return <span class="fu">$</span> <span class="dt">Free</span> <span class="fu">$</span> <span class="dt">ALambda</span> (expr2symlist args) body</code></pre>
 <p>Top level expression parser</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">parseExpr ::</span> <span class="dt">Parser</span> (<span class="dt">Expr</span> a)
-parseExpr <span class="fu">=</span> parseBoolean
-        <span class="fu">&lt;|&gt;</span> parseSymbol
+parseExpr <span class="fu">=</span> parseSymbol
         <span class="fu">&lt;|&gt;</span> parseNumber
         <span class="fu">&lt;|&gt;</span> parens ( parseDefn <span class="fu">&lt;|&gt;</span> parseFn <span class="fu">&lt;|&gt;</span> parseApp )</code></pre>
 <p>Expression parser inside a quoted list</p>

@@ -110,19 +110,28 @@ repl os<span class="fu">@</span><span class="dt">CmdLnOpts</span>{<span class="f
         <span class="kw">case</span> minput <span class="kw">of</span>
             <span class="dt">Nothing</span> <span class="ot">-&gt;</span> outputStrLn <span class="st">&quot;Goodbye.&quot;</span>
             <span class="dt">Just</span> input <span class="ot">-&gt;</span> <span class="kw">do</span>
-                <span class="kw">let</span> <span class="dt">Right</span> ast <span class="fu">=</span> parseTopLevel input
-                <span class="kw">let</span> ast&#39;      <span class="fu">=</span> (ast <span class="fu">!!</span> <span class="dv">0</span>)<span class="ot"> ::</span> <span class="dt">Expr</span> ()
-                when optParsed <span class="fu">$</span> <span class="kw">do</span>
-                    liftIO <span class="fu">.</span> putStrLn <span class="fu">.</span> show <span class="fu">$</span> ast&#39;
-                ((ret, log), st&#39;) <span class="ot">&lt;-</span> liftIO <span class="fu">$</span>
-                    runMachine st <span class="fu">$</span> (eval ast&#39;) <span class="fu">&gt;&gt;=</span> strict
-                liftIO <span class="fu">.</span> putStrLn <span class="fu">.</span> show <span class="fu">$</span> ret
-                when optConLog <span class="fu">$</span> <span class="kw">do</span>
-                    liftIO <span class="fu">.</span> putStrLn <span class="fu">$</span> <span class="st">&quot;Log\n---&quot;</span>
-                    displayLog log
-                when optState <span class="fu">$</span> <span class="kw">do</span>
-                    liftIO <span class="fu">.</span> putStrLn <span class="fu">.</span> show <span class="fu">$</span> st&#39;
-                loop st&#39;</code></pre>
+                <span class="kw">let</span> wtf <span class="fu">=</span> parseTopLevel input
+                <span class="kw">case</span> wtf <span class="kw">of</span>
+                    <span class="dt">Left</span> fuckyou <span class="ot">-&gt;</span> <span class="kw">do</span>
+                        liftIO <span class="fu">.</span> putStrLn <span class="fu">$</span> <span class="st">&quot;wtf: &quot;</span> <span class="fu">++</span> (show fuckyou)
+                    <span class="dt">Right</span> ast <span class="ot">-&gt;</span> <span class="kw">do</span>
+                        <span class="kw">let</span> ast&#39;      <span class="fu">=</span> (ast <span class="fu">!!</span> <span class="dv">0</span>)<span class="ot"> ::</span> <span class="dt">Expr</span> ()
+                        <span class="kw">let</span> maybeType <span class="fu">=</span> typeTree <span class="fu">$</span> cofreeMu <span class="fu">$</span> toUnary ast&#39;
+                        <span class="kw">case</span> maybeType <span class="kw">of</span>
+                            <span class="dt">Nothing</span> <span class="ot">-&gt;</span> liftIO <span class="fu">.</span> putStrLn <span class="fu">$</span> <span class="st">&quot;Bad type&quot;</span>
+                            <span class="dt">Just</span> ty <span class="ot">-&gt;</span> <span class="kw">do</span>
+                                <span class="co">-- TODO: reuse the type constraints</span>
+                                when optParsed <span class="fu">$</span> <span class="kw">do</span>
+                                    liftIO <span class="fu">.</span> putStrLn <span class="fu">.</span> show <span class="fu">$</span> ast&#39;
+                                ((ret, log), st&#39;) <span class="ot">&lt;-</span> liftIO <span class="fu">$</span>
+                                    runMachine st <span class="fu">$</span> (eval ast&#39;) <span class="fu">&gt;&gt;=</span> strict
+                                liftIO <span class="fu">.</span> putStrLn <span class="fu">.</span> show <span class="fu">$</span> ret
+                                when optConLog <span class="fu">$</span> <span class="kw">do</span>
+                                    liftIO <span class="fu">.</span> putStrLn <span class="fu">$</span> <span class="st">&quot;Log\n---&quot;</span>
+                                    displayLog log
+                                when optState <span class="fu">$</span> <span class="kw">do</span>
+                                    liftIO <span class="fu">.</span> putStrLn <span class="fu">.</span> show <span class="fu">$</span> st&#39;
+                                loop st&#39;</code></pre>
 <p>Executing a whole file does some type checking, separates out the definitions, installs those definitions into a machine, and then hands over execution to <code>repl</code> if there is no main expression.</p>
 <pre class="sourceCode literate haskell"><code class="sourceCode haskell"><span class="ot">execFile ::</span> <span class="dt">CmdLnOpts</span> <span class="ot">-&gt;</span> <span class="dt">IO</span> ()
 execFile os<span class="fu">@</span><span class="dt">CmdLnOpts</span>{<span class="fu">..</span>} <span class="fu">=</span> <span class="kw">do</span>
@@ -131,8 +140,9 @@ execFile os<span class="fu">@</span><span class="dt">CmdLnOpts</span>{<span clas
         <span class="dt">Left</span> err <span class="ot">-&gt;</span> print err <span class="fu">&gt;&gt;</span> return ()
         <span class="dt">Right</span> xs <span class="ot">-&gt;</span> <span class="kw">do</span>
             (defns, exprs) <span class="ot">&lt;-</span> return <span class="fu">$</span> partition isDefn xs
-            defnsTypes <span class="ot">&lt;-</span> forM defns <span class="fu">$</span> \defn <span class="ot">-&gt;</span> <span class="kw">do</span>
-                return <span class="fu">$</span> typeTree <span class="fu">$</span> cofreeMu defn
+            defnsTypes <span class="ot">&lt;-</span> forM defns <span class="fu">$</span> \defn <span class="ot">-&gt;</span> return <span class="fu">$</span> typeTree <span class="fu">$</span> cofreeMu <span class="fu">$</span>
+                toUnary defn
+            <span class="co">-- todo: do something with type information</span>
             st <span class="ot">&lt;-</span> insertDefns defns newMachineState
             <span class="kw">case</span> length exprs <span class="kw">of</span>
                 <span class="dv">0</span> <span class="ot">-&gt;</span> repl os st

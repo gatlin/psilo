@@ -114,10 +114,10 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+e+'<\
 <p>It is not a psilo implementation - just a simple lisp to explore writing interpreters. While not production quality, it might be of some educational value right now.</p>
 <p>A type inference system is in the works, which is motivating an evaluator rewrite. When it works I can begin experimenting with psilo’s type system and the language proper.</p>
 <p>Here is some code the interpreter runs right now:</p>
-<pre class="sourceCode scheme"><code class="sourceCode scheme"><span class="co">;; psilo standard library</span>
-
-<span class="co">; identity function</span>
+<pre class="sourceCode scheme"><code class="sourceCode scheme"><span class="co">; identity function</span>
 (<span class="kw">=</span> id (x) x)
+
+(<span class="kw">=</span> compose (f g) (\ (x) (f (g x))))
 
 <span class="co">; a (probably over-complicated) fixpoint combinator</span>
 (<span class="kw">=</span> fix
@@ -159,6 +159,28 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+e+'<\
 
 (<span class="kw">=</span> maybe-map (f mb)
   (maybe mb (\ (x) (just (f x))) none))
+
+<span class="co">; Box, the identity functor</span>
+(<span class="kw">=</span> Box (b) b)
+(<span class="kw">=</span> unbox (bx) (bx id))
+(<span class="kw">=</span> box (x) (Box (\ (f) (f x))))
+
+(<span class="kw">=</span> box-map (f bx)
+  ((\ (x) (box (f x)))
+   (unbox bx)))
+
+<span class="co">; Const, similar to Box but it does not mutate its contents when mapped over</span>
+(<span class="kw">=</span> Const (c) c)
+(<span class="kw">=</span> const (x) (Const (\ (f) (x))))
+(<span class="kw">=</span> get-const (c) (c id))
+(<span class="kw">=</span> const-map (f c) c)
+
+<span class="co">; Lens utilities!</span>
+(<span class="kw">=</span> over (l f s)
+  (unbox ((l (compose box f) s) box-map)))
+
+(<span class="kw">=</span> view (l s)
+  (get-const ((l Const s) const-map)))
 
 <span class="co">; Lazy lists</span>
 (<span class="kw">=</span> List (l) l)
@@ -215,9 +237,29 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+e+'<\
 (<span class="kw">=</span> filter (pred xs)
   (foldr xs (\ (y ys) (<span class="kw">if</span> (pred y) (<span class="kw">cons</span> y ys) ys)) nil))
 
+(<span class="kw">=</span> <span class="kw">zero?</span> (x) (=? <span class="dv">0</span> x))
+
+(<span class="kw">=</span> list-nil? (xs)
+  (((unpair (split xs) (\ (mh t)
+    (maybe mh (\ (h) <span class="dv">#f</span>) <span class="dv">#t</span>))))))
+
+<span class="co">; new and improved! as in, it works now!</span>
+(<span class="kw">=</span> take (n xs)
+  (<span class="kw">if</span> (<span class="kw">zero?</span> n) (nil)
+    (<span class="kw">if</span> (list-nil? xs) (nil)
+      (<span class="kw">cons</span> (<span class="kw">car</span> xs) (take (<span class="kw">-</span> n <span class="dv">1</span>) (<span class="kw">cdr</span> xs))))))
+
+<span class="co">; very useful in combination with `take`</span>
+(<span class="kw">=</span> unfold (gen seed)
+  ((\ (u) (u (pair gen seed)))
+   (fix (\ (u) (\ (args) (unpair args (\ (gen seed)
+     (<span class="kw">cons</span> seed (u (pair gen (gen seed)))))))))))
+
 <span class="co">;; some useful functions for testing</span>
 
 (<span class="kw">=</span> square (x) (* x x))
+(<span class="kw">=</span> <span class="kw">even?</span> (x) (=? <span class="dv">0</span> (mod x <span class="dv">2</span>)))
+(<span class="kw">=</span> add1 (x) (<span class="kw">+</span> <span class="dv">1</span> x))
 
 <span class="co">; the gold standard test of any good fixpoint combinator</span>
 (<span class="kw">=</span> fact
@@ -227,12 +269,41 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+e+'<\
           <span class="dv">1</span>
           (* n (f (<span class="kw">-</span> n <span class="dv">1</span>))))))))
 
+(<span class="kw">=</span> fact-rec (n)
+  (<span class="kw">if</span> (<span class="kw">zero?</span> n)
+      <span class="dv">1</span>
+      (* n (fact-rec (<span class="kw">-</span> n <span class="dv">1</span>)))))
+
 (<span class="kw">=</span> p1 (pair <span class="dv">1</span> <span class="dv">2</span>))
 
 (<span class="kw">=</span> sum (xs)
   (foldl (\ (acc n) (<span class="kw">+</span> acc n)) <span class="dv">0</span> xs))
 
-(<span class="kw">=</span> l1 (<span class="kw">cons</span> <span class="dv">1</span> (<span class="kw">cons</span> <span class="dv">2</span> (<span class="kw">cons</span> <span class="dv">3</span> (nil)))))</code></pre>
+(<span class="kw">=</span> l1 (<span class="kw">cons</span> <span class="dv">1</span> (<span class="kw">cons</span> <span class="dv">2</span> (<span class="kw">cons</span> <span class="dv">3</span> (nil)))))
+
+(<span class="kw">=</span> powers-of<span class="dv">-2</span> (unfold square <span class="dv">2</span>))
+
+(<span class="kw">=</span> Person (p) p)
+(<span class="kw">=</span> person (name age) (Person (\ (f) (f name age))))
+
+(<span class="kw">=</span> name (f p)
+  (\ (mapper)
+    (p (\ (n a)
+      (mapper (\ (new-n) (person new-n a))
+              (f n))))))
+
+(<span class="kw">=</span> age (f p)
+  (\ (mapper)
+    (p (\ (n a)
+      (mapper (\ (new-a) (person n new-a))
+              (f a))))))
+
+(<span class="kw">=</span> george (person &#39;george-washington <span class="dv">283</span>))
+
+(<span class="kw">=</span> birthday (p)
+  (over age add1 p))
+
+(<span class="kw">=</span> nats (unfold add1 <span class="dv">1</span>))</code></pre>
 <h1 id="how-to-build"><span class="header-section-number">4</span> How to build</h1>
 <p>You need the Glasgow Haskell Compiler and a number of libraries; I suggest starting off with <a href="http://haskell.org/platform">the Haskell platform</a>.</p>
 <p>Clone the repository:</p>
