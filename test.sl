@@ -4,7 +4,8 @@
 ; or globally.
 
 (= compose (f g) (\ (x) (f (g x))))
-(= add1-then-square (compose square add1))
 
 (= add1 (x) (+ 1 x))
 (= square (x) (* x x))
+
+(= wut (compose square add1))

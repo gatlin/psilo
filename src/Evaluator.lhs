@@ -256,15 +256,14 @@ return that. At this juncture we enforce strictness. However, the first time
 the result is calculated it will be stored as such.
 
 > eval (Free (ASymbol s)) = do
->     maybeLoc <- query s
->     case maybeLoc of
->         Just loc -> fetch loc >>= \maybeVal -> case maybeVal of
->             Just v -> do
->                 v' <- strict v
->                 update loc v'
->                 return v'
->             Nothing -> return $ VSymbol s
->         Nothing -> return $ VSymbol s
+>     log $ "Looking up symbol " ++ s
+>     maybeVal <- load s
+>     case maybeVal of
+>         Just v -> strict v >>= return
+>         _      -> do
+>             ev <- gets mEnv
+>             log $ "Couldn't find symbol in " ++ (show ev)
+>             return VNil
 
 Lambdas are stored basically as-is, except all the free variables in their
 bodies are copied into an internal environment and stored with them.
@@ -272,6 +271,7 @@ bodies are copied into an internal environment and stored with them.
 > eval (Free (ALambda args body)) = do
 >     ev <- gets mEnv
 >     let vars = freeVariables body
+>     log $ "Free variables for: " ++ (show vars)
 >     let ev' = filter (\(sym, val) -> elem sym vars) ev
 >     return $ VClosure args body ev'
 
@@ -311,8 +311,8 @@ Finally, if the operator was something else, we just return that.
 >                            (zip (take diff args) erands') ++ cl
 >                 else do
 >                     let ev' = (zip args erands') ++ cl
->                     log $ "new environment: " ++ (show ev')
->                     modify $ \st -> st { mEnv = ev' }
+>                     log $ "body: " ++ (show body)
+>                     modify $ \st -> st { mEnv = ev' ++ ev }
 >                     result <- eval body
 >                     modify $ \st -> st { mEnv = ev }
 >                     return result
