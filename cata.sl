@@ -135,6 +135,7 @@
     (if (list-nil? xs) (nil)
       (cons (car xs) (take (- n 1) (cdr xs))))))
 
+; very useful in combination with `take`
 (= unfold (gen seed)
   ((\ (u) (u (pair gen seed)))
    (fix (\ (u) (\ (args) (unpair args (\ (gen seed)
@@ -188,4 +189,4 @@
 (= birthday (p)
   (over age add1 p))
 
-(= nats (unfold add1 0))
+(= nats (unfold add1 1))

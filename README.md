@@ -56,7 +56,6 @@ the language proper.
 Here is some code the interpreter runs right now:
 
 ```scheme
-
 ; identity function
 (= id (x) x)
 
@@ -182,17 +181,17 @@ Here is some code the interpreter runs right now:
 
 (= zero? (x) (=? 0 x))
 
-(= take (n xs)
-  ((\ (tk) (tk (pair n xs)))
-   (fix (\ (f)
-     (\ (args) (unpair args (\ (n xs)
-       (if (zero? n) (nil)
-         (if (zero? (length xs)) (nil)
-           ((\ (h t)
-              (List (\ (c e)
-                (c h (f (pair (- n 1) t ))))))
-            (car xs) (cdr xs)))))))))))
+(= list-nil? (xs)
+  (((unpair (split xs) (\ (mh t)
+    (maybe mh (\ (h) #f) #t))))))
 
+; new and improved! as in, it works now!
+(= take (n xs)
+  (if (zero? n) (nil)
+    (if (list-nil? xs) (nil)
+      (cons (car xs) (take (- n 1) (cdr xs))))))
+
+; very useful in combination with `take`
 (= unfold (gen seed)
   ((\ (u) (u (pair gen seed)))
    (fix (\ (u) (\ (args) (unpair args (\ (gen seed)
@@ -211,6 +210,11 @@ Here is some code the interpreter runs right now:
       (if (=? n 0)
           1
           (* n (f (- n 1))))))))
+
+(= fact-rec (n)
+  (if (zero? n)
+      1
+      (* n (fact-rec (- n 1)))))
 
 (= p1 (pair 1 2))
 
@@ -240,6 +244,8 @@ Here is some code the interpreter runs right now:
 
 (= birthday (p)
   (over age add1 p))
+
+(= nats (unfold add1 1))
 ```
 
 How to build
