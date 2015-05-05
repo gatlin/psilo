@@ -60,3 +60,7 @@ The main purpose of this module is to remove some clutter from `Parser`.
 >
 > operator :: Parser String
 > operator = Tok.operator lexer
+>
+> symbolLetter :: Parser Char
+> symbolLetter = oneOf "!$%&|*+-/:<=>?@^_~#"
+

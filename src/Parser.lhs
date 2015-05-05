@@ -35,11 +35,10 @@ Booleans are represented by the atoms `#t` and `#f`.
 
 > parseBoolean :: Parser (Expr a)
 > parseBoolean = do
->     reserved "#"
->     b <- char 't' <|> char 'f'
->     case b of
->         't' -> return $ Free $ ABoolean True
->         'f' -> return $ Free $ ABoolean False
+>     atom <- identifier <|> operator
+>     case atom of
+>         "#t" -> return $ Free $ ABoolean True
+>         "#f" -> return $ Free $ ABoolean False
 
 Symbols are like "atoms" in other lisps or Erlang. They are equivalent
 only to themselves and have no intrinsic value. They are mostly used to

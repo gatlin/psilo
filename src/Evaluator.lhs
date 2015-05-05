@@ -256,19 +256,15 @@ return that. At this juncture we enforce strictness. However, the first time
 the result is calculated it will be stored as such.
 
 > eval (Free (ASymbol s)) = do
->     case s of
->         "#t" -> return $ VBoolean True
->         "#f" -> return $ VBoolean False
->         _ -> do
->             maybeLoc <- query s
->             case maybeLoc of
->                 Just loc -> fetch loc >>= \maybeVal -> case maybeVal of
->                     Just v -> do
->                         v' <- strict v
->                         update loc v'
->                         return v'
->                     Nothing -> return $ VSymbol s
->                 Nothing -> return $ VSymbol s
+>     maybeLoc <- query s
+>     case maybeLoc of
+>         Just loc -> fetch loc >>= \maybeVal -> case maybeVal of
+>             Just v -> do
+>                 v' <- strict v
+>                 update loc v'
+>                 return v'
+>             Nothing -> return $ VSymbol s
+>         Nothing -> return $ VSymbol s
 
 Lambdas are stored basically as-is, except all the free variables in their
 bodies are copied into an internal environment and stored with them.
