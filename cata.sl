@@ -87,7 +87,6 @@
 ; Safely deconstructs a (potentially infinite) list into its
 ; head and tail, returning them as a pair. The head is returned
 ; in a `Maybe`
-
 (= split (xs)
   ((\ (f)
      (foldr xs f (pair none nil)))
@@ -167,7 +166,6 @@
   (foldl (\ (acc n) (+ acc n)) 0 xs))
 
 (= l1 (cons 1 (cons 2 (cons 3 (nil)))))
-(= l2 (cons 2 (cons 1 (nil))))
 
 (= powers-of-2 (unfold square 2))
 

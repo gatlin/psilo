@@ -108,8 +108,10 @@ eval (Free (ASymbol sym)) = do
 
 eval (Free (ALambda (Free (AList args)) body)) = do
     env <- ask
+    glo <- gets mGlo
     args' <- forM args $ \(Free (ASymbol arg)) -> return arg
-    let vars = map (\(Free (ASymbol sym)) -> sym) $ freeVariables body
+    let vars = nub $ (map (\(Free (ASymbol sym)) -> sym) $ freeVariables body) \\ (map fst glo)
+    log $ "Free variables captured: " ++ (show vars)
     let env' = filter (\(sym, val) -> elem sym vars) env
     let clos = VClosure args' body env'
     loc <- fresh
