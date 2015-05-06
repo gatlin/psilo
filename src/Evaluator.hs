@@ -33,6 +33,9 @@ type Location = Int
 type Environment = [(Symbol, Value)]
 type Store = IntMap.IntMap Value
 
+instance Show Store where
+    show str = "Amount in store: " ++ (show (IntMap.size str))
+
 data MachineState = MachineState
     { mSto    :: Store       -- ^ the persistent store
     , mLoc    :: Location    -- ^ pointer to the store
@@ -131,7 +134,13 @@ eval (Free (AApply op (Free (AList erands)))) = case builtin op of
                         (zip (take diff syms) erands') ++ cl
                   else do
                       let args = zip syms erands'
-                      local ((args ++ cl) ++) $ eval body
+                      result <- local ((args ++ cl) ++) $ eval body
+                      forM_ (args ++ cl) $ \(sym, val) -> case val of
+                          VPointer p -> do
+                              sto <- gets mSto
+                              modify $ \st -> st { mSto = IntMap.delete p sto }
+                          _ -> return ()
+                      return result
           go (VPointer p) = do
               log $ "Dereferencing pointer: " ++ (show p)
               sto <- gets mSto

@@ -167,6 +167,7 @@
   (foldl (\ (acc n) (+ acc n)) 0 xs))
 
 (= l1 (cons 1 (cons 2 (cons 3 (nil)))))
+(= l2 (cons 2 (cons 1 (nil))))
 
 (= powers-of-2 (unfold square 2))
 
