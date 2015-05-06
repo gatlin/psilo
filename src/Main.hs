@@ -5,6 +5,7 @@ module Main where
 import Parser (parseFile, parseTopLevel)
 import Syntax
 import Evaluator
+import Typechecker
 
 import Control.Monad.Trans
 import System.Console.Haskeline
@@ -49,7 +50,6 @@ cmdLnOpts = CmdLnOpts
         short 'i' <>
         metavar "FILENAME" <>
         help "Execute a file" <> value "")
-{-
 
 repl :: CmdLnOpts -> MachineState -> IO ()
 repl os@CmdLnOpts{..} st = runInputT defaultSettings (loop st) where
@@ -64,7 +64,7 @@ repl os@CmdLnOpts{..} st = runInputT defaultSettings (loop st) where
                         liftIO . putStrLn $ "wtf: " ++ (show fuckyou)
                     Right ast -> do
                         let ast'      = (ast !! 0) :: Expr ()
-                        let maybeType = typeTree $ cofreeMu $ toUnary ast'
+                        let maybeType = typeTree $ cofreeMu ast'
                         case maybeType of
                             Nothing -> liftIO . putStrLn $ "Bad type"
                             Just ty -> do
@@ -88,9 +88,8 @@ execFile os@CmdLnOpts{..} = do
         Left err -> print err >> return ()
         Right xs -> do
             (defns, exprs) <- return $ partition isDefn xs
-            defnsTypes <- forM defns $ \defn -> return $ typeTree $ cofreeMu $
-                toUnary defn
-            -- todo: do something with type information
+            defnsTypes <- forM defns $ \defn -> return $ typeTree $
+                cofreeMu defn
             st <- insertDefns defns newMachineState
             case length exprs of
                 0 -> repl os st
@@ -106,7 +105,6 @@ execFile os@CmdLnOpts{..} = do
        insertDefns ds st = do
            (_, st') <- runMachine st $ forM_ ds eval
            return st'
-
 displayLog log = liftIO $ forM_ log putStrLn
 
 main :: IO ()
@@ -122,7 +120,4 @@ start os@CmdLnOpts{..} = case optRepl of
 opts :: ParserInfo CmdLnOpts
 opts = info (cmdLnOpts <**> helper)
     ( fullDesc <> progDesc "Run psilo programs" <> header "psilo" )
-    -}
-
-main = return ()
 

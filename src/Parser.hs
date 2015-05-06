@@ -13,6 +13,11 @@ import qualified Text.Parsec.Token as Tok
 import Syntax
 import Lexer
 
+parseUnit :: Parser (Expr a)
+parseUnit = do
+    reserved "()"
+    return $ Free (AUnit)
+
 parseNumber :: Parser (Expr a)
 parseNumber = try ( do { n <- integer
                        ; return $ Free $ AInteger n

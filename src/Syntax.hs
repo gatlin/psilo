@@ -18,11 +18,11 @@ type Symbol = String
 
 data AST a
     = AUnit
-    | AList [a]
     | AInteger Integer
     | ABoolean Bool
     | ASymbol Symbol
-    | ALambda Symbol a
+    | ALambda a a
+    | AList [a]
     | AApply a a
     | ADefine Symbol a
 
