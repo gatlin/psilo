@@ -18,7 +18,6 @@ import Control.Monad.Writer
 import Control.Monad.Reader
 import Control.Monad.Free
 import Control.Monad.Trans
-import qualified Data.IntMap.Strict as IntMap
 import Data.Foldable (Foldable, fold)
 import Data.Traversable (Traversable, sequence)
 import Data.List (intersperse, nub, (\\), concat, intersect)
@@ -28,29 +27,19 @@ import Control.Applicative
 import Parser
 import Syntax
 
-type Location = Int
-
 type Environment = [(Symbol, Value)]
-type Store = IntMap.IntMap Value
-
-instance Show Store where
-    show str = "Amount in store: " ++ (show (IntMap.size str))
 
 data MachineState = MachineState
-    { mSto    :: Store       -- ^ the persistent store
-    , mLoc    :: Location    -- ^ pointer to the store
-    , mGlo    :: Environment -- ^ global environment
+    { mGlo    :: Environment -- ^ global environment
     } deriving (Show)
 
 instance Monoid MachineState where
-    mempty = MachineState { mSto = IntMap.empty
-                          , mLoc = 0
-                          , mGlo = [] }
-    (MachineState s l g) `mappend` (MachineState s' l' g') =
-        MachineState (IntMap.union s s') (l + l') (g <> g')
+    mempty = MachineState { mGlo = [] }
+    (MachineState g) `mappend` (MachineState g') =
+        MachineState (g <> g')
 
 newMachineState :: MachineState
-newMachineState = MachineState IntMap.empty 0 []
+newMachineState = MachineState []
 
 newtype Machine a = M {
     runM :: WriterT [String] (ReaderT Environment (StateT MachineState IO)) a
@@ -64,7 +53,6 @@ data Value
     = VNil
     | VInteger Integer
     | VBoolean Bool
-    | VPointer Location
     | VSymbol  Symbol
     | VClosure { clArgs :: [Symbol]
                , clBody :: (Expr ())
@@ -81,7 +69,6 @@ instance Show Value where
     show (VClosure a b e) = "<closure> { args = " ++ (show a) ++
                             ", body = " ++ (show b) ++
                             ", captured = " ++ (show e) ++ " } "
-    show (VPointer p) = "<pointer:" ++ (show p) ++ ">"
 
 log msg = tell [msg] -- provided by @WriterT@
 
@@ -90,38 +77,6 @@ query sym = do
     env <- ask
     glo <- gets mGlo
     return $ lookup sym (env ++ glo)
-
-store :: Location -> Value -> Machine ()
-store loc val = do
-    sto <- gets mSto
-    modify $ \st -> st { mSto = IntMap.insert loc val sto }
-
-fetch :: Location -> Machine Value
-fetch loc = do
-    sto <- gets mSto
-    let mv = IntMap.lookup loc sto
-    case mv of
-        Just v -> return v
-        _      -> do
-            log $ "wtf"
-            return VNil
-
-fresh :: Machine Location
-fresh = do
-    loc <- gets mLoc
-    modify $ \st -> st { mLoc = loc + 1 }
-    return loc
-
-dealloc :: Value -> Machine ()
-dealloc (VPointer p) = do
-    sto <- gets mSto
-    v <- fetch p
-    case v of
-        (VClosure a b []) -> return ()
-        (VClosure a b _ ) -> do
-            modify $ \st -> st { mSto = IntMap.delete p sto }
-        _ -> return ()
-dealloc _ = return ()
 
 eval :: Expr () -> Machine Value
 eval (Free (AInteger n)) = return $ VInteger n
@@ -135,45 +90,32 @@ eval (Free (ASymbol sym)) = do
 
 eval (Free (ALambda (Free (AList args)) body)) = do
     env <- ask
-    glo <- gets mGlo
     args' <- forM args $ \(Free (ASymbol arg)) -> return arg
-    let vars = (map (\(Free (ASymbol sym)) -> sym) $ freeVariables body) \\ (map fst glo)
-    log $ "Free variables captured: " ++ (show vars)
-    let env' = filter (\(sym, val) -> elem sym vars) env
-    let clos = VClosure args' body $ nub env'
-    loc <- fresh
-    store loc clos
-    log $ "Creating closure"
-    return $ VPointer loc
+    return $ VClosure args' body $ nub env
 
 eval (Free (AApply op (Free (AList erands)))) = case builtin op of
     Just op' -> op' erands
     Nothing -> do
         fValue <- eval op >>= strict
-        go fValue
-    where go fValue@(VClosure syms body cl) = do
+        case fValue of
+            (VClosure syms body cl) -> do
               log $ "Applying op: " ++ (show fValue)
               let diff = (length syms) - (length erands)
               env <- ask
               erands' <- forM erands $ \e -> do
-                  loc <- fresh
-                  store loc $ VThunk e env
-                  return $ VPointer loc
+                  return $ VThunk e env
               if (diff > 0)
                   then return $
                       VClosure (drop diff syms) body $
                         (zip (take diff syms) erands') ++ cl
                   else do
                       let args = zip syms erands'
-                      result <- local ((args ++ cl) ++) $ eval body
-                      -- forM_ (args ++ cl) $ \(sym, val) -> dealloc val
+                      result <- local (const $ args ++ cl) $ eval body
                       return result
-
-          go v = return v
+            v -> return v
 
 eval (Free (ADefine sym body)) = do
     val <- eval body
-    loc <- fresh
     glo <- gets mGlo
     modify $ \st -> st { mGlo = (sym, val):glo }
     return VNil
@@ -182,12 +124,8 @@ eval (Pure _) = return VNil
 
 strict :: Value -> Machine Value
 strict (VThunk body cl) = do
-    result <- local (cl ++) $ eval body
+    result <- local (const cl) $ eval body
     return result
-strict ptr@(VPointer loc) = do
-    v <- fetch loc
-    dealloc ptr
-    strict v
 strict v = return v
 
 builtin (Free (ASymbol sym)) = case sym of
@@ -239,9 +177,10 @@ builtin (Free (ASymbol sym)) = case sym of
                       return 0
 builtin _ = Nothing
 
-freeVariables :: Expr () -> [Expr ()]
-freeVariables (Free (ALambda (Free (AList args)) body)) = (freeVariables body) \\ args
+freeVariables :: Expr () -> [Symbol]
+freeVariables (Free (ALambda (Free (AList args)) body)) = (freeVariables body) \\
+    (map (\(Free (ASymbol s)) -> s) args)
 freeVariables (Free (AApply op (Free (AList erands)))) =
     (freeVariables op) ++ (concatMap freeVariables erands)
-freeVariables s@(Free (ASymbol _)) = [s]
+freeVariables (Free (ASymbol s)) = [s]
 freeVariables _ = []

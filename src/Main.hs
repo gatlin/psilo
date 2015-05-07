@@ -64,22 +64,18 @@ repl os@CmdLnOpts{..} st = runInputT defaultSettings (loop st) where
                         liftIO . putStrLn $ "wtf: " ++ (show fuckyou)
                     Right ast -> do
                         let ast'      = (ast !! 0) :: Expr ()
-                        let maybeType = typeTree $ cofreeMu ast'
-                        case maybeType of
-                            Nothing -> liftIO . putStrLn $ "Bad type"
-                            Just ty -> do
-                                -- TODO: reuse the type constraints
-                                when optParsed $ do
-                                    liftIO . putStrLn . show $ ast'
-                                ((ret, log), st') <- liftIO $
-                                    runMachine st $ (eval ast') >>= strict
-                                liftIO . putStrLn . show $ ret
-                                when optConLog $ do
-                                    liftIO . putStrLn $ "Log\n---"
-                                    displayLog log
-                                when optState $ do
-                                    liftIO . putStrLn . show $ st'
-                                loop st'
+                        -- TODO: reuse the type constraints
+                        when optParsed $ do
+                            liftIO . putStrLn . show $ ast'
+                        ((ret, log), st') <- liftIO $
+                            runMachine st $ (eval ast') >>= strict
+                        liftIO . putStrLn . show $ ret
+                        when optConLog $ do
+                            liftIO . putStrLn $ "Log\n---"
+                            displayLog log
+                        when optState $ do
+                            liftIO . putStrLn . show $ st'
+                        loop st'
 
 execFile :: CmdLnOpts -> IO ()
 execFile os@CmdLnOpts{..} = do
