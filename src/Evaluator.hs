@@ -79,7 +79,8 @@ instance Show Value where
     show (VSymbol  s) = '\'':s
     show (VThunk   e c) = "<thunk> { " ++ (show e) ++ " } "
     show (VClosure a b e) = "<closure> { args = " ++ (show a) ++
-                            ", body = " ++ (show b) ++ " } "
+                            ", body = " ++ (show b) ++
+                            ", captured = " ++ (show e) ++ " } "
     show (VPointer p) = "<pointer:" ++ (show p) ++ ">"
 
 log msg = tell [msg] -- provided by @WriterT@
@@ -90,11 +91,23 @@ query sym = do
     glo <- gets mGlo
     return $ lookup sym (env ++ glo)
 
+store :: Location -> Value -> Machine ()
+store loc val = do
+    sto <- gets mSto
+    modify $ \st -> st { mSto = IntMap.insert loc val sto }
+
 fresh :: Machine Location
 fresh = do
     loc <- gets mLoc
     modify $ \st -> st { mLoc = loc + 1 }
     return loc
+
+dealloc :: Value -> Machine ()
+dealloc (VPointer p) = do
+    sto <- gets mSto
+    modify $ \st -> st { mSto = IntMap.delete p sto }
+    return ()
+dealloc _ = return ()
 
 eval :: Expr () -> Machine Value
 eval (Free (AInteger n)) = return $ VInteger n
@@ -103,17 +116,17 @@ eval (Free (ABoolean b)) = return $ VBoolean b
 eval (Free (ASymbol sym)) = do
     maybeVal <- query sym
     case maybeVal of
-        Just val -> strict val
+        Just val -> strict val >>= return
         Nothing  -> error $ "No value for symbol " ++ sym
 
 eval (Free (ALambda (Free (AList args)) body)) = do
     env <- ask
     glo <- gets mGlo
     args' <- forM args $ \(Free (ASymbol arg)) -> return arg
-    let vars = nub $ (map (\(Free (ASymbol sym)) -> sym) $ freeVariables body) \\ (map fst glo)
+    let vars = (map (\(Free (ASymbol sym)) -> sym) $ freeVariables body) \\ (map fst glo)
     log $ "Free variables captured: " ++ (show vars)
     let env' = filter (\(sym, val) -> elem sym vars) env
-    let clos = VClosure args' body env'
+    let clos = VClosure args' body $ nub env'
     loc <- fresh
     sto <- gets mSto
     modify $ \st -> st { mSto = IntMap.insert loc clos sto }
@@ -137,17 +150,8 @@ eval (Free (AApply op (Free (AList erands)))) = case builtin op of
                   else do
                       let args = zip syms erands'
                       result <- local ((args ++ cl) ++) $ eval body
-                      forM_ (args ++ cl) $ \(sym, val) -> case val of
-                          VPointer p -> do
-                              sto <- gets mSto
-                              modify $ \st -> st { mSto = IntMap.delete p sto }
-                          _ -> return ()
+                      forM_ (args ++ cl) $ \(sym, val) -> dealloc val
                       return result
-          go (VPointer p) = do
-              log $ "Dereferencing pointer: " ++ (show p)
-              sto <- gets mSto
-              let Just v = IntMap.lookup p sto
-              go v
           go v = return v
 
 eval (Free (ADefine sym body)) = do

@@ -18,7 +18,7 @@
 
 ; pairs are tensor products
 (= Pair (p) p)
-(= unpair (pr f) (pr f))
+(= unpair (p f) (p f))
 (= pair (a b)
   (Pair (\ (f) (f a b))))
 
@@ -163,7 +163,7 @@
 (= p1 (pair 1 2))
 
 (= sum (xs)
-  (foldl (\ (acc n) (+ acc n)) 0 xs))
+  (foldr xs (\ (y ys) (+ y ys)) 0))
 
 (= l1 (cons 1 (cons 2 (cons 3 (nil)))))
 
