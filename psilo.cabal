@@ -20,7 +20,7 @@ Source-Repository head
 
 executable psilo
   default-language:    Haskell2010
-  main-is: Main.lhs
+  main-is: Main.hs
   hs-source-dirs: src
   build-depends:       
       base                 >= 4.6
