@@ -96,6 +96,16 @@ store loc val = do
     sto <- gets mSto
     modify $ \st -> st { mSto = IntMap.insert loc val sto }
 
+fetch :: Location -> Machine Value
+fetch loc = do
+    sto <- gets mSto
+    let mv = IntMap.lookup loc sto
+    case mv of
+        Just v -> return v
+        _      -> do
+            log $ "wtf"
+            return VNil
+
 fresh :: Machine Location
 fresh = do
     loc <- gets mLoc
@@ -105,8 +115,12 @@ fresh = do
 dealloc :: Value -> Machine ()
 dealloc (VPointer p) = do
     sto <- gets mSto
-    modify $ \st -> st { mSto = IntMap.delete p sto }
-    return ()
+    v <- fetch p
+    case v of
+        (VClosure a b []) -> return ()
+        (VClosure a b _ ) -> do
+            modify $ \st -> st { mSto = IntMap.delete p sto }
+        _ -> return ()
 dealloc _ = return ()
 
 eval :: Expr () -> Machine Value
@@ -128,8 +142,7 @@ eval (Free (ALambda (Free (AList args)) body)) = do
     let env' = filter (\(sym, val) -> elem sym vars) env
     let clos = VClosure args' body $ nub env'
     loc <- fresh
-    sto <- gets mSto
-    modify $ \st -> st { mSto = IntMap.insert loc clos sto }
+    store loc clos
     log $ "Creating closure"
     return $ VPointer loc
 
@@ -142,7 +155,10 @@ eval (Free (AApply op (Free (AList erands)))) = case builtin op of
               log $ "Applying op: " ++ (show fValue)
               let diff = (length syms) - (length erands)
               env <- ask
-              erands' <- forM erands $ \e -> return $ VThunk e env
+              erands' <- forM erands $ \e -> do
+                  loc <- fresh
+                  store loc $ VThunk e env
+                  return $ VPointer loc
               if (diff > 0)
                   then return $
                       VClosure (drop diff syms) body $
@@ -150,8 +166,9 @@ eval (Free (AApply op (Free (AList erands)))) = case builtin op of
                   else do
                       let args = zip syms erands'
                       result <- local ((args ++ cl) ++) $ eval body
-                      forM_ (args ++ cl) $ \(sym, val) -> dealloc val
+                      -- forM_ (args ++ cl) $ \(sym, val) -> dealloc val
                       return result
+
           go v = return v
 
 eval (Free (ADefine sym body)) = do
@@ -167,9 +184,9 @@ strict :: Value -> Machine Value
 strict (VThunk body cl) = do
     result <- local (cl ++) $ eval body
     return result
-strict (VPointer p) = do
-    sto <- gets mSto
-    let Just v = IntMap.lookup p sto
+strict ptr@(VPointer loc) = do
+    v <- fetch loc
+    dealloc ptr
     strict v
 strict v = return v
 
