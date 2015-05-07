@@ -86,7 +86,7 @@ eval (Free (ASymbol sym)) = do
     maybeVal <- query sym
     case maybeVal of
         Just val -> strict val >>= return
-        Nothing  -> error $ "No value for symbol " ++ sym
+        Nothing  -> return $ VSymbol sym
 
 eval (Free (ALambda (Free (AList args)) body)) = do
     env <- ask
@@ -122,6 +122,7 @@ eval (Free (ADefine sym body)) = do
 
 eval (Pure _) = return VNil
 
+-- TODO cache results
 strict :: Value -> Machine Value
 strict (VThunk body cl) = do
     result <- local (const cl) $ eval body
