@@ -52,8 +52,7 @@
 (= box (x) (Box (\ (f) (f x))))
 
 (= box-map (f bx)
-  ((\ (x) (box (f x)))
-   (unbox bx)))
+  (box (f (unbox bx))))
 
 ; Const, similar to Box but it does not mutate its contents when mapped over
 (= Const (c) c)
@@ -190,3 +189,54 @@
   (over age add1 p))
 
 (= nats (unfold add1 1))
+
+; An example of how you can define modules
+
+(= my-module
+  ((\ (foo bar baz)
+     (\ (p)
+       (p (\ (x) (foo x foo bar baz))
+          (\ (x) (bar x foo bar baz))
+          (\ (x y) (baz x y foo bar baz)))))
+   (\ (x foo bar baz)
+     (+ 1 x))
+
+   (\ (x foo bar baz)
+     (* 2 (baz x x foo bar baz)))
+
+   (\ (x y foo bar baz)
+     (+ (foo y foo bar baz) (foo x foo bar baz)))))
+
+(= import-example
+  (\ (foo bar baz)
+    (+ (foo 4)
+       (* (bar 5)
+          (baz 6 7)))))
+
+(= foo (x)
+  (my-module (\ (foo bar baz) (foo x foo bar baz))))
+
+(= bar (x)
+  (my-module (\ (foo bar baz) (bar x foo bar baz))))
+
+(= baz (x y)
+  (my-module (\ (foo bar baz) (baz x y foo bar baz))))
+
+(= monad-box
+  ((\ (return join bind)
+     (\ (p)
+       (p (\ (x) (return x return join bind))
+          (\ (x) (join x return join bind))
+          (\ (ma f) (bind ma f return join bind)))))
+
+   (\ (x) (box x))
+
+   (\ (bx) (unbox bx))
+
+   (\ (ma f return join bind)
+     (join (box-map f ma) return join bind))))
+
+(= wat (n)
+  (unbox (monad-box (\ (return join bind)
+    (bind (return (- n 10)) (\ (x)
+    (return x)))))))
