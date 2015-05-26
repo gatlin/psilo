@@ -240,3 +240,23 @@
   (unbox (monad-box (\ (return join bind)
     (bind (return (- n 10)) (\ (x)
     (return x)))))))
+
+(= comonad-box
+  ((\ (extract fork extend)
+     (\ (p)
+       (p (\ (bx) (extract bx extract fork extend))
+          (\ (bx) (fork bx extract fork extend))
+          (\ (f bx) (extend f bx extract fork extend)))))
+
+   (\ (bx extract fork extend)
+     (unbox bx))
+
+   (\ (bx extract fork extend)
+     (box bx))
+
+   (\ (f bx extract fork extend)
+     (box-map f (fork bx extract fork extend)))))
+
+(= cowat (n)
+  (comonad-box (\ (extract fork extend)
+    (extract (extend (\ (bx) (* 2 (extract bx))) (box n))))))
