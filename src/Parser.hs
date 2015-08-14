@@ -12,7 +12,7 @@ import Data.Monoid
 import Control.Monad (forM)
 import Control.Monad.Free
 import Control.Comonad
-import System.IO (Handle(..), withFile, IOMode(..), stdout)
+import System.IO (Handle(..), withFile, IOMode(..), hGetContents)
 
 import Prelude hiding (map, take, tail, head, filter)
 
@@ -244,3 +244,18 @@ parseTopLevel inp = do
     case extract en of
         []  -> Left "Parse failed idk y"
         (x:_) -> Right [x]
+
+parseFile :: String -> IO (Either String [Expr ()])
+parseFile fn = withFile fn ReadMode $ \hndl -> do
+    contents <- hGetContents hndl
+    let loop ""  []     = return []
+        loop txt exprs = do
+            e <- drain (parse txt >< take 1)
+            let expr = extract e
+            case expr of
+                []  -> return exprs
+                ((expr', txt'):_) -> loop txt' (expr':exprs)
+    result <- loop contents []
+    case result of
+        []  -> return $ Left "fucked"
+        _   -> return $ Right result

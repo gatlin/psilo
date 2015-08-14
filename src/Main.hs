@@ -14,6 +14,7 @@ import Data.Monoid
 import Data.Maybe
 import Control.Monad (forM, forM_, when )
 import Data.List (partition)
+import Control.Comonad
 import Control.Comonad.Cofree
 
 import System.Environment
@@ -21,6 +22,7 @@ import System.IO
 
 import Options.Applicative as Opt hiding (runParser)
 
+import Tubes
 import Test
 
 data CmdLnOpts = CmdLnOpts {
@@ -75,7 +77,7 @@ repl os@CmdLnOpts{..} st = runInputT defaultSettings (loop st) where
                         when optState $ do
                             liftIO . putStrLn . show $ st'
                         loop st'
-{-
+
 execFile :: CmdLnOpts -> IO ()
 execFile os@CmdLnOpts{..} = do
     parsed <- parseFile optFile
@@ -100,7 +102,7 @@ execFile os@CmdLnOpts{..} = do
        insertDefns ds st = do
            (_, st') <- runMachine st $ forM_ ds eval
            return st'
--}
+
 displayLog log = liftIO $ forM_ log putStrLn
 
 main :: IO ()
@@ -111,7 +113,7 @@ start os@CmdLnOpts{..} = case optRepl of
     True      -> repl os newMachineState
     _         -> case optFile of
         "" -> return ()
---        fileName -> execFile os
+        fileName -> execFile os
 
 opts :: ParserInfo CmdLnOpts
 opts = info (cmdLnOpts <**> helper)
