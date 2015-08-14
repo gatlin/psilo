@@ -2,7 +2,7 @@
 
 module Main where
 
-import Parser (parseFile, parseTopLevel)
+import Parser
 import Syntax
 import Evaluator
 import Typechecker
@@ -18,9 +18,8 @@ import Control.Comonad.Cofree
 
 import System.Environment
 import System.IO
-import Text.Parsec
 
-import Options.Applicative
+import Options.Applicative as Opt hiding (runParser)
 
 import Test
 
@@ -32,7 +31,7 @@ data CmdLnOpts = CmdLnOpts {
     , optFile   :: String
 } deriving Show
 
-cmdLnOpts :: Parser CmdLnOpts
+cmdLnOpts :: Opt.Parser CmdLnOpts
 cmdLnOpts = CmdLnOpts
     <$> flag False True (
         long "repl" <> short 'r' <> help "Initiate a REPL (default=TRUE)" )
@@ -76,7 +75,7 @@ repl os@CmdLnOpts{..} st = runInputT defaultSettings (loop st) where
                         when optState $ do
                             liftIO . putStrLn . show $ st'
                         loop st'
-
+{-
 execFile :: CmdLnOpts -> IO ()
 execFile os@CmdLnOpts{..} = do
     parsed <- parseFile optFile
@@ -101,6 +100,7 @@ execFile os@CmdLnOpts{..} = do
        insertDefns ds st = do
            (_, st') <- runMachine st $ forM_ ds eval
            return st'
+-}
 displayLog log = liftIO $ forM_ log putStrLn
 
 main :: IO ()
@@ -111,7 +111,7 @@ start os@CmdLnOpts{..} = case optRepl of
     True      -> repl os newMachineState
     _         -> case optFile of
         "" -> return ()
-        fileName -> execFile os
+--        fileName -> execFile os
 
 opts :: ParserInfo CmdLnOpts
 opts = info (cmdLnOpts <**> helper)

@@ -36,6 +36,7 @@ executable psilo
     , parsec
     , containers
     , comonad              >= 4.2.5
+    , tubes
 
 executable preprocess
   default-language:    Haskell2010

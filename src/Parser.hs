@@ -1,104 +1,246 @@
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE FlexibleContexts #-}
+
 module Parser where
 
-import Text.Parsec
-import Text.Parsec.String (Parser, parseFromFile)
-import Control.Applicative ((<$>))
-import Control.Monad (mapAndUnzipM)
-import Control.Monad.Free
-import Data.List.Split (splitOn)
+import Tubes
 
-import qualified Text.Parsec.Expr as Ex
-import qualified Text.Parsec.Token as Tok
+import Data.Functor.Identity
+import Control.Applicative hiding (many, optional)
+import Data.Char
+import Data.Monoid
+import Control.Monad (forM)
+import Control.Monad.Free
+import Control.Comonad
+import System.IO (Handle(..), withFile, IOMode(..), stdout)
+
+import Prelude hiding (map, take, tail, head, filter)
 
 import Syntax
-import Lexer
 
-parseUnit :: Parser (Expr a)
-parseUnit = do
-    reserved "()"
-    return $ Free (AUnit)
+-- * The basic parsing framework
 
-parseNumber :: Parser (Expr a)
-parseNumber = try ( do { n <- integer
-                       ; return $ Free $ AInteger n
-                       } )
+{- |
+Our basic parser framework, built on applicatives. @s@ represents the building
+blocks out of which input strings are generated. For our purposes it will
+almost always be 'Char'. 't' represents the result type of the parse.
+-}
+newtype Parser s t = P {
+    runParser :: [s] -> [(t, [s])]
+}
 
-parseSymbol :: Parser (Expr a)
-parseSymbol = do
-    atom <- identifier <|> operator
-    return $ case atom of
-        "#t"    -> Free $ ABoolean True
-        "#f"    -> Free $ ABoolean False
-        otherwise -> Free $ ASymbol atom
+-- | Create a parser for some result type
+pPure :: t -> Parser s t
+pPure x = P $ \inp -> [(x, inp)]
 
-parseList :: Parser (Expr a)
-parseList = fmap (Free . AList) $ sepBy parseExpr spaces
+-- | Apply a parser to the results of another parser
+pApp :: Parser s (a -> b) -> Parser s a -> Parser s b
+pApp (P p1) (P p2) = P $ \inp -> do
+    (v1, ss1) <- p1 inp
+    (v2, ss2) <- p2 ss1
+    return (v1 v2, ss2)
 
-parseQuoted :: Parser (Expr a)
-parseQuoted = do
-    char '\''
-    x <- parseExpr
-    return $ Free $ AList [Free (ASymbol "quote"), x]
+instance Functor (Parser s) where
+    fmap f p = pApp (pPure f) p
 
-parseFn :: Parser (Expr a)
-parseFn = do
-    reserved "\\"
-    optional whitespace
-    args <- parens $ many parseSymbol
-    optional whitespace
-    body <- parseExpr
-    return $ Free $ ALambda (Free (AList args)) body
+instance Applicative (Parser s) where
+    pure = pPure
+    (<*>) = pApp
 
-parseApp :: Parser (Expr a)
-parseApp = do
-    fst <- ( try parseSymbol
-         <|> try parseNumber
-         <|> try (parens parseFn)
-         <|> parens parseApp )
-    optional whitespace
-    rst <- many parseExpr
-    return $ Free (AApply fst (Free (AList rst)))
+instance Alternative (Parser s) where
+    empty = P $ \inp -> empty
+    (P p1) <|> (P p2) = P $ \inp ->
+        p1 inp ++ p2 inp
 
-parseDefn :: Parser (Expr a)
-parseDefn = do
-    optional whitespace
-    reserved "="
-    optional whitespace
-    Free (ASymbol sym) <- parseSymbol
-    optional whitespace
-    body <- parseFunDef <|> parseSimpleDef
-    return $ Free $ ADefine sym body
+-- * Parsing control combinators
 
-parseSimpleDef = parseExpr
+-- | With the supplied parser 'p' succeeds on 0 or more of its sequences
+many :: Alternative f => f a -> f [a]
+many p = (\x xs -> (pure x) <> xs) <$> p <*> optional (many p)
 
-parseFunDef = try $ do
-    args <- parens $ many parseSymbol
-    optional whitespace
-    body <- parseExpr
-    return $ Free $ ALambda (Free (AList args)) body
+-- | With the supplied parser 'p' succeeds on 1 or more of its sequences
+many1 :: Alternative f => f a -> f [a]
+many1 p = (\x xs -> (pure x) <> xs) <$> p <*> many p
 
-parseExpr :: Parser (Expr a)
-parseExpr = parseSymbol
-        <|> parseNumber
-        <|> parseQuoted
-        <|> parens ( parseDefn <|> parseFn <|> parseApp )
+sepBy1 :: Alternative f => f a -> f b -> f [a]
+sepBy1 p sep = (\x xs -> (pure x) <> xs) <$> p <*> many (id <$ sep <*> p)
 
-contents :: Parser a -> Parser a
-contents p = do
-    whitespace
-    r <- p
-    eof
-    return r
+sepBy :: Alternative f => f a -> f b -> f [a]
+sepBy  p sep = sepBy1 p sep <|> (pure <$> p)
 
-topLevel :: Parser [Expr a]
-topLevel = many $ do
-    x <- parseExpr
-    return x
+-- | Given a sequence of permissible options, succeeds if the input is any
+-- of them
+oneOf :: (Eq t, Foldable t1) => t1 t -> Parser t t
+oneOf these = P $ \inp -> case inp of
+    s:ss -> if elem s these then pure (s, ss) else empty
+    _    -> empty
 
-type Parsed a = Either ParseError [Expr a]
+-- | Allows a sequence matched by 'p' to not be present in the input stream
+optional :: Alternative f => f [t] -> f [t]
+optional p = p <|> pure mempty
 
-parseFile :: String -> IO (Parsed a)
-parseFile fname = parseFromFile (contents topLevel) fname
+-- * Tube-specific parsing utilities
 
-parseTopLevel :: String -> Parsed a
-parseTopLevel s = parse (contents topLevel) "<stdin>" s
+{- $tubeparsers
+Using 'Tube's and 'Pump's, we are able to write parser combinators which are
+agnostic to the underlying sequence type. Only the 'Pump' has to know about
+lists, and soon this will not be necessary either.
+-}
+
+-- | A pump which enumerates the contents of a list
+enumerator inp = pump (return inp)
+            (\(Identity lst) -> case lst of
+                []  -> (Nothing, Identity [])
+                x:xs -> (Just x, Identity xs))
+            (\(Identity xs) x -> Identity (xs ++ [x]))
+{-# INLINE enumerator #-}
+
+-- | Given a sink, constructs a parser. The actual sink need not be aware of
+-- the underlying sequence type (eg, [], Text, ByteString, etc).
+mkParser :: Sink (Maybe s) Identity (Maybe t) -> Parser s t
+mkParser snk = P $ \inp -> runIdentity $
+    runPump post (enumerator inp) snk
+    where
+        post :: [s] -> Maybe t -> [(t, [s])]
+        post cs mc = maybe [] (\c -> [(c, cs)]) mc
+        {-# INLINE post #-}
+
+ifJust :: Monad m => Maybe a -> (a -> m (Maybe b)) -> m (Maybe b)
+ifJust x what = maybe (return Nothing) what x
+
+-- * Basic parser combinators
+
+char :: Char -> Parser Char Char
+char target = mkParser $ do
+    mc <- await
+    ifJust mc $ \c ->
+        if target == c
+            then return (Just c)
+            else return Nothing
+
+digit :: Parser Char Integer
+digit = mkParser $ do
+    ms <- await
+    ifJust ms $ \s -> if isDigit s
+        then let s' = read [s]
+             in  if s' >= 0 && s' <= 9
+                 then return (Just s')
+                 else return Nothing
+        else return Nothing
+
+space :: Parser Char Char
+space = char ' ' <|> char '\t' <|> char '\n'
+
+whitespace :: Parser Char String
+whitespace = many1 space
+
+parens :: Parser Char a -> Parser Char a
+parens p = id <$ char '(' <* optional (many space) <*> p <* optional (many space) <* char ')'
+
+string_lit :: String -> Parser Char String
+string_lit goal = mkParser $ do
+    incoming <- forM [1..(length goal)] $ \_ -> do
+        mc <- await
+        case mc of
+            Just c -> return [c]
+            Nothing -> return []
+    let incoming' = concat incoming
+    if goal == incoming'
+        then return $ Just goal
+        else return Nothing
+
+boolean :: Parser Char Bool
+boolean = mkParser $ do
+    blit <- forM [1,2] $ \_ -> do
+        mc <- await
+        case mc of
+            Just c -> return [c]
+            Nothing -> return []
+    case (concat blit) of
+        "#t"    -> return $ Just True
+        "#f"    -> return $ Just False
+        _       -> return Nothing
+
+number :: Parser Char Integer
+number = foldl (\a b -> a * 10 + b) 0 <$> many digit
+
+-- * The psilo language parser
+
+sym :: Parser Char Symbol
+sym = many $ letter <|> alphanum
+    <|> (oneOf "!@#$%^&*{}[]+-/")
+
+letter :: Parser Char Char
+letter = oneOf "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+alphanum :: Parser Char Char
+alphanum = letter <|> oneOf "1234567890"
+
+aNumber x = liftF $ AInteger x
+aSymbol s = liftF $ ASymbol s
+aBoolean b = liftF $ ABoolean b
+
+parse_integer :: Parser Char (Expr a)
+parse_integer = aNumber <$> number
+
+parse_symbol :: Parser Char (Expr a)
+parse_symbol = aSymbol <$> sym
+
+parse_boolean :: Parser Char (Expr a)
+parse_boolean = aBoolean <$> boolean
+
+parse_list :: Parser Char (Expr a)
+parse_list = fmap Free $
+    AList <$> sepBy parse_expr (many space)
+
+parse_unit :: Parser Char (Expr a)
+parse_unit = fmap Free $ AUnit <$ string_lit "'()"
+
+parse_app :: Parser Char (Expr a)
+parse_app = fmap Free $
+    AApply <$> (parse_symbol <|> (parens parse_lambda))
+           <*  many space
+           <*> parse_list
+
+parse_lambda :: Parser Char (Expr a)
+parse_lambda = fmap Free $
+    ALambda <$  char '\\'
+            <*  many space
+            <*> parens ( parse_list )
+            <*  many space
+            <*> parse_expr
+
+parse_definition :: Parser Char (Expr a)
+parse_definition = fmap Free $
+    ADefine <$  char '='
+            <*  many space
+            <*> sym
+            <*  many space
+            <*> parse_expr
+
+parse_expr :: Parser Char (Expr a)
+parse_expr =
+        (parens parse_lambda)
+    <|> (parens parse_app)
+    <|> (parens parse_definition)
+    <|> parse_integer
+    <|> parse_boolean
+    <|> parse_unit
+    <|> parse_symbol
+
+drain :: Monad m
+      => Source b m ()
+      -> m (Pump (Maybe b) b Identity [b])
+drain src = reduce send (enumerator []) id src
+
+parse :: (Monad m)
+      => String
+      -> Source (Expr (), String) m ()
+parse expr = each (runParser parse_expr expr)
+
+parseTopLevel :: String -> Either String [Expr ()]
+parseTopLevel inp = do
+    en <- drain (parse inp >< map fst >< take 1)
+    case extract en of
+        []  -> Left "Parse failed idk y"
+        (x:_) -> Right [x]

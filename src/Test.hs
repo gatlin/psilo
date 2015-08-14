@@ -15,6 +15,7 @@ import Data.Maybe
 import Control.Monad.Free
 import Control.Comonad
 
+{-
 testsym = "okay"
 
 getAst x = case parseTopLevel x of
@@ -23,3 +24,4 @@ getAst x = case parseTopLevel x of
 
 square_ast = getAst "(= square (x) (* x x))"
 square_mu  = cofreeMu square_ast
+-}
