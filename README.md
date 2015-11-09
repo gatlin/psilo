@@ -4,7 +4,7 @@ psilo
 a parallel, streaming, iterative list operation language for writing interesting
 programs. [View it on GitHub.](https://github.com/gatlin/psilo)
 
-&copy; 2014 [Gatlin Johnson](http://niltag.net) <gatlin@niltag.net>
+&copy; 2014, 2015 [Gatlin Johnson](http://niltag.net) <gatlin@niltag.net>
 
 What is psilo?
 ===
