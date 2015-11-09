@@ -17,11 +17,6 @@
     <!-- glyphicons -->
     <link href="css/bootstrap-glyphicons.css" rel="stylesheet">
 
-    <!-- Merriweather font -->
-    <link rel="stylesheet"
-          type="text/css"
-          href="//fonts.googleapis.com/css?family=Merriweather:300,700,700italic,300italic|Open+Sans:700,400" />
-
     <style type="text/css">
 
         div#toc-wrapper ul, div#toc-wrapper ol {
@@ -66,24 +61,12 @@
 <li><a href="#questions-comments-hate-mail"><span class="toc-section-number">5</span> Questions / comments / hate mail</a></li>
 </ul>
                 </div>
-                <div id="annotations">
-                    <h2>Annotated source code</h2>
-                      <ul class="list-unstyled">
-                          <li><a href="src/main.html">Main module</a></li>
-                          <li><a href="src/syntax.html">Syntax module</a></li>
-                          <li><a href="src/parser.html">Parser module</a></li>
-                          <li><a href="src/evaluator.html">Evaluator module</a></li>
-                          <li><a href="src/typechecker.html">Typechecker
-                                  module</a></li>
-                          <li><a href="src/lexer.html">Lexer module</a></li>
-                      </ul>
-                </div>
             </div><!-- toc column -->
             <div class="col-md-12 col-lg-8 pull-left">
 
 <h1 id="psilo"><span class="header-section-number">1</span> psilo</h1>
 <p>a parallel, streaming, iterative list operation language for writing interesting programs. <a href="https://github.com/gatlin/psilo">View it on GitHub.</a></p>
-<p>© 2014 <a href="http://niltag.net">Gatlin Johnson</a> <script type="text/javascript">
+<p>© 2014, 2015 <a href="http://niltag.net">Gatlin Johnson</a> <script type="text/javascript">
 <!--
 h='&#110;&#x69;&#108;&#116;&#x61;&#x67;&#46;&#110;&#x65;&#116;';a='&#64;';n='&#x67;&#x61;&#116;&#108;&#x69;&#110;';e=n+a+h;
 document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+e+'<\/'+'a'+'>');
@@ -110,6 +93,9 @@ document.write('<a h'+'ref'+'="ma'+'ilto'+':'+e+'" clas'+'s="em' + 'ail">'+e+'<\
 <li>If the computer can do it, it should.</li>
 </ul>
 <h1 id="status"><span class="header-section-number">3</span> Status</h1>
+<p><strong>November 2015</strong></p>
+<p>I took a hiatus from this project to focus on work and other immediate concerns. During this time I also did a bit more research and have reconsidered the way I want psilo to work. So this was probably for the best, though I’m eager to make some progress.</p>
+<p><strong>Previously …</strong></p>
 <p>Psilo is still being designed. I have written a really simple evaluator for prototyping and experimenting with the language which is actively being developed.</p>
 <p>It is not a psilo implementation - just a simple lisp to explore writing interpreters. While not production quality, it might be of some educational value right now.</p>
 <p>A type inference system is in the works, which is motivating an evaluator rewrite. When it works I can begin experimenting with psilo’s type system and the language proper.</p>
