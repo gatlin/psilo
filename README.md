@@ -41,6 +41,15 @@ Philosophy:
 Status
 ===
 
+**November 2015**
+
+I took a hiatus from this project to focus on work and other immediate
+concerns. During this time I also did a bit more research and have reconsidered
+the way I want psilo to work. So this was probably for the best, though I'm
+eager to make some progress.
+
+**Previously ...**
+
 Psilo is still being designed. I have written a really simple evaluator for
 prototyping and experimenting with the language which is actively being
 developed.
