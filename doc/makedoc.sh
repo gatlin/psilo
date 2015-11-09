@@ -27,18 +27,18 @@ if hash pandoc 2>/dev/null; then
 
     ###
     # src dir
-    for f in $(ls ../src/*.lhs); do
-        filename=`basename $f`
-        extension="${filename##*.}"
-        filename="${filename%.*}"
-        out=$(echo $filename | tr '[:upper:]' '[:lower:]')
-        pandoc -s -t latex -f markdown+lhs -o ./tex/$out.tex $f
-        pandoc -s -t html5 -f markdown+lhs+yaml_metadata_block \
-        --template=templates/src.tmpl.html \
-        --normalize \
-        --variable n=$out \
-        -o ./html/src/$out.html $f
-    done
+    #for f in $(ls ../src/*.lhs); do
+    #    filename=`basename $f`
+    #    extension="${filename##*.}"
+    #    filename="${filename%.*}"
+    #    out=$(echo $filename | tr '[:upper:]' '[:lower:]')
+    #    pandoc -s -t latex -f markdown+lhs -o ./tex/$out.tex $f
+    #    pandoc -s -t html5 -f markdown+lhs+yaml_metadata_block \
+    #    --template=templates/src.tmpl.html \
+    #    --normalize \
+    #    --variable n=$out \
+    #    -o ./html/src/$out.html $f
+    #done
 else
     echo "Install pandoc to generate documentation."
     exit 0
