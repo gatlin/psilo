@@ -6,3 +6,4 @@ dist
 *.hi
 *.swp
 *.swo
+.stack-work/*

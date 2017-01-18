@@ -72,7 +72,9 @@ make_closure :: Set Symbol -> [Symbol] -> CoreExpr () -> Runtime Value
 make_closure captured args body = case S.null captured of
     True -> return $ ClosV args body emptyEnv
     False -> do
-        capturedVars <- filterM (fmap not . isSymTopLevel) $ S.toList captured
+        capturedVars <- filterM (fmap not . isSymTopLevel) $
+                        filter (\s -> not (S.member s builtin_syms)) $
+                                  S.toList captured
         cEnv <- forM capturedVars $ \fv -> do
             Just oldLoc <- lookup fv
             newLoc <- nextLoc
