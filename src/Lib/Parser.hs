@@ -17,6 +17,7 @@ import Data.Bool
 import Control.Arrow ((***))
 import Data.Either (isRight)
 import Data.List (intercalate, replicate, null)
+import Data.Maybe (listToMaybe)
 
 import Tubes
 import Lib.Syntax
@@ -192,19 +193,19 @@ alphanum = letter <|> oneOf "1234567890"
 
 -- * Parser combinators
 
-parse_num :: Monad m => Parser m Char (Expr a)
+parse_num :: Monad m => Parser m Char (CoreExpr a)
 parse_num = aNumber <$> double
 
-parse_bool :: Monad m => Parser m Char (Expr a)
+parse_bool :: Monad m => Parser m Char (CoreExpr a)
 parse_bool = aBool <$> boolean
 
-parse_id :: Monad m => Parser m Char (Expr a)
+parse_id :: Monad m => Parser m Char (CoreExpr a)
 parse_id = aId <$> sym
 
-parse_string :: Monad m => Parser m Char (Expr a)
+parse_string :: Monad m => Parser m Char (CoreExpr a)
 parse_string = aString <$> (quotes (many printable))
 
-parse_if :: Monad m => Parser m Char (Expr a)
+parse_if :: Monad m => Parser m Char (CoreExpr a)
 parse_if = fmap Free $ IfC
     <$  string "if"
     <*  optional spaces
@@ -214,13 +215,13 @@ parse_if = fmap Free $ IfC
     <*  optional spaces
     <*> parse_expr
 
-parse_app :: Monad m => Parser m Char (Expr a)
+parse_app :: Monad m => Parser m Char (CoreExpr a)
 parse_app = fmap Free $ AppC
     <$> (parse_id <|> parse_expr)
     <*  optional spaces
     <*> (parse_expr `sepBy` spaces)
 
-parse_clos :: Monad m => Parser m Char (Expr a)
+parse_clos :: Monad m => Parser m Char (CoreExpr a)
 parse_clos = fmap Free $ ClosC
     <$  (string "lambda" <|> string "\\")
     <*  optional spaces
@@ -228,7 +229,9 @@ parse_clos = fmap Free $ ClosC
     <*  optional spaces
     <*> parse_expr
 
-parse_expr :: Monad m => Parser m Char (Expr a)
+
+
+parse_expr :: Monad m => Parser m Char (CoreExpr a)
 parse_expr = parse_bool
          <|> parse_num
          <|> parse_id
@@ -237,7 +240,24 @@ parse_expr = parse_bool
          <|> parens parse_clos
          <|> parens parse_app
 
+parse_def :: Monad m => Parser m Char (CoreExpr a)
+parse_def = fmap Free $ DefC
+    <$  (string "def")
+    <*  optional spaces
+    <*> sym
+    <*  optional spaces
+    <*> parse_expr
+
+parse_toplevel :: Monad m => Parser m Char (CoreExpr a)
+parse_toplevel = (parens parse_def) <|> parse_expr
+
 parse :: (Foldable f, Monad m)
       => f Char
-      -> Source m (Expr a, Source m Char)
-parse src = runParser parse_expr (Source (each src))
+      -> m (Maybe (CoreExpr a))
+parse input = do
+    parses <- reduce (flip (:)) [] $
+              ( sample $
+                runParser parse_toplevel (Source (each input)) )
+              >< take 1
+              >< map fst
+    return $ listToMaybe parses

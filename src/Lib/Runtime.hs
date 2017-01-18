@@ -10,6 +10,10 @@ import Control.Monad.Reader
 import Control.Monad.IO.Class
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM
+import Data.Set (Set)
+import qualified Data.Set as S
+import Data.Map (Map)
+import qualified Data.Map as M
 import Lib.Syntax
 
 type Location = Int
@@ -19,7 +23,8 @@ data Value
     | BoolV { boolV :: Bool }
     | StringV { stringV :: String }
     | SymV { symV :: Symbol }
-    | ClosV { closVArgs :: [Symbol], closVBody :: Expr (), closVEnv :: Env }
+    | ClosV { closVArgs :: [Symbol], closVBody :: CoreExpr (), closVEnv :: Env }
+    | NopV
     deriving (Show)
 
 -- * Environment
@@ -32,7 +37,7 @@ data Binding = Binding
 type Env = [Binding]
 
 bind :: Symbol -> Location -> Binding
-bind = Binding
+bind sym loc = Binding sym loc
 
 emptyEnv :: Env
 emptyEnv = []
@@ -46,10 +51,10 @@ extendEnv = (:)
 extendEnv' :: Env -> Env -> Env
 extendEnv' = (++)
 
-lookup' :: Symbol -> Env -> Maybe Location
+lookup' :: Symbol -> Env -> Maybe Binding
 lookup' _ [] = Nothing
-lookup' which ((Binding sym loc):rest)
-    | sym == which = Just loc
+lookup' which (binding@(Binding sym loc):rest)
+    | sym == which = Just binding
     | otherwise = lookup' which rest
 
 -- * Storage
@@ -68,6 +73,7 @@ storeIsEmpty (Store stor) = IM.null stor
 data RuntimeState = RuntimeState
     { storeLoc :: Location
     , storage :: Store
+    , topLevelDefns :: Map Symbol Location
     } deriving (Show)
 
 newtype Runtime a = Runtime {
@@ -81,9 +87,21 @@ newtype Runtime a = Runtime {
 
 type Result = (Value, RuntimeState)
 
-doRuntime :: Runtime a -> IO (a, RuntimeState)
-doRuntime rt = runStateT (runReaderT (unRuntime rt) emptyEnv) $
-    RuntimeState 0 emptyStore
+runRuntime :: RuntimeState -> Runtime a -> IO (a, RuntimeState)
+runRuntime rs rt = runStateT (runReaderT (unRuntime rt) emptyEnv) rs
+
+evalRuntime :: RuntimeState -> Runtime a -> IO a
+evalRuntime rs rt = runRuntime rs rt >>= return . fst
+
+execRuntime :: RuntimeState -> Runtime a -> IO RuntimeState
+execRuntime rs rt = runRuntime rs rt >>= return . snd
+
+defaultRuntimeState :: RuntimeState
+defaultRuntimeState = RuntimeState {
+    storeLoc = 0,
+    storage = emptyStore,
+    topLevelDefns = M.empty
+    }
 
 nextLoc :: Runtime Location
 nextLoc = do
@@ -94,11 +112,10 @@ nextLoc = do
 getEnv :: Runtime Env
 getEnv = ask
 
-
 lookup :: Symbol -> Runtime (Maybe Location)
 lookup sym = do
     env <- getEnv
-    return $ lookup' sym env
+    return $ fmap bindingLoc $ lookup' sym env
 
 overrideStore :: Location -> Value -> Runtime ()
 overrideStore loc val = do
@@ -139,5 +156,22 @@ lookupAndFetch :: Symbol -> Runtime (Maybe Value)
 lookupAndFetch sym = do
     mLoc <- lookup sym
     case mLoc of
-        Nothing -> return Nothing
+        Nothing -> do
+            tlds <- gets topLevelDefns
+            let Just loc = M.lookup sym tlds
+            fetch loc
         Just loc -> fetch loc
+
+isSymTopLevel :: Symbol -> Runtime Bool
+isSymTopLevel sym = do
+    tlds <- gets topLevelDefns
+    return $ M.member sym tlds
+
+topLevelDefine :: Symbol -> CoreExpr () -> (CoreExpr () -> Runtime Value) -> Runtime Value
+topLevelDefine sym expr k = do
+    loc <- nextLoc
+    tlds <- gets topLevelDefns
+    modify $ \st -> st {
+        topLevelDefns = M.insert sym loc tlds
+        }
+    k expr

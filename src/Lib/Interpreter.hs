@@ -4,9 +4,11 @@ import Lib.Runtime
 import Lib.Syntax
 import Control.Monad.Free
 import Control.Monad.Reader
-import Control.Monad (forM, forM_)
+import Control.Monad.State
+import Control.Monad (forM, forM_, filterM)
 import Data.Set (Set)
 import qualified Data.Set as S
+import qualified Data.Map as M
 
 import Prelude hiding (lookup)
 
@@ -36,12 +38,17 @@ builtin_syms = S.fromList
     [ "+", "*", "=", "<", ">" ]
 
 -- | Given an expression produce a set of free variable symbols
-free_variables :: Expr () -> Set Symbol
-free_variables expr = (flip runReader) S.empty $ go expr S.empty where
-    go :: Expr () -> Set Symbol -> Reader (Set Symbol) (Set Symbol)
+free_variables :: CoreExpr () -> Set Symbol -> Set Symbol
+free_variables expr tlds = (flip runReader) tlds $ go expr S.empty where
+    go :: CoreExpr () -> Set Symbol -> Reader (Set Symbol) (Set Symbol)
     go (Free (NumC _)) fvs = return fvs
     go (Free (BoolC _)) fvs = return fvs
     go (Free (StringC _)) fvs = return fvs
+    go (Free (IfC c t e)) fvs = do
+        c_fvs <- go c fvs
+        t_fvs <- go t c_fvs
+        e_fvs <- go e t_fvs
+        return e_fvs
     go (Free (IdC sym)) fvs = do
         boundVars <- ask
         case S.member sym (S.union builtin_syms boundVars) of
@@ -61,19 +68,20 @@ free_variables expr = (flip runReader) S.empty $ go expr S.empty where
 -- | Given a set of captured environment symbols and the pieces of a lambda
 -- abstraction expression, duplicate the relevant portions of the store and
 -- produce a new closure value with its own environment
-make_closure :: Set Symbol -> [Symbol] -> Expr () -> Runtime Value
+make_closure :: Set Symbol -> [Symbol] -> CoreExpr () -> Runtime Value
 make_closure captured args body = case S.null captured of
     True -> return $ ClosV args body emptyEnv
     False -> do
-        cEnv <- forM (S.toList captured) $ \fv -> do
+        capturedVars <- filterM (fmap not . isSymTopLevel) $ S.toList captured
+        cEnv <- forM capturedVars $ \fv -> do
             Just oldLoc <- lookup fv
             newLoc <- nextLoc
             val <- duplicateInStore oldLoc newLoc
-            return $ Binding fv newLoc
+            return $ bind fv newLoc
         return $ ClosV args body cEnv
 
--- | Interpret an 'Expr ()' in a 'Runtime' to produce a result 'Value'
-interpret :: Expr () -> Runtime Value
+-- | Interpret an 'CoreExpr ()' in a 'Runtime' to produce a result 'Value'
+interpret :: CoreExpr () -> Runtime Value
 interpret (Free (NumC n)) = return $ NumV n
 interpret (Free (BoolC b)) = return $ BoolV b
 interpret (Free (StringC s)) = return $ StringV s
@@ -93,7 +101,8 @@ interpret (Free (IfC c t e)) = do
         else interpret e
 
 interpret clos@(Free (ClosC args body)) = do
-    let freeVars = free_variables clos
+    tlds <- gets topLevelDefns
+    let freeVars = free_variables clos $ M.keysSet tlds
     make_closure freeVars args body
 
 interpret app@(Free (AppC fun appArgs)) = do
@@ -111,11 +120,20 @@ interpret app@(Free (AppC fun appArgs)) = do
             -- now remove that shit from the store
             forM_ cEnv $ \(Binding _ loc) -> removeFromStore loc
             return result
-        SymV sym -> return $ case sym of
-            "+" -> op_plus (vals !! 0) (vals !! 1)
-            "*" -> op_mult (vals !! 0) (vals !! 1)
-            "=" -> op_eq (vals !! 0) (vals !! 1)
-            "<" -> op_lt (vals !! 0) (vals !! 1)
-            ">" -> op_gt (vals !! 0) (vals !! 1)
+        SymV sym -> case sym of
+            "+" -> return $ op_plus (vals !! 0) (vals !! 1)
+            "*" -> return $ op_mult (vals !! 0) (vals !! 1)
+            "=" -> return $ op_eq (vals !! 0) (vals !! 1)
+            "<" -> return $ op_lt (vals !! 0) (vals !! 1)
+            ">" -> return $ op_gt (vals !! 0) (vals !! 1)
+
     forM_ locs $ \loc -> removeFromStore loc
     return result
+
+interpret (Free (DefC sym body)) = do
+    tlds <- gets topLevelDefns
+    loc <- nextLoc
+    modify $ \st -> st { topLevelDefns = M.insert sym loc tlds }
+    bodyVal <- interpret body
+    overrideStore loc bodyVal
+    return NopV

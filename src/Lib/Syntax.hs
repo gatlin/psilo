@@ -7,7 +7,7 @@ import Control.Monad.Free
 
 type Symbol = String
 
-data Ast a
+data CoreAst a
     = NumC { numC :: Double }
     | BoolC { boolC :: Bool }
     | StringC { stringC :: String }
@@ -15,27 +15,31 @@ data Ast a
     | AppC { appFun :: a, appArgs :: [a] }
     | ClosC { closCArgs :: [Symbol], closCBody :: a }
     | IfC { ifCond :: a, ifThen :: a, ifElse :: a }
+    | DefC { defSym :: Symbol, defValue :: a }
     deriving (Functor, Show)
 
-type Expr = Free Ast
+type CoreExpr = Free CoreAst
 
-aNumber :: (MonadFree Ast m) => Double -> m a
+aNumber :: (MonadFree CoreAst m) => Double -> m a
 aNumber d = liftF $ NumC d
 
-aBool :: (MonadFree Ast m) => Bool -> m a
+aBool :: (MonadFree CoreAst m) => Bool -> m a
 aBool b = liftF $ BoolC b
 
-aString :: (MonadFree Ast m) => String -> m a
+aString :: (MonadFree CoreAst m) => String -> m a
 aString s = liftF $ StringC s
 
-aId :: (MonadFree Ast m) => Symbol -> m a
+aId :: (MonadFree CoreAst m) => Symbol -> m a
 aId s = liftF $ IdC s
 
-aApp :: (MonadFree Ast m) => a -> [a] -> m a
+aApp :: (MonadFree CoreAst m) => a -> [a] -> m a
 aApp f a = liftF $ AppC f a
 
-aClos :: (MonadFree Ast m) => [Symbol] -> a -> m a
+aClos :: (MonadFree CoreAst m) => [Symbol] -> a -> m a
 aClos a b = liftF $ ClosC a b
 
-aIf :: (MonadFree Ast m) => a -> a -> a -> m a
+aIf :: (MonadFree CoreAst m) => a -> a -> a -> m a
 aIf c t e = liftF $ IfC c t e
+
+aDef :: (MonadFree CoreAst m) => Symbol -> a -> m a
+aDef s b = liftF $ DefC s b
