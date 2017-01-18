@@ -22,6 +22,14 @@ op_mult :: Value -> Value -> Value
 op_mult (NumV l) (NumV r) = NumV $ l * r
 op_mult _        _        = error "Can't multiply non-numbers"
 
+op_minus :: Value -> Value -> Value
+op_minus (NumV l) (NumV r) = NumV $ l - r
+op_minus _ _ = error "Can't subtract non-numbers"
+
+op_div :: Value -> Value -> Value
+op_div (NumV l) (NumV r) = NumV $ l / r
+op_div _ _ = error "Can't divide non-numbers"
+
 op_eq :: Value -> Value -> Value
 op_eq (BoolV l) (BoolV r) = BoolV $ l == r
 op_eq (NumV l) (NumV r)   = BoolV $ l == r
@@ -35,7 +43,7 @@ op_gt (NumV l) (NumV r) = BoolV $ l > r
 
 builtin_syms :: Set Symbol
 builtin_syms = S.fromList
-    [ "+", "*", "=", "<", ">" ]
+    [ "+", "*", "-", "/", "=", "<", ">" ]
 
 -- | Given an expression produce a set of free variable symbols
 free_variables :: CoreExpr () -> Set Symbol -> Set Symbol
@@ -125,6 +133,8 @@ interpret app@(Free (AppC fun appArgs)) = do
         SymV sym -> case sym of
             "+" -> return $ op_plus (vals !! 0) (vals !! 1)
             "*" -> return $ op_mult (vals !! 0) (vals !! 1)
+            "-" -> return $ op_minus (vals !! 0) (vals !! 1)
+            "/" -> return $ op_div (vals !! 0) (vals !! 1)
             "=" -> return $ op_eq (vals !! 0) (vals !! 1)
             "<" -> return $ op_lt (vals !! 0) (vals !! 1)
             ">" -> return $ op_gt (vals !! 0) (vals !! 1)
