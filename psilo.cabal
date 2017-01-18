@@ -1,53 +1,48 @@
 name:                psilo
 version:             0.1.0.0
-synopsis:            psilo language implementation
-description:         A compiler for the psilo programming language
-homepage:            https://github.com/gatlin/psilo
-license:             MIT
-license-file:        LICENSE-MIT
-author:              Gatlin Johnson
-maintainer:          gatlin@niltag.net
-copyright:           2015 Gatlin Johnson
-Category:            Compiler
+synopsis:            Initial project template from stack
+description:         Please see README.md
+homepage:            https://github.com/githubuser/psilo#readme
+license:             BSD3
+license-file:        LICENSE
+author:              Author name here
+maintainer:          example@example.com
+copyright:           2017 Author name here
+category:            Web
 build-type:          Simple
+extra-source-files:  README.md
 cabal-version:       >=1.10
-extra-source-files:  
-Bug-Reports:         https://github.com/gatlin/psilo/issues
 
-Source-Repository head
-    Type: git
-    Location: git@github.com:gatlin/psilo.git
-
-executable psilo
+library
+  hs-source-dirs:      src
+  exposed-modules:     Lib, Lib.Parser, Lib.Runtime, Lib.Syntax,
+                       Lib.Interpreter
+  build-depends:       base >= 4.7 && < 5,
+                       tubes,
+                       comonad,
+                       mtl,
+                       transformers,
+                       free,
+                       containers
   default-language:    Haskell2010
-  main-is: Main.hs
-  hs-source-dirs: src
-  build-depends:       
-      base                 >= 4.6
-    , pandoc               >= 1.12
-    , ghc
-    , haskeline            >= 0.7
-    , mtl
-    , transformers
-    , free
-    , optparse-applicative
-    , comonad
-    , split
-    , parsec
-    , containers
-    , comonad              >= 4.2.5
-    , tubes
 
-executable preprocess
+executable psilo-exe
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  build-depends:       base
+                     , psilo
   default-language:    Haskell2010
-  main-is: preprocessor.hs
-  build-depends:       
-      base                 >= 4.6
-    , pandoc               >= 1.12
-    , haskeline            >= 0.7
-    , mtl
-    , transformers
-    , free
-    , optparse-applicative
-    , split
 
+test-suite psilo-test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Spec.hs
+  build-depends:       base
+                     , psilo
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
+
+source-repository head
+  type:     git
+  location: https://github.com/githubuser/psilo
