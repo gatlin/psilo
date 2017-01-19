@@ -2,7 +2,6 @@ module Main where
 
 import Options.Applicative
 import Options.Applicative.Common
-import Tubes
 import Lib
 
 data CmdLnOpts = CmdLnOpts
@@ -33,6 +32,4 @@ test_program = "(def square (\\ (x) (* x x))) (def plus1 (\\ (x) (+ 1 x)))"
 begin :: CmdLnOpts -> IO ()
 begin cmdLnOpts = case inputFile cmdLnOpts of
     Nothing -> replMain
-    _ -> do
-        defns <- parse_multi $ Source (each test_program)
-        putStrLn . show $ defns
+    Just inFile -> interpret_file inFile

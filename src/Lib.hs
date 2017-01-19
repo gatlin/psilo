@@ -1,6 +1,7 @@
 module Lib
     ( replMain
     , interpret
+    , interpret_file
     , parse
     , parse_multi
     ) where
@@ -13,3 +14,4 @@ import Lib.Syntax
 import Lib.Runtime
 import Lib.Interpreter
 import Lib.REPL
+import Lib.FileEval

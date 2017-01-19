@@ -25,7 +25,13 @@ data Value
     | SymV { symV :: Symbol }
     | ClosV { closVArgs :: [Symbol], closVBody :: CoreExpr (), closVEnv :: Env }
     | NopV
-    deriving (Show)
+
+instance Show Value where
+    show (NumV n) = show n
+    show (BoolV b) = if b then "#t" else "#f"
+    show (StringV s) = "\"" ++ s ++ "\""
+    show (ClosV _ _ _) = "Closure"
+    show _ = "Value"
 
 -- * Environment
 
@@ -34,28 +40,42 @@ data Binding = Binding
     , bindingLoc :: Location
     } deriving (Show)
 
-type Env = [Binding]
+newtype Env = Env { unEnv :: Map Symbol Location }
 
 bind :: Symbol -> Location -> Binding
 bind sym loc = Binding sym loc
 
 emptyEnv :: Env
-emptyEnv = []
+emptyEnv = Env M.empty
 
 envIsEmpty :: Env -> Bool
-envIsEmpty env = (length env) == 0
+envIsEmpty (Env env) = M.null env
+
+envFromBindings :: [Binding] -> Env
+envFromBindings bindings = go bindings emptyEnv where
+    go [] env = env
+    go ((Binding sym loc):rest) (Env env) = go rest $
+        Env $ M.insert sym loc env
+
+bindingsFromEnv :: Env -> [Binding]
+bindingsFromEnv (Env env) = fmap (\(a,b) -> Binding a b) $ M.assocs env
 
 extendEnv :: Binding -> Env -> Env
-extendEnv = (:)
+extendEnv (Binding sym loc) (Env env) = Env $ M.insert sym loc env
 
 extendEnv' :: Env -> Env -> Env
-extendEnv' = (++)
+extendEnv' (Env e1) (Env e2) = Env $ M.union e1 e2
 
 lookup' :: Symbol -> Env -> Maybe Binding
-lookup' _ [] = Nothing
-lookup' which (binding@(Binding sym loc):rest)
-    | sym == which = Just binding
-    | otherwise = lookup' which rest
+lookup' sym (Env env)
+    | M.null env = Nothing
+    | otherwise = case M.lookup sym env of
+          Nothing -> Nothing
+          Just loc -> Just (Binding sym loc)
+
+instance Monoid Env where
+    mempty = emptyEnv
+    mappend = extendEnv'
 
 -- * Storage
 

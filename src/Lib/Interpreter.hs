@@ -7,6 +7,7 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad (forM, forM_, filterM)
 import Data.Set (Set)
+import Data.Monoid
 import qualified Data.Set as S
 import qualified Data.Map as M
 
@@ -88,7 +89,7 @@ make_closure captured args body = case S.null captured of
             newLoc <- nextLoc
             val <- duplicateInStore oldLoc newLoc
             return $ bind fv newLoc
-        return $ ClosV args body cEnv
+        return $ ClosV args body $ envFromBindings cEnv
 
 -- | Interpret an 'CoreExpr ()' in a 'Runtime' to produce a result 'Value'
 interpret :: CoreExpr () -> Runtime Value
@@ -124,11 +125,12 @@ interpret app@(Free (AppC fun appArgs)) = do
         return (loc, resultVal)) >>= return . unzip
     result <- case funV of
         ClosV closArgs body cEnv -> do
-            let bindings = zipWith bind closArgs locs
-            result <- local (\env -> bindings ++ cEnv ++ env) $
+            let bindings = envFromBindings $ zipWith bind closArgs locs
+            result <- local (\env -> bindings <> cEnv <> env) $
                 interpret body
             -- now remove that shit from the store
-            forM_ cEnv $ \(Binding _ loc) -> removeFromStore loc
+            forM_  (bindingsFromEnv cEnv)$ \(Binding _ loc) ->
+                removeFromStore loc
             return result
         SymV sym -> case sym of
             "+" -> return $ op_plus (vals !! 0) (vals !! 1)

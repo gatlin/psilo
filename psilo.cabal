@@ -16,7 +16,7 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Lib, Lib.Parser, Lib.Runtime, Lib.Syntax,
-                       Lib.Interpreter, Lib.REPL
+                       Lib.Interpreter, Lib.REPL, Lib.FileEval
   build-depends:       base >= 4.7 && < 5,
                        tubes,
                        comonad,
@@ -34,7 +34,6 @@ executable psilo-exe
   build-depends:       base
                      , psilo
                      , optparse-applicative
-                     , tubes
   default-language:    Haskell2010
 
 test-suite psilo-test
