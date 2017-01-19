@@ -5,20 +5,32 @@ import qualified Prelude as P
 import Lib.Interpreter
 import Lib.Runtime
 import Lib.Parser
+import Lib.FileEval
 import System.Console.Haskeline
 import Control.Monad.Trans
 import Control.Monad.IO.Class
+import Data.Char (isSpace)
 import Tubes
+
+ltrim = dropWhile isSpace
 
 replMain :: IO ()
 replMain = runInputT defaultSettings (loop defaultRuntimeState) where
     loop rtState = do
         minput <- getInputLine "% "
-        case minput of
+        let minput' = fmap ltrim minput
+        case minput' of
             Nothing -> return ()
-            Just ":store" -> do
-                liftIO . putStrLn . show $ storage rtState
-                loop rtState
+            Just (':':cmd) -> case break isSpace cmd of
+                ("store",_) -> do
+                    liftIO . putStrLn . show $ rtState
+                    loop rtState
+                ("load", filePath) -> do
+                    rtState' <- liftIO $ do
+                        file_contents <- readFile $ ltrim filePath
+                        defns <- parse_multi $ Source $ each file_contents
+                        load_defns defns rtState
+                    loop rtState'
             Just input -> do
                 mParsed <- liftIO $ parse $ Source (each input)
                 case mParsed of
