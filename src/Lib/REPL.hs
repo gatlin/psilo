@@ -20,10 +20,10 @@ replMain = runInputT defaultSettings (loop defaultRuntimeState) where
                 liftIO . putStrLn . show $ storage rtState
                 loop rtState
             Just input -> do
-                mParsed <- liftIO $ parse input
+                mParsed <- liftIO $ parse $ Source (each input)
                 case mParsed of
                     Nothing -> liftIO $ putStrLn "Parser error"
-                    Just parsed -> do
+                    Just (parsed, _) -> do
                         (result, rtState') <- liftIO $ runRuntime rtState $
                             interpret parsed
                         liftIO . putStrLn . show $ result

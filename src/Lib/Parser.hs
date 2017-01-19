@@ -219,17 +219,15 @@ parse_app :: Monad m => Parser m Char (CoreExpr a)
 parse_app = fmap Free $ AppC
     <$> (parse_id <|> parse_expr)
     <*  optional spaces
-    <*> (parse_expr `sepBy` spaces)
+    <*> (optional $ parse_expr `sepBy` spaces)
 
 parse_clos :: Monad m => Parser m Char (CoreExpr a)
 parse_clos = fmap Free $ ClosC
     <$  (string "lambda" <|> string "\\")
     <*  optional spaces
-    <*> parens (sym `sepBy` spaces)
+    <*> parens (optional $ sym `sepBy` spaces)
     <*  optional spaces
     <*> parse_expr
-
-
 
 parse_expr :: Monad m => Parser m Char (CoreExpr a)
 parse_expr = parse_bool
@@ -251,13 +249,22 @@ parse_def = fmap Free $ DefC
 parse_toplevel :: Monad m => Parser m Char (CoreExpr a)
 parse_toplevel = (parens parse_def) <|> parse_expr
 
-parse :: (Foldable f, Monad m)
-      => f Char
-      -> m (Maybe (CoreExpr a))
+parse :: (Monad m)
+      => Source m Char
+      -> m (Maybe ((CoreExpr a, Source m Char)))
 parse input = do
     parses <- reduce (flip (:)) [] $
               ( sample $
-                runParser parse_toplevel (Source (each input)) )
+                runParser parse_toplevel input )
               >< take 1
-              >< map fst
     return $ listToMaybe parses
+
+-- | Parse multiple top-level definitions
+parse_multi
+    :: Monad m
+    => Source m Char
+    -> m [CoreExpr ()]
+parse_multi input = do
+    let parsed = runParser (parse_toplevel `sepBy` spaces) input
+    defns <- reduce (++) [] $ sample parsed >< take 1 >< map fst
+    return defns

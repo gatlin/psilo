@@ -158,8 +158,10 @@ lookupAndFetch sym = do
     case mLoc of
         Nothing -> do
             tlds <- gets topLevelDefns
-            let Just loc = M.lookup sym tlds
-            fetch loc
+            let mLoc' = M.lookup sym tlds
+            case mLoc' of
+                Nothing -> error $ "Symbol " ++ sym ++ " not bound"
+                Just loc -> fetch loc
         Just loc -> fetch loc
 
 isSymTopLevel :: Symbol -> Runtime Bool
