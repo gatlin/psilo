@@ -247,7 +247,10 @@ parse_def = fmap Free $ DefC
     <*> parse_expr
 
 parse_toplevel :: Monad m => Parser m Char (CoreExpr a)
-parse_toplevel = id <$ (optional spaces) <*> ((parens parse_def) <|> parse_expr) <* (optional spaces)
+parse_toplevel = id
+    <$ (optional spaces)
+    <*> ((parens parse_def) <|> parse_expr)
+    <* (optional spaces)
 
 parse' :: (Monad m)
       => Source m Char
