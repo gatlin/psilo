@@ -31,6 +31,7 @@ replMain = runInputT defaultSettings (loop defaultRuntimeState) where
                         file_contents <- readFile $ ltrim filePath
                         defns <- parse_multi $ Source $ each file_contents
                         load_defns (reverse defns) rtState
+--                        withFileSource 
                     loop rtState'
             Just input -> do
                 mParsed <- liftIO $ parse $ Source (each input)

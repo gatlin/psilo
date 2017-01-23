@@ -268,6 +268,7 @@ parse input = do
     fmap (fmap fst) $ unyield $ (sample rp) >< take 1
 
 -- | Parse multiple top-level definitions
+
 parse_multi
     :: Monad m
     => Source m Char

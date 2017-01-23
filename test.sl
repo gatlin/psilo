@@ -3,3 +3,41 @@
        (t (\ (a) ((f f) a))))
      (\ (f)
        (t (\ (a) ((f f) a)))))))
+
+(def id (\ (x) x))
+(def compose (\ (f g)
+    (\ (x) (f (g x)))))
+
+(def Box (\ (b) b))
+(def box (\ (x) (\ Box (\ (f) (f x)))))
+(def unbox (\ (bx) (bx id)))
+(def box-map (\ (f bx)
+    (box (f (unbox bx)))))
+
+(def Const (\ (c) c))
+(def const (\ (x) (Const (\ (f) x))))
+(def get-const (\ (c) (c id)))
+(def const-map (\ (f c)
+    (const (get-const c))))
+
+(def over (\ (l f s)
+    (unbox ((l (compose box f) s) box-map))))
+(def view (\ (l s)
+    (get-const ((l Const s) const-map))))
+
+(def Person (\ (p) p))
+(def make-person (\ (name age)
+    (Person (\ (f) (f name age)))))
+
+(def name (\ (f p)
+    (\ (mapper)
+      (p (\ (n a)
+        (mapper (\ (new-n) (person new-n a))
+                (f n)))))))
+(def age (\ (f p)
+    (\ (mapper)
+      (p (\ (n a)
+        (mapper (\ (new-a) (person new new-a))
+                (f a)))))))
+
+(def george (person "george" 283))
