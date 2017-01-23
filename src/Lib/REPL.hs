@@ -34,7 +34,7 @@ replMain = runInputT defaultSettings (loop defaultRuntimeState) where
             Just input -> do
                 mParsed <- liftIO $ parse $ Source (each input)
                 case mParsed of
-                    Nothing -> liftIO $ putStrLn "Parser error"
+                    Nothing -> (liftIO $ putStrLn "Parser error") >> loop rtState
                     Just (parsed, _) -> do
                         (result, rtState') <- liftIO $ runRuntime rtState $
                             interpret parsed

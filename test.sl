@@ -1,13 +1,4 @@
-(def make-pair (\ (x y) (\ (f) (f x y))))
-
-(def p1 (make-pair 1 2))
-
-(def fst (\ (p) (p (\ (x y) x))))
-(def snd (\ (p) (p (\ (x y) y))))
-
-(def fact (\ (n)
-    (if (= n 0)
-        1
-        (* n (fact (- n 1))))))
-
-(def main (\ () (fact 5)))
+(def make-person (\ (name age) (\ (f) (f name age))))
+(def gatlin (make-person "gatlin" 28))
+(def get-age (\ (p) (p (\ (name age) age))))
+(def main (\ () (get-age gatlin)))

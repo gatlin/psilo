@@ -253,11 +253,8 @@ parse :: (Monad m)
       => Source m Char
       -> m (Maybe ((CoreExpr a, Source m Char)))
 parse input = do
-    parses <- reduce (flip (:)) [] $
-              ( sample $
-                runParser parse_toplevel input )
-              >< take 1
-    return $ listToMaybe parses
+    let rp = runParser parse_toplevel input
+    fmap (fmap fst) $ unyield $ (sample rp) >< take 1
 
 -- | Parse multiple top-level definitions
 parse_multi
