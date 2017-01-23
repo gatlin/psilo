@@ -30,7 +30,7 @@ instance Show Value where
     show (NumV n) = show n
     show (BoolV b) = if b then "#t" else "#f"
     show (StringV s) = "\"" ++ s ++ "\""
-    show (ClosV _ _ _) = "Closure"
+    show (ClosV a b e) = "Closure<" ++ (show e) ++ ">"
     show _ = "Value"
 
 -- * Environment
@@ -40,7 +40,7 @@ data Binding = Binding
     , bindingLoc :: Location
     } deriving (Show)
 
-newtype Env = Env { unEnv :: Map Symbol Location }
+newtype Env = Env { unEnv :: Map Symbol Location } deriving (Show)
 
 bind :: Symbol -> Location -> Binding
 bind sym loc = Binding sym loc

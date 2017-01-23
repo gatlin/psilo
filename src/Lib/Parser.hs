@@ -7,7 +7,7 @@ module Lib.Parser where
 
 import Prelude hiding (map, take, filter)
 import qualified Prelude as P
-import Control.Monad (forever, forM, forM_)
+import Control.Monad (forever, forM, forM_, join)
 import Control.Monad.Trans
 import Control.Applicative hiding (many, optional)
 import Data.Monoid ((<>))
@@ -247,11 +247,19 @@ parse_def = fmap Free $ DefC
     <*> parse_expr
 
 parse_toplevel :: Monad m => Parser m Char (CoreExpr a)
-parse_toplevel = (parens parse_def) <|> parse_expr
+parse_toplevel = id <$ (optional spaces) <*> ((parens parse_def) <|> parse_expr) <* (optional spaces)
 
-parse :: (Monad m)
+parse' :: (Monad m)
       => Source m Char
       -> m (Maybe ((CoreExpr a, Source m Char)))
+parse' input = do
+    let rp = runParser parse_toplevel input
+    fmap (fmap fst) $ unyield $ (sample rp)
+
+parse
+    :: (Monad m)
+    => Source m Char
+    -> m (Maybe ((CoreExpr a, Source m Char)))
 parse input = do
     let rp = runParser parse_toplevel input
     fmap (fmap fst) $ unyield $ (sample rp) >< take 1
@@ -261,7 +269,10 @@ parse_multi
     :: Monad m
     => Source m Char
     -> m [CoreExpr ()]
-parse_multi input = do
-    let parsed = runParser (parse_toplevel `sepBy` spaces) input
-    defns <- reduce (++) [] $ sample parsed >< take 1 >< map fst
-    return defns
+parse_multi input = go input [] where
+    go :: Monad m => Source m Char -> [CoreExpr ()] -> m [CoreExpr ()]
+    go inp defns = do
+        mResult <- parse' inp
+        case mResult of
+            Nothing -> return defns
+            Just (parsed, inp') -> go inp' (parsed:defns)
