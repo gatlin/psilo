@@ -164,12 +164,12 @@ fetch loc = do
         False -> return Nothing
         True -> do
             let val = stor IM.! loc
-            when (valIsClos val) $ do
+{-            when (valIsClos val) $ do
                 modify $ \st -> st {
                     storage = Store $  case envIsEmpty (closVEnv val) of
                             True -> stor
                             False -> IM.delete loc stor
-                    }
+                    } -}
             return $ Just val
 
 lookupAndFetch :: Symbol -> Runtime (Maybe Value)

@@ -1,282 +1,140 @@
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Lib.Parser where
 
-import Prelude hiding (map, take, filter)
-import qualified Prelude as P
-import Control.Monad (forever, forM, forM_, join)
-import Control.Monad.Trans
-import Control.Applicative hiding (many, optional)
-import Data.Monoid ((<>))
-import Data.Char (isDigit, isPrint)
-import Control.Monad.Free
-import Data.Bool
-import Control.Arrow ((***))
-import Data.Either (isRight)
-import Data.List (intercalate, replicate, null)
-import Data.Maybe (listToMaybe)
-
-import Tubes
+import Prelude hiding (takeWhile)
+import Data.Text (Text)
+import qualified Data.Text as Text
+import Data.Attoparsec.Text
+import Control.Applicative
+import Data.Char (isDigit, isAlpha)
+import Control.Monad (join)
+import Control.Monad.IO.Class
 import Lib.Syntax
 
--- |
--- A 'Parser' transforms a stream of tokens into a stream
--- of possible parses along with unused input.
-newtype Parser m s t = P {
-    runParser :: Source m s -> Source m (t, Source m s)
-    }
+num_parser :: Parser (CoreExpr a)
+num_parser = aNumber <$> (double <|> rational)
 
-instance Monad m => Functor (Parser m s) where
-    fmap f (P srcFn) = P $ \src ->
-                               fmap (\(a, b) ->
-                                         (f a, b)) $ srcFn src
+symchars :: String
+symchars = "=<>.!@#$%^&*{}[]+-/\\"
 
-instance Monad m => Applicative (Parser m s) where
-    pure x = P $ \inp -> Source $ yield (x, inp)
-    (P p1) <*> (P p2) = P $ \inp -> do
-        (v1, ss1) <- p1 inp
-        (v2, ss2) <- p2 ss1
-        return (v1 v2, ss2)
+symchar :: Parser Char
+symchar = satisfy $ \c -> elem c symchars
 
-instance Monad m => Alternative (Parser m s) where
-    empty = P $ \inp -> empty
-    (P p1) <|> (P p2) = P $ \inp -> (p1 inp) <|> (p2 inp)
+sym :: Parser String
+sym = do
+    firstChar <- letter <|> symchar
+    otherChars <- many' $ letter <|> digit <|> symchar
+    return $ firstChar:otherChars
 
--- * Fundamental parser combinators
+id_parser :: Parser (CoreExpr a)
+id_parser = do
+    the_sym <- sym
+    return $ aId the_sym
 
-(<++>) :: Applicative f => f [a] -> f [a] -> f [a]
-a <++> b = (++) <$> a <*> b
+string_parser :: Parser (CoreExpr a)
+string_parser = do
+    char '"'
+    str <- many' $ notChar '"'
+    char '"'
+    return $ aString str
 
-(<:>) :: Applicative f => f a -> f [a] -> f [a]
-a <:> b = (:) <$> a <*> b
+bool_parser :: Parser (CoreExpr a)
+bool_parser = do
+    char '#'
+    bv <- char 't' <|> char 'f'
+    case bv of
+        't' -> return $ aBool True
+        'f' -> return $ aBool False
 
-optional :: (Alternative f, Monoid a) => f a -> f a
-optional p = p <|> pure mempty
+app_parser :: Parser (CoreExpr a)
+app_parser = do
+    (op:operands) <- expr_parser `sepBy1` (many space)
+    return . join $ aApp op operands
 
-many :: (Alternative f, Monoid (g a), Applicative g) => f a -> f (g a)
-many p = (\x xs -> (pure x) <> xs) <$> p <*> optional (many p)
+lam_parser :: Parser Text
+lam_parser =  (string "\\")
 
-sepBy1 :: (Alternative f, Monoid (g a), Applicative g)
-       => f a -> f b -> f (g a)
-sepBy1 p sep = (\x xs -> (pure x) <> xs) <$> p <*> many (id <$ sep <*> p)
+clos_parser :: Parser (CoreExpr a)
+clos_parser = do
+    char '\\'
+    skipSpace
+    char '('
+    skipSpace
+    args <- sym `sepBy` (many space)
+    skipSpace
+    char ')'
+    skipSpace
+    body <- expr_parser
+    return . join $ aClos args body
 
-sepBy :: (Alternative f, Monoid (g a), Applicative g)
-      => f a -> f b -> f (g a)
-sepBy p sep = sepBy1 p sep <|> (pure <$> p)
+if_parser :: Parser (CoreExpr a)
+if_parser = do
+    string "if"
+    skipSpace
+    c <- expr_parser
+    skipSpace
+    t <- expr_parser
+    skipSpace
+    e <- expr_parser
+    return . join $ aIf c t e
 
--- * More advanced parser combinators, and 'Char' based parsers
+def_parser :: Parser (CoreExpr a)
+def_parser = do
+    string "def"
+    skipSpace
+    sym <- sym
+    skipSpace
+    val <- expr_parser
+    return . join $ aDef sym val
 
--- | Succeeds iff the incoming token is among those in the argument list.
-oneOf :: (Monad m, Eq t) => [t] -> Parser m t t
-oneOf these = P $ \inp -> Source $ do
-    mv <- lift $ unyield $ sample inp
-    case mv of
-        Nothing -> halt
-        Just (c, inp') -> if elem c these
-            then yield (c, Source inp')
-            else halt
+parens :: Parser a -> Parser a
+parens p = do
+    char '('
+    skipSpace
+    thing <- p
+    skipSpace
+    char ')'
+    return thing
 
--- | Succeeds iff the next token is equal to the specified character.
-char :: Monad m => Char -> Parser m Char Char
-char target = P $ \inp -> Source $ do
-    mC <- lift $ unyield $ sample inp
-    case mC of
-        Nothing -> halt
-        Just (c, inp') ->
-            if c == target
-                then yield (c, Source inp')
-                else halt
+expr_parser :: Parser (CoreExpr a)
+expr_parser = (parens clos_parser)
+          <|> (parens if_parser)
+          <|> bool_parser
+          <|> id_parser
+          <|> num_parser
+          <|> string_parser
+          <|> (parens app_parser)
 
--- | Succeeds iff the incoming token is a printable character.
-printable :: Monad m => Parser m Char Char
-printable = P $ \inp -> Source $ do
-    mc <- lift $ unyield $ sample inp
-    case mc of
-        Nothing -> halt
-        Just (c, inp') ->
-            if isPrint c
-                then yield (c, Source inp')
-                else halt
+toplevel_parser :: Parser (CoreExpr a)
+toplevel_parser = do
+    skipSpace
+    defn <- parens def_parser
+    skipSpace
+    return defn
 
--- | Succeeds if the incoming token is a numeric digit, and parses it as such.
-digit :: Monad m=> Parser m Char Int
-digit = P $ \inp -> Source $ do
-    ms <- lift $ unyield $ sample inp
-    case ms of
-        Nothing -> halt
-        Just (c, inp') -> if isDigit c
-            then let d = read [c]
-                 in  if d >= 0 && d <= 9
-                         then yield (d, Source inp')
-                         else halt
-            else halt
+module_parser :: Parser [CoreExpr a]
+module_parser = toplevel_parser `sepBy` (many space)
 
--- | Succeeds iff the next tokens form the given string.
-string :: Monad m => String -> Parser m Char String
-string target = P $ \inp -> Source $ go target [] (sample inp) where
-    go [] acc inp = yield (acc, Source inp)
-    go (x:xs) acc inp = do
-        mc <- lift $ unyield inp
-        case mc of
-            Nothing -> halt
-            Just (c, inp') ->
-                if c == x
-                    then go xs (acc++[c]) inp'
-                    else halt
-
-boolean :: Monad m => Parser m Char Bool
-boolean = fmap (\case
-                       "#t" -> True
-                       "#f" -> False) $ (string "#t") <|> (string "#f")
-
--- * Programming language parsing utilities for 'Char' streams
-
-num :: (Monad m) => Parser m Char String
-num = many (oneOf "1234567890")
-
-plus :: (Monad m) => Parser m Char String
-plus = char '+' *> num
-
-minus :: (Monad m) => Parser m Char String
-minus = char '-' *> num
-
--- | Succeeds iff the tokens form an integer literal
-integer :: Monad m => Parser m Char Int
-integer = rd <$> (plus <|> minus <|> num)
-    where rd = read :: String -> Int
-
--- | Succeeds iff the tokens form a double literal
-double :: Monad m => Parser m Char Double
-double = fmap rd $ num' <++> decimal <++> exponent where
-    rd = read :: String -> Double
-    num' = plus <|> minus <|> num
-    decimal = optional $ char '.' <:> num
-    exponent = optional $ oneOf "eE" <:> num
-
--- | Succeeds iff the token is a single whitespace character
-space :: Monad m => Parser m Char Char
-space = char ' ' <|> char '\t' <|> char '\n'
-
-spaces :: Monad m => Parser m Char String
-spaces = many space
-
--- | Succeeds iff the given sub-parser suceeds and is delimited by the
--- specified tokens.
-delim :: Monad m => Char -> Char -> Parser m Char a -> Parser m Char a
-delim start end p = id
-    <$  char start
-    <*  optional spaces
-    <*> p
-    <*  optional spaces
-    <*  char end
-
--- | 'delim' specifically for parentheses
-parens :: Monad m => Parser m Char a -> Parser m Char a
-parens = delim '(' ')'
-
--- | 'delim' specifically for double quotes
-quotes :: Monad m => Parser m Char a -> Parser m Char a
-quotes = delim '"' '"'
-
--- | Succeeds iff the next tokens form a legal symbol
-sym :: Monad m => Parser m Char String
-sym = many $ letter <|> alphanum <|> (oneOf "=<>.!@#$%^&*{}[]+-/\\")
-
-letter :: Monad m => Parser m Char Char
-letter = oneOf "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-
-alphanum :: Monad m => Parser m Char Char
-alphanum = letter <|> oneOf "1234567890"
-
--- * Parser combinators
-
-parse_num :: Monad m => Parser m Char (CoreExpr a)
-parse_num = aNumber <$> double
-
-parse_bool :: Monad m => Parser m Char (CoreExpr a)
-parse_bool = aBool <$> boolean
-
-parse_id :: Monad m => Parser m Char (CoreExpr a)
-parse_id = aId <$> sym
-
-parse_string :: Monad m => Parser m Char (CoreExpr a)
-parse_string = aString <$> (quotes (many printable))
-
-parse_if :: Monad m => Parser m Char (CoreExpr a)
-parse_if = fmap Free $ IfC
-    <$  string "if"
-    <*  optional spaces
-    <*> parse_expr
-    <*  optional spaces
-    <*> parse_expr
-    <*  optional spaces
-    <*> parse_expr
-
-parse_app :: Monad m => Parser m Char (CoreExpr a)
-parse_app = fmap Free $ AppC
-    <$> (parse_id <|> parse_expr)
-    <*  optional spaces
-    <*> (optional $ parse_expr `sepBy` spaces)
-
-parse_clos :: Monad m => Parser m Char (CoreExpr a)
-parse_clos = fmap Free $ ClosC
-    <$  (string "lambda" <|> string "\\")
-    <*  optional spaces
-    <*> parens (optional $ sym `sepBy` spaces)
-    <*  optional spaces
-    <*> parse_expr
-
-parse_expr :: Monad m => Parser m Char (CoreExpr a)
-parse_expr = parse_bool
-         <|> parse_num
-         <|> parse_id
-         <|> parse_string
-         <|> parens parse_if
-         <|> parens parse_clos
-         <|> parens parse_app
-
-parse_def :: Monad m => Parser m Char (CoreExpr a)
-parse_def = fmap Free $ DefC
-    <$  (string "def")
-    <*  optional spaces
-    <*> sym
-    <*  optional spaces
-    <*> parse_expr
-
-parse_toplevel :: Monad m => Parser m Char (CoreExpr a)
-parse_toplevel = id
-    <$ (optional spaces)
-    <*> ((parens parse_def) <|> parse_expr)
-    <* (optional spaces)
-
-parse' :: (Monad m)
-      => Source m Char
-      -> m (Maybe ((CoreExpr a, Source m Char)))
-parse' input = do
-    let rp = runParser parse_toplevel input
-    fmap (fmap fst) $ unyield $ (sample rp)
-
-parse
+parse_expr
     :: (Monad m)
-    => Source m Char
-    -> m (Maybe ((CoreExpr a, Source m Char)))
-parse input = do
-    let rp = runParser parse_toplevel input
-    fmap (fmap fst) $ unyield $ (sample rp) >< take 1
-
--- | Parse multiple top-level definitions
+    => Text
+    -> m (Maybe (CoreExpr ()))
+parse_expr input = do
+    let parse_result = parseOnly ((parens def_parser) <|> expr_parser) input
+    case parse_result of
+        Left _ -> return Nothing
+        Right result -> return $ Just result
 
 parse_multi
-    :: Monad m
-    => Source m Char
+    :: MonadIO m
+    => Text
     -> m [CoreExpr ()]
-parse_multi input = go input [] where
-    go :: Monad m => Source m Char -> [CoreExpr ()] -> m [CoreExpr ()]
-    go inp defns = do
-        mResult <- parse' inp
-        case mResult of
-            Nothing -> return defns
-            Just (parsed, inp') -> go inp' (parsed:defns)
+parse_multi inp = do
+    let the_parser = module_parser
+    let parse_result = parseOnly the_parser inp
+    case parse_result of
+        Left reason -> do
+            liftIO . putStrLn $ "Parse failure: " ++ reason
+            return []
+        Right result -> return result

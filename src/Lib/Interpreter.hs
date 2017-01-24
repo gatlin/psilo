@@ -86,9 +86,13 @@ make_closure captured args body = case S.null captured of
                                   S.toList captured
         cEnv <- forM capturedVars $ \fv -> do
             Just oldLoc <- lookup fv
-            newLoc <- nextLoc
-            val <- duplicateInStore oldLoc newLoc
-            return $ bind fv newLoc
+            mOldLoc <- lookup fv
+            case mOldLoc of
+                Just oldLoc -> do
+                    newLoc <- nextLoc
+                    val <- duplicateInStore oldLoc newLoc
+                    return $ bind fv newLoc
+                Nothing -> error $ "Looking up " ++ (show fv)
         return $ ClosV args body $ envFromBindings cEnv
 
 -- | Interpret an 'CoreExpr ()' in a 'Runtime' to produce a result 'Value'
@@ -140,6 +144,10 @@ interpret app@(Free (AppC fun appArgs)) = do
             "=" -> return $ op_eq (vals !! 0) (vals !! 1)
             "<" -> return $ op_lt (vals !! 0) (vals !! 1)
             ">" -> return $ op_gt (vals !! 0) (vals !! 1)
+        other -> case appArgs of
+            [] -> return other
+            args  -> error $ "Can't apply arguments to unary function: " ++
+                       (show funV) ++ ", args: " ++ (show args)
 
     forM_ locs $ \loc -> removeFromStore loc
     return result

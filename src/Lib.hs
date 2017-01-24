@@ -2,7 +2,7 @@ module Lib
     ( replMain
     , interpret
     , interpret_file
-    , parse
+    , parse_expr
     , parse_multi
     ) where
 
