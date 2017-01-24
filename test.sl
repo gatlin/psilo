@@ -35,3 +35,5 @@
 (def p1 (make-pair 1 2))
 
 (def +1 (\ (x) (+ 1 x)))
+
+(def main (\ () (+1 2)))
