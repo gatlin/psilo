@@ -34,8 +34,6 @@
 
 (def p1 (make-pair 1 2))
 
-
-
 (defun fact (n)
   (if (= n 0)
       1
