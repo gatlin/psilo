@@ -34,10 +34,18 @@
 
 (def p1 (make-pair 1 2))
 
-(defun fact (n)
-  (if (= n 0)
-      1
-      (* n (fact (- n 1)))))
+(defun fact-no-tc (n)
+  (if (= n 1)
+    1
+    (* n (fact-no-tc (- n 1)))))
+
+(defun fact-tc-helper (product n)
+  (if (< n 2)
+    product
+    (fact-tc-helper (* product n)
+                    (- n 1))))
+
+(defun fact-tc (n) (fact-tc-helper 1 n))
 
 (defun main ()
     ((\ (pr)
