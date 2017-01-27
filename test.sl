@@ -39,6 +39,9 @@
       1
       (* n (fact (- n 1)))))
 
-(defun main () (fact (+1 3)))
+(defun main ()
+    ((\ (pr)
+       (+1 (view fst pr)))
+     (make-pair 1 2)))
 
 (defun +1 (x) (+ 1 x))
