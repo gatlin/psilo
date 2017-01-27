@@ -63,9 +63,6 @@ bindingsFromEnv (Env env) = fmap (\(a,b) -> Binding a b) $ M.assocs env
 extendEnv :: Binding -> Env -> Env
 extendEnv (Binding sym loc) (Env env) = Env $ M.insert sym loc env
 
-extendEnv' :: Env -> Env -> Env
-extendEnv' (Env e1) (Env e2) = Env $ M.union e1 e2
-
 lookup' :: Symbol -> Env -> Maybe Binding
 lookup' sym (Env env)
     | M.null env = Nothing
@@ -75,7 +72,7 @@ lookup' sym (Env env)
 
 instance Monoid Env where
     mempty = emptyEnv
-    mappend = extendEnv'
+    (Env e1) `mappend` (Env e2) = Env $ M.union e1 e2
 
 -- * Storage
 
@@ -184,8 +181,3 @@ topLevelDefine sym expr = do
     modify $ \st -> st {
         topLevelDefns = M.insert sym expr tlds
         }
-
-getTopLevelDefn :: Symbol -> Runtime (CoreExpr ())
-getTopLevelDefn sym = do
-    tlds <- gets topLevelDefns
-    return $ tlds M.! sym
