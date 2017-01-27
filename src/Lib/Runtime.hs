@@ -93,7 +93,7 @@ storeIsEmpty (Store stor) = IM.null stor
 data RuntimeState = RuntimeState
     { storeLoc :: Location
     , storage :: Store
-    , topLevelDefns :: Map Symbol Location
+    , topLevelDefns :: Map Symbol (CoreExpr ())
     } deriving (Show)
 
 newtype Runtime a = Runtime {
@@ -164,24 +164,13 @@ fetch loc = do
         False -> return Nothing
         True -> do
             let val = stor IM.! loc
-{-            when (valIsClos val) $ do
-                modify $ \st -> st {
-                    storage = Store $  case envIsEmpty (closVEnv val) of
-                            True -> stor
-                            False -> IM.delete loc stor
-                    } -}
             return $ Just val
 
 lookupAndFetch :: Symbol -> Runtime (Maybe Value)
 lookupAndFetch sym = do
     mLoc <- lookup sym
     case mLoc of
-        Nothing -> do
-            tlds <- gets topLevelDefns
-            let mLoc' = M.lookup sym tlds
-            case mLoc' of
-                Nothing -> error $ "Symbol " ++ sym ++ " not bound"
-                Just loc -> fetch loc
+        Nothing -> error $ "Symbol " ++ sym ++ " not bound"
         Just loc -> fetch loc
 
 isSymTopLevel :: Symbol -> Runtime Bool
@@ -189,11 +178,14 @@ isSymTopLevel sym = do
     tlds <- gets topLevelDefns
     return $ M.member sym tlds
 
-topLevelDefine :: Symbol -> CoreExpr () -> (CoreExpr () -> Runtime Value) -> Runtime Value
-topLevelDefine sym expr k = do
-    loc <- nextLoc
+topLevelDefine :: Symbol -> CoreExpr () -> Runtime ()
+topLevelDefine sym expr = do
     tlds <- gets topLevelDefns
     modify $ \st -> st {
-        topLevelDefns = M.insert sym loc tlds
+        topLevelDefns = M.insert sym expr tlds
         }
-    k expr
+
+getTopLevelDefn :: Symbol -> Runtime (CoreExpr ())
+getTopLevelDefn sym = do
+    tlds <- gets topLevelDefns
+    return $ tlds M.! sym

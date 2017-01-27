@@ -104,10 +104,14 @@ interpret (Free (IdC s)) = do
     case S.member s builtin_syms of
         True -> return $ SymV s
         False -> do
-            mSym <- lookupAndFetch s
-            case mSym of
-                Nothing -> error $ "Unbound symbol: " ++ s
-                Just val -> return val
+            tlds <- gets topLevelDefns
+            case M.lookup s tlds of
+                Nothing -> do
+                    mSym <- lookupAndFetch s
+                    case mSym of
+                        Nothing -> error $ "Unbound symbol: " ++ s
+                        Just val -> return val
+                Just tld -> interpret tld
 
 interpret (Free (IfC c t e)) = do
     BoolV condVal <- interpret c
@@ -153,9 +157,5 @@ interpret app@(Free (AppC fun appArgs)) = do
     return result
 
 interpret (Free (DefC sym body)) = do
-    tlds <- gets topLevelDefns
-    loc <- nextLoc
-    modify $ \st -> st { topLevelDefns = M.insert sym loc tlds }
-    bodyVal <- interpret body
-    overrideStore loc bodyVal
+    topLevelDefine sym body
     return NopV

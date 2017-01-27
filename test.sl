@@ -34,11 +34,13 @@
 
 (def p1 (make-pair 1 2))
 
-(defun +1 (x) (+ 1 x))
+
 
 (defun fact (n)
   (if (= n 0)
       1
       (* n (fact (- n 1)))))
 
-(defun main () (fact (+ 1 2)))
+(defun main () (fact (+1 3)))
+
+(defun +1 (x) (+ 1 x))
