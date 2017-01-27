@@ -88,6 +88,20 @@ def_parser = do
     val <- expr_parser
     return . join $ aDef sym val
 
+defun_parser :: Parser (CoreExpr a)
+defun_parser = do
+    string "defun"
+    skipSpace
+    name <- sym
+    skipSpace
+    char '('
+    args <- sym `sepBy` (many space)
+    skipSpace
+    char ')'
+    skipSpace
+    body <- expr_parser
+    return . join $ aDef name (join $ aClos args body)
+
 parens :: Parser a -> Parser a
 parens p = do
     char '('
@@ -109,7 +123,7 @@ expr_parser = (parens clos_parser)
 toplevel_parser :: Parser (CoreExpr a)
 toplevel_parser = do
     skipSpace
-    defn <- parens def_parser
+    defn <- (parens defun_parser) <|> (parens def_parser)
     skipSpace
     return defn
 
@@ -121,7 +135,9 @@ parse_expr
     => Text
     -> m (Maybe (CoreExpr ()))
 parse_expr input = do
-    let parse_result = parseOnly ((parens def_parser) <|> expr_parser) input
+    let parse_result = parseOnly ((parens def_parser)
+                                  <|> (parens defun_parser)
+                                  <|> expr_parser) input
     case parse_result of
         Left _ -> return Nothing
         Right result -> return $ Just result
