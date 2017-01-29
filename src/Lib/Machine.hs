@@ -195,7 +195,6 @@ execute :: Asm -> Machine -> Machine
 execute i@(Jump _) m = execute' i m
 execute i@(JumpIf _) m = execute' i m
 execute i@(Call _) m = execute' i m
-execute i@(JumpImm) m = execute' i m
 execute (Ret) m = execute' Ret m
 execute i m = incrPC $ execute' i m
 
@@ -247,8 +246,9 @@ boolToValue True = 1
 (<.>) :: (a -> Value) -> (Value -> Value -> a) -> Value -> Value -> Value
 (<.>) f op v w = f $ op v w
 
-runMachine :: [Asm] -> Machine
-runMachine is = run' (V.fromList $ execute <$> is)
+-- | Run a program on a brand new machine
+run :: [Asm] -> Machine
+run is = run' (V.fromList $ execute <$> is)
     (setMain . setCounter 0 . prepare is $ newMachine 100)
 
 setMain :: Machine -> Machine
@@ -383,12 +383,11 @@ test5 = [ Label "fact"
         , PushLocal
         , Mul
         , PopLocal
-        , Call "fact_helper"
-        , Ret
+        , Jump "fact_helper"
         , Label "fact_helper_ret"
         , Pop
         , Ret
         , Label "main"
-        , Push 100
+        , Push 5
         , Call "fact"
         ]
