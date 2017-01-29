@@ -195,6 +195,7 @@ execute :: Asm -> Machine -> Machine
 execute i@(Jump _) m = execute' i m
 execute i@(JumpIf _) m = execute' i m
 execute i@(Call _) m = execute' i m
+execute i@(JumpImm) m = execute' i m
 execute (Ret) m = execute' Ret m
 execute i m = incrPC $ execute' i m
 
