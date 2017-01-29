@@ -27,8 +27,6 @@ main = execParser opts >>= begin where
        <> progDesc "Execute psilo programs."
        <> header "psilo - a practical, safe, interpreted, linear operation language")
 
-test_program = "(def square (\\ (x) (* x x))) (def plus1 (\\ (x) (+ 1 x)))"
-
 begin :: CmdLnOpts -> IO ()
 begin cmdLnOpts = case inputFile cmdLnOpts of
     Nothing -> replMain
