@@ -31,13 +31,17 @@ replMain = runInputT defaultSettings (loop defaultRuntimeState) where
                 ("store",_) -> do
                     liftIO . putStrLn . show $ rtState
                     loop rtState
+                    {-
                 ("load", filePath) -> do
                     rtState' <- liftIO $ do
                         file_contents <- TextIO.readFile $ ltrim filePath
                         defns <- parse_multi file_contents
                         load_defns defns rtState
                     loop rtState'
+-}
             Just input -> do
+                loop rtState
+                {-
                 mParsed <- parse_expr $ Text.pack input
                 case mParsed of
                     Nothing -> do
@@ -48,3 +52,4 @@ replMain = runInputT defaultSettings (loop defaultRuntimeState) where
                             interpret parsed
                         liftIO . putStrLn . show $ result
                         loop rtState'
+-}

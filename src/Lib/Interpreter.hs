@@ -1,6 +1,6 @@
 module Lib.Interpreter where
 
-import Lib.Runtime
+import Lib.Machine
 import Lib.Syntax
 import Control.Monad.Free
 import Control.Monad.Reader
@@ -12,39 +12,6 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 
 import Prelude hiding (lookup)
-
--- * Builtin operations and symbols
-
-op_plus :: Value -> Value -> Value
-op_plus (NumV l) (NumV r) = NumV $ l + r
-op_plus _        _        = error "Can't add non-numbers"
-
-op_mult :: Value -> Value -> Value
-op_mult (NumV l) (NumV r) = NumV $ l * r
-op_mult _        _        = error "Can't multiply non-numbers"
-
-op_minus :: Value -> Value -> Value
-op_minus (NumV l) (NumV r) = NumV $ l - r
-op_minus _ _ = error "Can't subtract non-numbers"
-
-op_div :: Value -> Value -> Value
-op_div (NumV l) (NumV r) = NumV $ l / r
-op_div _ _ = error "Can't divide non-numbers"
-
-op_eq :: Value -> Value -> Value
-op_eq (BoolV l) (BoolV r) = BoolV $ l == r
-op_eq (NumV l) (NumV r)   = BoolV $ l == r
-op_eq _         _         = error "Values must be both numeric or boolean"
-
-op_lt :: Value -> Value -> Value
-op_lt (NumV l) (NumV r) = BoolV $ l < r
-
-op_gt :: Value -> Value -> Value
-op_gt (NumV l) (NumV r) = BoolV $ l > r
-
-builtin_syms :: Set Symbol
-builtin_syms = S.fromList
-    [ "+", "*", "-", "/", "=", "<", ">" ]
 
 -- | Given an expression produce a set of free variable symbols
 free_variables :: CoreExpr () -> Set Symbol -> Set Symbol
@@ -77,6 +44,7 @@ free_variables expr tlds = (flip runReader) tlds $ go expr S.empty where
 -- | Given a set of captured environment symbols and the pieces of a lambda
 -- abstraction expression, duplicate the relevant portions of the store and
 -- produce a new closure value with its own environment
+{-
 make_closure :: Set Symbol -> [Symbol] -> CoreExpr () -> Runtime Value
 make_closure captured args body = case S.null captured of
     True -> return $ ClosV args body emptyEnv
@@ -94,68 +62,8 @@ make_closure captured args body = case S.null captured of
                     return $ bind fv newLoc
                 Nothing -> error $ "Looking up " ++ (show fv)
         return $ ClosV args body $ envFromBindings cEnv
+-}
 
 -- | Interpret an 'CoreExpr ()' in a 'Runtime' to produce a result 'Value'
 interpret :: CoreExpr () -> Runtime Value
-interpret (Free (NumC n)) = return $ NumV n
-interpret (Free (BoolC b)) = return $ BoolV b
-interpret (Free (StringC s)) = return $ StringV s
-interpret (Free (IdC s)) = do
-    case S.member s builtin_syms of
-        True -> return $ SymV s
-        False -> do
-            tlds <- gets topLevelDefns
-            case M.lookup s tlds of
-                Nothing -> do
-                    mSym <- lookupAndFetch s
-                    case mSym of
-                        Nothing -> error $ "Unbound symbol: " ++ s
-                        Just val -> return val
-                Just tld -> interpret tld
-
-interpret (Free (IfC c t e)) = do
-    BoolV condVal <- interpret c
-    if condVal
-        then interpret t
-        else interpret e
-
-interpret clos@(Free (ClosC args body)) = do
-    tlds <- gets topLevelDefns
-    let freeVars = free_variables clos $ M.keysSet tlds
-    make_closure freeVars args body
-
-interpret app@(Free (AppC fun appArgs)) = do
-    funV <- interpret fun
-    (locs, vals) <- (forM appArgs $ \arg -> do
-        resultVal <- interpret arg
-        loc <- nextLoc
-        overrideStore loc resultVal
-        return (loc, resultVal)) >>= return . unzip
-    result <- case funV of
-        ClosV closArgs body cEnv -> do
-            let bindings = envFromBindings $ zipWith bind closArgs locs
-            result <- local (\env -> bindings <> cEnv <> env) $
-                interpret body
-            -- now remove that shit from the store
-            forM_  (bindingsFromEnv cEnv)$ \(Binding _ loc) ->
-                removeFromStore loc
-            return result
-        SymV sym -> case sym of
-            "+" -> return $ op_plus (vals !! 0) (vals !! 1)
-            "*" -> return $ op_mult (vals !! 0) (vals !! 1)
-            "-" -> return $ op_minus (vals !! 0) (vals !! 1)
-            "/" -> return $ op_div (vals !! 0) (vals !! 1)
-            "=" -> return $ op_eq (vals !! 0) (vals !! 1)
-            "<" -> return $ op_lt (vals !! 0) (vals !! 1)
-            ">" -> return $ op_gt (vals !! 0) (vals !! 1)
-        other -> case appArgs of
-            [] -> return other
-            args  -> error $ "Can't apply arguments to unary function: " ++
-                       (show funV) ++ ", args: " ++ (show args)
-
-    forM_ locs $ \loc -> removeFromStore loc
-    return result
-
-interpret (Free (DefC sym body)) = do
-    topLevelDefine sym body
-    return NopV
+interpret _ = return NopV

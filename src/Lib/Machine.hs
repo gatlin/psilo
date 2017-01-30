@@ -450,32 +450,32 @@ test3 = [ Label "fib"           -- "n" is on the stack
         ]
 
 -- tail-recursive fibonacci
-test4 :: [Asm]
-test4 = [ Label "fib"     -- n
-        , PushLocal
-        , Push 0
-        , Push 1
-        , PopLocal
-        , Call "fib_rec"
-        , Pop
-        , Pop
+test4 :: [Asm]               -- top of stack <-----> bottom of stack
+test4 = [ Label "fib"        -- n
+        , PushLocal          -- _
+        , Push 0             -- 0
+        , Push 1             -- 1 -> 0
+        , PopLocal           -- n -> 1 -> 0
+        , Call "fib_rec"     -- n -> A -> B
+        , Pop                -- A -> B
+        , Pop                -- B
         , Ret
-        , Label "fib_rec"
-        , Dup
-        , Push 0
-        , Eq
-        , JumpIf "fib_done"
-        , PushLocal
-        , Dup
-        , PushLocal
-        , Add
-        , PopLocal
-        , Swap
-        , Push 1
-        , PopLocal
-        , Sub
+        , Label "fib_rec"    -- n -> A -> B
+        , Dup                -- n -> n -> A -> B
+        , Push 0             -- 0 -> n -> n -> A -> B
+        , Eq                 -- t/f -> n -> A -> B
+        , JumpIf "fib_done"  -- n -> A -> B
+        , PushLocal          -- A -> B
+        , Dup                -- A -> A -> B
+        , PushLocal          -- A -> B
+        , Add                -- (A+B)
+        , PopLocal           -- A -> (A+B)
+        , Swap               -- (A+B) -> A
+        , Push 1             -- 1 -> (A+B) -> A
+        , PopLocal           -- n -> 1 -> (A+B) -> A
+        , Sub                -- (n-1) -> (A+B) -> A
         , Jump "fib_rec"
-        , Label "fib_done"
+        , Label "fib_done"   -- n -> A -> B
         , Ret
         , Label "main"
         , Push 8
