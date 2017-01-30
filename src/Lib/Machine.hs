@@ -488,17 +488,15 @@ test5 = [ Label "fact"
         , Dup
         , Push 1
         , Eq
-        , JumpIf "fact_ret"
-        , Jump "fact_continue"
-        , Label "fact_ret"
-        , Ret
-        , Label "fact_continue"
+        , JumpIf "fact_done"
         , Dup
         , Push 1
         , Swap
         , Sub
         , Call "fact"
         , Mul
+        , Ret
+        , Label "fact_done"
         , Ret
         , Label "main"
         , Push 5

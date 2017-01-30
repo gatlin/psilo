@@ -67,6 +67,14 @@ make_closure captured args body = case S.null captured of
                     return $ bind fv newLoc
                 Nothing -> error $ "Looking up " ++ (show fv)
         return $ ClosV args body $ envFromBindings cEnv
+
+
+compile :: CoreExpr () -> [ Asm ]
+compile expr = reverse (go expr []) where
+    go (Pure _) asm = asm
+    go (Free (NumC n)) asm = (Push n) : asm
+    go (Free (BoolC b)) asm = (Push (if b then 1 else 0)) : asm
+--    go (Free (StringC str)) asm =
 -}
 
 -- | Interpret an 'CoreExpr ()' in a 'Runtime' to produce a result 'Value'
