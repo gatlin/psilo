@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 {- |
 This is heavily inspired by
@@ -13,7 +14,6 @@ rudimentary FFI / IO capabilities.
 
 module Lib.Machine where
 
-import Control.Comonad
 import Control.Applicative
 import Data.Functor.Identity
 import Data.Vector (Vector, (!))
@@ -23,6 +23,11 @@ import qualified Data.Map as M
 import Data.Monoid
 import Data.Maybe (fromJust)
 import Data.Word
+
+import Control.Monad
+import Control.Monad.Trans
+import Control.Monad.IO.Class
+import Control.Monad.State
 
 import Lib.Syntax
 
@@ -126,7 +131,7 @@ newCallStack :: CallStack
 newCallStack = []
 
 -- | The actual machine definition
-data Machine = Machine
+data MachineState = M
     { machinePC :: Location
     , machineStack :: Stack
     , machineHeap :: Heap
@@ -135,8 +140,21 @@ data Machine = Machine
     , machineLabels :: Env
     } deriving (Show)
 
-newMachine :: Int {- ^ Heap size -} -> Machine
-newMachine heapSz = Machine
+newtype MachineT m a = Machine {
+    unMachineT :: StateT MachineState m a
+    } deriving ( Functor
+               , Applicative
+               , Monad
+               , MonadState MachineState
+               , MonadTrans )
+
+type Machine = MachineT IO
+
+runMachine :: Monad m => MachineState -> MachineT m a -> m (a, MachineState)
+runMachine ms m = runStateT (unMachineT m) ms
+
+newMachineState :: Int {- ^ Heap size -} -> MachineState
+newMachineState heapSz = M
     0
     newStack
     (newHeap heapSz)
@@ -144,36 +162,36 @@ newMachine heapSz = Machine
     newLocalStack
     mempty
 
-setCounter :: Int -> Machine -> Machine
-setCounter c (Machine _ st hp cs ls env) = Machine c st hp cs ls env
+setCounter :: Int -> MachineState -> MachineState
+setCounter c (M _ st hp cs ls env) = M c st hp cs ls env
 
-callStackPush :: Int -> Machine -> Machine
-callStackPush c (Machine pc st hp cs ls env) =
-    Machine pc st hp ((c, ls):cs) newLocalStack env
+callStackPush :: Int -> MachineState -> MachineState
+callStackPush c (M pc st hp cs ls env) =
+    M pc st hp ((c, ls):cs) newLocalStack env
 
-callStackPop :: Machine -> (Int, Machine)
-callStackPop (Machine pc st hp ((c,ls):cs) _ env) =
-    (c,Machine pc st hp cs ls env)
+callStackPop :: MachineState -> (Int, MachineState)
+callStackPop (M pc st hp ((c,ls):cs) _ env) =
+    (c,M pc st hp cs ls env)
 
-incrPC :: Machine -> Machine
-incrPC (Machine pc st hp cs ls env) =
-    Machine (pc + 1) st hp cs ls env
+incrPC :: MachineState -> MachineState
+incrPC (M pc st hp cs ls env) =
+    M (pc + 1) st hp cs ls env
 
-mapStack :: (Stack -> Stack) -> Machine -> Machine
-f `mapStack` (Machine pc st hp cs ls env) =
-    Machine pc (f st) hp cs ls env
+mapStack :: (Stack -> Stack) -> MachineState -> MachineState
+f `mapStack` (M pc st hp cs ls env) =
+    M pc (f st) hp cs ls env
 
-mapHeap :: (Heap -> Heap) -> Machine -> Machine
-f `mapHeap` (Machine pc st hp cs ls env) =
-    Machine pc st (f hp) cs ls env
+mapHeap :: (Heap -> Heap) -> MachineState -> MachineState
+f `mapHeap` (M pc st hp cs ls env) =
+    M pc st (f hp) cs ls env
 
-mapLocal :: (LocalStack -> LocalStack) -> Machine -> Machine
-f `mapLocal` (Machine pc st hp cs ls env) =
-    Machine pc st hp cs (f ls) env
+mapLocal :: (LocalStack -> LocalStack) -> MachineState -> MachineState
+f `mapLocal` (M pc st hp cs ls env) =
+    M pc st hp cs (f ls) env
 
-mapLabels :: (Env -> Env) -> Machine -> Machine
-f `mapLabels` (Machine pc st hp cs ls env) =
-    Machine pc st hp cs ls (f env)
+mapLabels :: (Env -> Env) -> MachineState -> MachineState
+f `mapLabels` (M pc st hp cs ls env) =
+    M pc st hp cs ls (f env)
 
 -- * Low level instructions
 
@@ -213,58 +231,108 @@ The location is *not* discarded.
 -}
 
 -- | Top level instruction execution.
-execute :: Asm -> Machine -> Machine
-execute i@(Jump _) m = execute' i m
-execute i@(JumpIf _) m = execute' i m
-execute i@(Call _) m = execute' i m
-execute (Ret) m = execute' Ret m
-execute i m = incrPC $ execute' i m
+execute :: Monad m => Asm -> MachineT m ()
+execute i@(Jump _)= execute' i
+execute i@(JumpIf _) = execute' i
+execute i@(Call _) = execute' i
+execute (Ret) = execute' Ret
+execute i = execute' i >> modify incrPC
 
-setLabel :: Asm -> Machine -> Machine
+setLabel :: Asm -> MachineState -> MachineState
 setLabel (Label l) m = incrPC $ const (envSet l c ls) `mapLabels` m
     where c = machinePC m
           ls = machineLabels m
 setLabel _ m = incrPC m
 
-execute' :: Asm -> Machine -> Machine
-execute' (Add) m = stackBinOp (+) `mapStack` m
-execute' (Sub) m = stackBinOp (-) `mapStack` m
-execute' (Mul) m = stackBinOp (*) `mapStack` m
-execute' (Lt) m = stackBinOp (boolToValue <.> (<)) `mapStack` m
-execute' (Le) m = stackBinOp (boolToValue <.> (<=)) `mapStack` m
-execute' (Gt) m = stackBinOp (boolToValue <.> (>)) `mapStack` m
-execute' (Ge) m = stackBinOp (boolToValue <.> (>=)) `mapStack` m
-execute' (Eq) m = stackBinOp (boolToValue <.> (==)) `mapStack` m
-execute' (Not) m = stackApp (\v -> case v of
-                                       0 -> 1
-                                       _ -> 0) `mapStack` m
-execute' (StoreI loc) m = heapSet loc (stackPeek $ machineStack m) `mapHeap` m
-execute' (LoadI loc) m = stackPush (heapGet loc $ machineHeap m) `mapStack` m
-execute' (Store) m = heapSet (fromIntegral loc) val `mapHeap` m
-    where (loc, val) = (\(Stack (x:y:_)) -> (x, y)) $ machineStack m
-execute' (Load) m = stackPush (heapGet loc' $ machineHeap m) `mapStack` m
-    where loc = stackPeek $ machineStack m
-          loc' = fromIntegral loc
-execute' (Push v) m = stackPush v `mapStack` m
-execute' (Pop) m = stackPop `mapStack` m
-execute' (Dup) m = stackPush (stackPeek $ machineStack m) `mapStack` m
-execute' (Swap) m = stackSwap `mapStack` m
-execute' (PushLocal) m = stackPop `mapStack` (localPush
-                                              (stackPeek $ machineStack m)
-                                                 `mapLocal` m)
-execute' (PopLocal) m = const lds `mapLocal` (stackPush v `mapStack` m)
-    where (v, lds) = localPop $ machineLocalStack m
-execute' (Label _) m = m
-execute' (Jump n) m = setCounter (envGet n $ machineLabels m) m
-execute' (JumpIf n) m
-    | stackPeek (machineStack m) == 0 = incrPC popped
-    | otherwise = setCounter (envGet n $ machineLabels m) popped
-    where popped = stackPop `mapStack` m
-execute' (Call n) m = setCounter target . callStackPush current $ m
-    where current = machinePC m
-          target = envGet n $ machineLabels m
-execute' (Ret) m = setCounter (callPoint + 1) m'
-    where (callPoint, m') = callStackPop m
+execute' :: Monad m => Asm -> MachineT m ()
+execute' (Add) = modify (mapStack (stackBinOp (+))) >> return ()
+execute' (Sub) = modify (mapStack (stackBinOp (-))) >> return ()
+execute' (Mul) = modify (mapStack (stackBinOp (*))) >> return ()
+
+execute' (Lt) = modify (mapStack (stackBinOp (boolToValue <.> (<))))
+
+execute' (Le) = modify (mapStack (stackBinOp (boolToValue <.> (<=))))
+
+execute' (Gt) = modify (mapStack (stackBinOp (boolToValue <.> (>))))
+
+execute' (Ge) = modify (mapStack (stackBinOp (boolToValue <.> (>=))))
+
+execute' (Eq) = modify (mapStack (stackBinOp (boolToValue <.> (==))))
+
+execute' (Not) = do
+    let invNum n = case n of
+            0 -> 1
+            _ -> 0
+    modify $ mapStack (stackApp invNum)
+    return ()
+
+execute' (StoreI loc) = do
+    stack <- gets machineStack
+    modify $ mapHeap (heapSet loc (stackPeek stack))
+
+execute' (LoadI loc) = do
+    heap <- gets machineHeap
+    modify $ mapStack (stackPush (heapGet loc heap))
+
+execute' (Store) = do
+    m <- get
+    let (loc, val) = (\(Stack (x:y:_)) -> (x, y)) $ machineStack m
+    put $ heapSet (fromIntegral loc) val `mapHeap` m
+
+execute' (Load) = do
+    stack <- gets machineStack
+    heap <- gets machineHeap
+    let loc = stackPeek stack
+    let loc' = fromIntegral loc
+    modify $ mapStack (stackPush (heapGet loc' heap))
+    return ()
+
+execute' (Push v) = modify $ mapStack (stackPush v)
+execute' (Pop) = modify $ mapStack stackPop
+execute' (Dup) = do
+    stack <- gets machineStack
+    modify $ mapStack (stackPush (stackPeek stack))
+
+execute' (Swap) = modify $ mapStack stackSwap
+
+execute' (PushLocal) = do
+    stack <- gets machineStack
+    modify $ mapStack stackPop .
+        mapLocal (localPush (stackPeek stack))
+
+execute' (PopLocal) = do
+    m <- get
+    let stack = machineStack m
+    let local = machineLocalStack m
+    let (v, lds) = localPop local
+    modify $ mapLocal (const lds) . mapStack (stackPush v)
+
+execute' (Label _) = return ()
+
+execute' (Jump n) = do
+    labels <- gets machineLabels
+    modify $ setCounter (envGet n labels)
+
+execute' (JumpIf n) = do
+    m <- get
+    let stack = machineStack m
+        labels = machineLabels m
+        popped = stackPop `mapStack` m
+    if stackPeek stack == 0
+        then put $ incrPC popped
+        else put $ setCounter (envGet n labels) popped
+
+execute' (Call n) = do
+    m <- get
+    let current = machinePC m
+        labels = machineLabels m
+        target = envGet n labels
+    modify $ setCounter target . callStackPush current
+
+execute' (Ret) = do
+    m <- get
+    let (callPoint, m') = callStackPop m
+    put $ setCounter (callPoint + 1) m'
 
 boolToValue :: Bool -> Value
 boolToValue False = 0
@@ -274,23 +342,41 @@ boolToValue True = 1
 (<.>) f op v w = f $ op v w
 
 -- | Run a program on a brand new machine
-run :: [Asm] -> Machine
-run is = run' (V.fromList $ execute <$> is)
-    (setMain . setCounter 0 . prepare is $ newMachine 65536)
 
-setMain :: Machine -> Machine
+prepare :: [Asm] -> MachineState -> MachineState
+prepare is = appEndo . getDual $ foldMap (Dual . Endo . setLabel) is
+
+setMain :: MachineState -> MachineState
 setMain m = setCounter _main m
     where _main = envGet "main" $ machineLabels m
 
-run' :: Vector (Machine -> Machine) -> Machine -> Machine
-run' is m
-    | end pc = m
-    | otherwise = run' is (is ! pc $ m)
-    where pc = machinePC $ m
+run :: [Asm] -> IO MachineState
+run is = run' (V.fromList $ execute <$> is)
+    (setMain . setCounter 0 . prepare is $ newMachineState 65536)
+
+run'
+    :: Vector (Machine ())
+    -> MachineState
+    -> IO MachineState
+run' is ms
+    | end pc = return ms
+    | otherwise = do
+          (_, ms') <- runMachine ms (is ! pc)
+          run' is ms'
+    where pc = machinePC ms
           end = ((V.length is) ==)
 
-prepare :: [Asm] -> Machine -> Machine
-prepare is = appEndo . getDual $ foldMap (Dual . Endo . setLabel) is
+{-
+run'
+    :: Vector (MachineState -> Identity MachineState)
+    -> MachineState
+    -> IO MachineState
+run' is m
+    | end pc = return m
+    | otherwise = (is ! pc $ m) >>= \m' -> run' is m'
+    where pc = machinePC $ m
+          end = ((V.length is) ==)
+-}
 
 -- * Some tests
 
