@@ -104,7 +104,10 @@ instance Monoid LocalStack where
 -- | A vector-based heap implementation
 newtype Heap = Heap {
     unHeap :: Vector Value
-    } deriving (Show)
+    }
+
+instance Show Heap where
+    show (Heap mem) = "Heap<" ++ (show $ V.length mem) ++ ">"
 
 heapSet :: Location -> Value -> Heap -> Heap
 heapSet loc val (Heap mem) = Heap $ mem V.// [(loc, val)]
@@ -273,7 +276,7 @@ boolToValue True = 1
 -- | Run a program on a brand new machine
 run :: [Asm] -> Machine
 run is = run' (V.fromList $ execute <$> is)
-    (setMain . setCounter 0 . prepare is $ newMachine 100)
+    (setMain . setCounter 0 . prepare is $ newMachine 65536)
 
 setMain :: Machine -> Machine
 setMain m = setCounter _main m
@@ -284,7 +287,7 @@ run' is m
     | end pc = m
     | otherwise = run' is (is ! pc $ m)
     where pc = machinePC $ m
-          end = (((V.length is)) ==)
+          end = ((V.length is) ==)
 
 prepare :: [Asm] -> Machine -> Machine
 prepare is = appEndo . getDual $ foldMap (Dual . Endo . setLabel) is
