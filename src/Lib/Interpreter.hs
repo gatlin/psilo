@@ -2,6 +2,7 @@ module Lib.Interpreter where
 
 import Lib.Machine
 import Lib.Syntax
+import qualified Lib.Runtime as R
 import Control.Monad.Free
 import Control.Monad.Reader
 import Control.Monad.State
@@ -12,6 +13,10 @@ import qualified Data.Set as S
 import qualified Data.Map as M
 
 import Prelude hiding (lookup)
+
+builtin_syms :: Set Symbol
+builtin_syms = S.fromList
+    [ "+", "*", "-", "/", "=", "<", ">" ]
 
 -- | Given an expression produce a set of free variable symbols
 free_variables :: CoreExpr () -> Set Symbol -> Set Symbol
@@ -65,5 +70,5 @@ make_closure captured args body = case S.null captured of
 -}
 
 -- | Interpret an 'CoreExpr ()' in a 'Runtime' to produce a result 'Value'
-interpret :: CoreExpr () -> Runtime Value
-interpret _ = return NopV
+interpret :: CoreExpr () -> R.Runtime R.Value
+interpret _ = return R.NopV
