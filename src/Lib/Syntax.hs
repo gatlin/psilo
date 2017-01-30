@@ -1,16 +1,19 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Lib.Syntax where
 
 import Control.Monad.Free
+import Data.Text (Text)
+import qualified Data.Text as T
 
 type Symbol = String
 
 data CoreAst a
     = NumC { numC :: Double }
     | BoolC { boolC :: Bool }
-    | StringC { stringC :: String }
+    | StringC { stringC :: Text }
     | IdC { idC :: Symbol }
     | AppC { appFun :: a, appArgs :: [a] }
     | ClosC { closCArgs :: [Symbol], closCBody :: a }
@@ -26,7 +29,7 @@ aNumber d = liftF $ NumC d
 aBool :: (MonadFree CoreAst m) => Bool -> m a
 aBool b = liftF $ BoolC b
 
-aString :: (MonadFree CoreAst m) => String -> m a
+aString :: (MonadFree CoreAst m) => Text -> m a
 aString s = liftF $ StringC s
 
 aId :: (MonadFree CoreAst m) => Symbol -> m a

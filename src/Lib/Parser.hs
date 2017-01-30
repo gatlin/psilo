@@ -37,7 +37,7 @@ string_parser = do
     char '"'
     str <- many' $ notChar '"'
     char '"'
-    return $ aString str
+    return $ aString $ Text.pack str
 
 bool_parser :: Parser (CoreExpr a)
 bool_parser = do

@@ -14,6 +14,8 @@ import Data.Set (Set)
 import qualified Data.Set as S
 import Data.Map (Map)
 import qualified Data.Map as M
+import Data.Text (Text)
+import qualified Data.Text as T
 import Lib.Syntax
 
 type Location = Int
@@ -21,7 +23,7 @@ type Location = Int
 data Value
     = NumV { numV :: Double }
     | BoolV { boolV :: Bool }
-    | StringV { stringV :: String }
+    | StringV { stringV :: Text }
     | SymV { symV :: Symbol }
     | ClosV { closVArgs :: [Symbol], closVBody :: CoreExpr (), closVEnv :: Env }
     | NopV
@@ -29,7 +31,7 @@ data Value
 instance Show Value where
     show (NumV n) = show n
     show (BoolV b) = if b then "#t" else "#f"
-    show (StringV s) = "\"" ++ s ++ "\""
+    show (StringV s) = "\"" ++ (show s) ++ "\""
     show (ClosV a b e) = "Closure<" ++ (show e) ++ ">"
     show _ = "Value"
 

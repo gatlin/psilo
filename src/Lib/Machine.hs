@@ -6,6 +6,9 @@ This is heavily inspired by
 
     https://github.com/taiki45/hs-vm/
 
+Some terminology has changed, all values are unsigned 16 bit words,
+the ISA has been expanded, and ultimately the machine will have some
+rudimentary FFI / IO capabilities.
 -}
 
 module Lib.Machine where
@@ -19,11 +22,12 @@ import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Monoid
 import Data.Maybe (fromJust)
+import Data.Word
 
 import Lib.Syntax
 
 type Location = Int
-type Value = Integer
+type Value = Word16
 
 -- | Mapping from symbols to locations. Serves double duty in the VM as both the
 -- type of closure environments (hence its name) and the mapping of labels to
@@ -62,6 +66,9 @@ stackPeek (Stack (x:_)) = x
 stackBinOp :: (Value -> Value -> Value) -> Stack -> Stack
 stackBinOp op (Stack (x:y:rest)) = Stack $ op x y : rest
 
+stackSwap :: Stack -> Stack
+stackSwap (Stack (x:y:rest)) = Stack $ y : (x : rest)
+
 stackApp :: (Value -> Value) -> Stack -> Stack
 stackApp f (Stack (x:xs)) = Stack $ f x : xs
 
@@ -77,11 +84,14 @@ newtype LocalStack = LocalStack {
     unLocalStack :: [Value]
     } deriving (Show)
 
-localStackPush :: Value -> LocalStack -> LocalStack
-localStackPush v (LocalStack vs) = LocalStack $ v : vs
+localPush :: Value -> LocalStack -> LocalStack
+localPush v (LocalStack vs) = LocalStack $ v : vs
 
-localStackPop :: LocalStack -> (Value, LocalStack)
-localStackPop (LocalStack (v:vs)) = (v, LocalStack vs)
+localPop :: LocalStack -> (Value, LocalStack)
+localPop (LocalStack (v:vs)) = (v, LocalStack vs)
+
+localPeek :: LocalStack -> Value
+localPeek (LocalStack (x:_)) = x
 
 newLocalStack :: LocalStack
 newLocalStack = LocalStack []
@@ -154,8 +164,8 @@ mapHeap :: (Heap -> Heap) -> Machine -> Machine
 f `mapHeap` (Machine pc st hp cs ls env) =
     Machine pc st (f hp) cs ls env
 
-mapLocalStack :: (LocalStack -> LocalStack) -> Machine -> Machine
-f `mapLocalStack` (Machine pc st hp cs ls env) =
+mapLocal :: (LocalStack -> LocalStack) -> Machine -> Machine
+f `mapLocal` (Machine pc st hp cs ls env) =
     Machine pc st hp cs (f ls) env
 
 mapLabels :: (Env -> Env) -> Machine -> Machine
@@ -166,29 +176,38 @@ f `mapLabels` (Machine pc st hp cs ls env) =
 
 -- | The assembly instructions for the stack machine
 data Asm
-    = Add            -- ^ Add stack values
-    | Sub            -- ^ Subtract stack values
-    | Mul            -- ^ Multiply stack values
-    | Div            -- ^ Divide stack values
-    | Lt             -- ^ first stack value < second stack value
-    | Le             -- ^ first stack value <= second stack value
-    | Gt             -- ^ first stack value > second stack value
-    | Ge             -- ^ first stack value >= second stack value
-    | Eq             -- ^ first stack value == second stack value
-    | Not            -- ^ Turnover bool: non-zero => 0, 0 => 1
-    | Store Location -- ^ Store stack value to heap location
-    | Load Location  -- ^ Push value at location to stack
-    | Push Value     -- ^ Push constant value to stack
-    | Pop            -- ^ Pop and discard value from stack
-    | Dup            -- ^ Duplicate top value on stack
-    | PushLocal      -- ^ Push value to local stack
-    | PopLocal       -- ^ Pop value from local stack
-    | Label Symbol   -- ^ Set label and save current position
-    | Jump Symbol    -- ^ Unconditional jump
-    | JumpIf Symbol  -- ^ Jump if first stack value is non-zero. Then discard it.
-    | Call Symbol    -- ^ Store current PC and jump to function.
-    | Ret            -- ^ Return from calling point
+    = Add             -- ^ Add stack values
+    | Sub             -- ^ Subtract stack values
+    | Mul             -- ^ Multiply stack values
+    | Div             -- ^ Integer division of stack values
+    | Lt              -- ^ first stack value < second stack value
+    | Le              -- ^ first stack value <= second stack value
+    | Gt              -- ^ first stack value > second stack value
+    | Ge              -- ^ first stack value >= second stack value
+    | Eq              -- ^ first stack value == second stack value
+    | Not             -- ^ Turnover bool: non-zero => 0, 0 => 1
+    | StoreI Location -- ^ Store top of stack to immediate location
+    | LoadI Location  -- ^ Push value at immediate location onto stack
+    | Store           -- ^ See [1] below this definition
+    | Load            -- ^ See [1] below this definition
+    | Push Value      -- ^ Push constant value to stack
+    | Pop             -- ^ Pop and discard value from stack
+    | Dup             -- ^ Duplicate top value on stack
+    | Swap            -- ^ Swap the top two values on the stack
+    | PushLocal       -- ^ Push value to local stack
+    | PopLocal        -- ^ Pop value from local stack
+    | Label Symbol    -- ^ Set label and save current position
+    | Jump Symbol     -- ^ Unconditional jump
+    | JumpIf Symbol   -- ^ Jump if first stack value is non-zero. Then discard.
+    | Call Symbol     -- ^ Store current PC and jump to function.
+    | Ret             -- ^ Return from calling point
     deriving (Show)
+
+{-
+[1]: Like 'StoreI' and 'LoadI' but the locations are not hardcoded, but instead
+the top stack value is the storage location, and the second is the actual value.
+The location is *not* discarded.
+-}
 
 -- | Top level instruction execution.
 execute :: Asm -> Machine -> Machine
@@ -208,7 +227,6 @@ execute' :: Asm -> Machine -> Machine
 execute' (Add) m = stackBinOp (+) `mapStack` m
 execute' (Sub) m = stackBinOp (-) `mapStack` m
 execute' (Mul) m = stackBinOp (*) `mapStack` m
-execute' (Div) m = stackBinOp div `mapStack` m
 execute' (Lt) m = stackBinOp (boolToValue <.> (<)) `mapStack` m
 execute' (Le) m = stackBinOp (boolToValue <.> (<=)) `mapStack` m
 execute' (Gt) m = stackBinOp (boolToValue <.> (>)) `mapStack` m
@@ -217,16 +235,22 @@ execute' (Eq) m = stackBinOp (boolToValue <.> (==)) `mapStack` m
 execute' (Not) m = stackApp (\v -> case v of
                                        0 -> 1
                                        _ -> 0) `mapStack` m
-execute' (Store loc) m = heapSet loc (stackPeek $ machineStack m) `mapHeap` m
-execute' (Load loc) m = stackPush (heapGet loc $ machineHeap m) `mapStack` m
+execute' (StoreI loc) m = heapSet loc (stackPeek $ machineStack m) `mapHeap` m
+execute' (LoadI loc) m = stackPush (heapGet loc $ machineHeap m) `mapStack` m
+execute' (Store) m = heapSet (fromIntegral loc) val `mapHeap` m
+    where (loc, val) = (\(Stack (x:y:_)) -> (x, y)) $ machineStack m
+execute' (Load) m = stackPush (heapGet loc' $ machineHeap m) `mapStack` m
+    where loc = stackPeek $ machineStack m
+          loc' = fromIntegral loc
 execute' (Push v) m = stackPush v `mapStack` m
 execute' (Pop) m = stackPop `mapStack` m
 execute' (Dup) m = stackPush (stackPeek $ machineStack m) `mapStack` m
-execute' (PushLocal) m = stackPop `mapStack` (localStackPush
+execute' (Swap) m = stackSwap `mapStack` m
+execute' (PushLocal) m = stackPop `mapStack` (localPush
                                               (stackPeek $ machineStack m)
-                                                 `mapLocalStack` m)
-execute' (PopLocal) m = const lds `mapLocalStack` (stackPush v `mapStack` m)
-    where (v, lds) = localStackPop $ machineLocalStack m
+                                                 `mapLocal` m)
+execute' (PopLocal) m = const lds `mapLocal` (stackPush v `mapStack` m)
+    where (v, lds) = localPop $ machineLocalStack m
 execute' (Label _) m = m
 execute' (Jump n) m = setCounter (envGet n $ machineLabels m) m
 execute' (JumpIf n) m
@@ -286,24 +310,24 @@ test2 = [ Label "sub5"
         , PopLocal
         , Sub
         , Ret
-        , Label "store_result"
-        , Store 0
+        , Label "store_value"
+        -- assumption: stack is address and then value
+        , Store
+        , Pop
+        , Pop
         , Ret
-        , Label "store_condition"
-        , Call "store_result"
-        , Jump "end"
         , Label "main"
-        , Push 11
+        , Push 6
         , Call "sub5"
-        , Dup
-        , JumpIf "store_condition"
-        , Label "end"
+        , Push 17
+        , Call "store_value"
         ]
 
+-- non-tail-recursive fibonacci
 test3 :: [Asm]
 test3 = [ Label "fib"           -- "n" is on the stack
         , Dup                   -- duplicate it
-        , Push 0                -- push a 0
+        , Push 0              -- push a 0
         , Eq                    -- replace with 1 if n=0, else 0
         , JumpIf "fib_finished" -- if 1, n=0 and we are done
         , Dup                   -- duplicate "n" again
@@ -336,9 +360,42 @@ test3 = [ Label "fib"           -- "n" is on the stack
         , Call "fib"
         ]
 
--- non-tail-recursive factorial
+-- tail-recursive fibonacci
 test4 :: [Asm]
-test4 = [ Label "fact"
+test4 = [ Label "fib"     -- n
+        , PushLocal
+        , Push 0
+        , Push 1
+        , PopLocal
+        , Call "fib_rec"
+        , Pop
+        , Pop
+        , Ret
+        , Label "fib_rec"
+        , Dup
+        , Push 0
+        , Eq
+        , JumpIf "fib_done"
+        , PushLocal
+        , Dup
+        , PushLocal
+        , Add
+        , PopLocal
+        , Swap
+        , Push 1
+        , PopLocal
+        , Sub
+        , Jump "fib_rec"
+        , Label "fib_done"
+        , Ret
+        , Label "main"
+        , Push 8
+        , Call "fib"
+        ]
+
+-- non-tail-recursive factorial
+test5 :: [Asm]
+test5 = [ Label "fact"
         , Dup
         , Push 1
         , Eq
@@ -348,21 +405,20 @@ test4 = [ Label "fact"
         , Ret
         , Label "fact_continue"
         , Dup
-        , PushLocal
         , Push 1
-        , PopLocal
+        , Swap
         , Sub
         , Call "fact"
         , Mul
         , Ret
         , Label "main"
-        , Push 100
+        , Push 5
         , Call "fact"
         ]
 
 -- tail-recursive factorial
-test5 :: [Asm]
-test5 = [ Label "fact"
+test6 :: [Asm]
+test6 = [ Label "fact"
         , PushLocal
         , Push 1
         , PopLocal
@@ -376,9 +432,8 @@ test5 = [ Label "fact"
         , Lt
         , JumpIf "fact_helper_ret"
         , Dup
-        , PushLocal
         , Push 1
-        , PopLocal
+        , Swap
         , Sub
         , PushLocal
         , Mul
@@ -390,4 +445,12 @@ test5 = [ Label "fact"
         , Label "main"
         , Push 5
         , Call "fact"
+        ]
+
+test7 :: [Asm]
+test7 = [ Label "main"
+        , Push 10
+        , Push 17
+        , Store
+        , Load
         ]
