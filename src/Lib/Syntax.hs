@@ -11,7 +11,8 @@ import qualified Data.Text as T
 type Symbol = String
 
 data CoreAst a
-    = NumC { numC :: Double }
+    = IntC { intC :: Integer }
+    | DoubleC { doubleC :: Double }
     | BoolC { boolC :: Bool }
     | StringC { stringC :: Text }
     | IdC { idC :: Symbol }
@@ -23,8 +24,11 @@ data CoreAst a
 
 type CoreExpr = Free CoreAst
 
-aNumber :: (MonadFree CoreAst m) => Double -> m a
-aNumber d = liftF $ NumC d
+aInt :: (MonadFree CoreAst m) => Integer -> m a
+aInt d = liftF $ IntC d
+
+aDouble :: (MonadFree CoreAst m) => Double -> m a
+aDouble d = liftF $ DoubleC d
 
 aBool :: (MonadFree CoreAst m) => Bool -> m a
 aBool b = liftF $ BoolC b

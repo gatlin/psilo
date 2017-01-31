@@ -22,7 +22,8 @@ builtin_syms = S.fromList
 free_variables :: CoreExpr () -> Set Symbol -> Set Symbol
 free_variables expr tlds = (flip runReader) tlds $ go expr S.empty where
     go :: CoreExpr () -> Set Symbol -> Reader (Set Symbol) (Set Symbol)
-    go (Free (NumC _)) fvs = return fvs
+    go (Free (IntC _)) fvs = return fvs
+    go (Free (DoubleC _)) fvs = return fvs
     go (Free (BoolC _)) fvs = return fvs
     go (Free (StringC _)) fvs = return fvs
     go (Free (IfC c t e)) fvs = do
