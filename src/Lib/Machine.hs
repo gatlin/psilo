@@ -350,14 +350,15 @@ setMain :: MachineState -> MachineState
 setMain m = setCounter _main m
     where _main = envGet "main" $ machineLabels m
 
-run :: [Asm] -> IO MachineState
+run :: Monad m => [Asm] -> m MachineState
 run is = run' (V.fromList $ execute <$> is)
     (setMain . setCounter 0 . prepare is $ newMachineState 65536)
 
 run'
-    :: Vector (Machine ())
+    :: Monad m
+    => Vector (MachineT m ())
     -> MachineState
-    -> IO MachineState
+    -> m MachineState
 run' is ms
     | end pc = return ms
     | otherwise = do
@@ -365,18 +366,6 @@ run' is ms
           run' is ms'
     where pc = machinePC ms
           end = ((V.length is) ==)
-
-{-
-run'
-    :: Vector (MachineState -> Identity MachineState)
-    -> MachineState
-    -> IO MachineState
-run' is m
-    | end pc = return m
-    | otherwise = (is ! pc $ m) >>= \m' -> run' is m'
-    where pc = machinePC $ m
-          end = ((V.length is) ==)
--}
 
 -- * Some tests
 
