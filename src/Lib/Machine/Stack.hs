@@ -7,9 +7,12 @@ This is heavily inspired by
 
     https://github.com/taiki45/hs-vm/
 
-Some terminology has changed, all values are unsigned 16 bit words,
-the ISA has been expanded, and ultimately the machine will have some
-rudimentary FFI / IO capabilities.
+However,
+
+* Some terminology has changed
+* Sections of memory are (by convention) reserved to act as registers
+* The ISA has been expanded
+* The 'MachineT' type is a monad transformer
 -}
 
 module Lib.Machine.Stack
