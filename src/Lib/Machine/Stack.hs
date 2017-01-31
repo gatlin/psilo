@@ -12,7 +12,12 @@ the ISA has been expanded, and ultimately the machine will have some
 rudimentary FFI / IO capabilities.
 -}
 
-module Lib.Machine.Stack where
+module Lib.Machine.Stack
+    ( MachineT(..)
+    , runMachine
+    , Asm(..)
+    )
+where
 
 import Control.Applicative
 import Data.Functor.Identity
@@ -146,6 +151,7 @@ newtype MachineT m a = Machine {
                , Applicative
                , Monad
                , MonadState MachineState
+               , MonadIO
                , MonadTrans )
 
 type Machine = MachineT IO
@@ -200,7 +206,8 @@ data Asm
     = Add             -- ^ Add stack values
     | Sub             -- ^ Subtract stack values
     | Mul             -- ^ Multiply stack values
-    | Div             -- ^ Integer division of stack values
+    | Div             -- ^ Divide stack values
+    | Mod             -- ^ Modulo operator
     | Lt              -- ^ first stack value < second stack value
     | Le              -- ^ first stack value <= second stack value
     | Gt              -- ^ first stack value > second stack value
@@ -248,6 +255,8 @@ execute' :: Monad m => Asm -> MachineT m ()
 execute' (Add) = modify (mapStack (stackBinOp (+))) >> return ()
 execute' (Sub) = modify (mapStack (stackBinOp (-))) >> return ()
 execute' (Mul) = modify (mapStack (stackBinOp (*))) >> return ()
+execute' (Div) = modify (mapStack (stackBinOp div)) >> return ()
+execute' (Mod) = modify (mapStack (stackBinOp mod)) >> return ()
 
 execute' (Lt) = modify (mapStack (stackBinOp (boolToValue <.> (<))))
 
