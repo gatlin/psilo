@@ -12,11 +12,16 @@ import Control.Monad (join)
 import Control.Monad.IO.Class
 import Lib.Syntax
 
-int_parser :: Parser (CoreExpr a)
-int_parser = aInt <$> (signed decimal)
-
-double_parser :: Parser (CoreExpr a)
-double_parser = aDouble <$> (signed $ double <|> rational)
+num_parser :: Parser (CoreExpr a)
+num_parser = do
+    whole_part <- many1 digit
+    mDot <- peekChar
+    case mDot of
+        Just '.' -> do
+            char '.'
+            frac_part <- many1 digit
+            return $ aDouble $ read $ whole_part ++ ['.'] ++ frac_part
+        _ -> return $ aInt (read whole_part)
 
 symchars :: String
 symchars = "=<>.!@#$%^&*{}[]+-/\\"
@@ -119,8 +124,7 @@ expr_parser = (parens clos_parser)
           <|> (parens if_parser)
           <|> bool_parser
           <|> id_parser
-          <|> double_parser
-          <|> int_parser
+          <|> num_parser
           <|> string_parser
           <|> (parens app_parser)
 

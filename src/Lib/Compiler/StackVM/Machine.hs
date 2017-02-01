@@ -10,7 +10,7 @@ This is heavily inspired by
 However,
 
 * Some terminology has changed
-* Sections of memory are (by convention) reserved to act as registers
+* The first 8 memory cells are (by convention) reserved to act as registers
 * The ISA has been expanded
 * The 'MachineT' type is a monad transformer
 -}
@@ -19,6 +19,22 @@ module Lib.Compiler.StackVM.Machine
     ( MachineT(..)
     , runMachine
     , Asm(..)
+    , Location
+    , Value
+    , Env(..)
+    , envGet
+    , safeEnvGet
+    , envSet
+    , envFrom
+    , run
+    , execute
+    , test1
+    , test2
+    , test3
+    , test4
+    , test5
+    , test6
+    , test7
     )
 where
 
@@ -58,6 +74,12 @@ envSet sym val (Env env) = Env $ M.insert sym val env
 
 envGet :: Symbol -> Env -> Location
 envGet sym (Env env) = fromJust $ M.lookup sym env
+
+envFrom :: [(Symbol, Location)] -> Env
+envFrom symlocs = Env $ M.fromList symlocs
+
+safeEnvGet :: Symbol -> Env -> Maybe Location
+safeEnvGet sym (Env env) = M.lookup sym env
 
 -- * The Machine
 
@@ -237,7 +259,6 @@ data Asm
 {-
 [1]: Like 'StoreI' and 'LoadI' but the locations are not hardcoded, but instead
 the top stack value is the storage location, and the second is the actual value.
-The location is *not* discarded.
 -}
 
 -- | Top level instruction execution.
@@ -256,7 +277,7 @@ setLabel _ m = incrPC m
 
 execute' :: Monad m => Asm -> MachineT m ()
 execute' (Add) = modify (mapStack (stackBinOp (+))) >> return ()
-execute' (Sub) = modify (mapStack (stackBinOp (-))) >> return ()
+execute' (Sub) = modify (mapStack (stackBinOp (flip (-)))) >> return ()
 execute' (Mul) = modify (mapStack (stackBinOp (*))) >> return ()
 execute' (Div) = modify (mapStack (stackBinOp div)) >> return ()
 execute' (Mod) = modify (mapStack (stackBinOp mod)) >> return ()
@@ -383,9 +404,7 @@ run' is ms
 
 test1 :: [Asm]
 test1 = [ Label "sub5"
-        , PushLocal
         , Push 5
-        , PopLocal
         , Sub
         , Ret
         , Label "main"
@@ -395,9 +414,7 @@ test1 = [ Label "sub5"
 
 test2 :: [Asm]
 test2 = [ Label "sub5"
-        , PushLocal
         , Push 5
-        , PopLocal
         , Sub
         , Ret
         , Label "store_value"
@@ -432,11 +449,13 @@ test3 = [ Label "fib"           -- "n" is on the stack
         , PushLocal             -- \
         , Push 1                --  +- put a 1 on the stack between the "n"s
         , PopLocal              -- /
+        , Swap
         , Sub                   -- subtract, putting "n-1" on the stack
         , PushLocal             -- set this aside
         , PushLocal             -- \
         , Push 2                --  +- put a 2 on the stack before the "n"
         , PopLocal              -- /
+        , Swap
         , Sub                   -- subtract, putting "n-2" on the stack
         , PopLocal              -- put the "n-1" back on the stack
         , Call "fib"            -- call fib(n-1)
@@ -492,7 +511,6 @@ test5 = [ Label "fact"
         , JumpIf "fact_done"
         , Dup
         , Push 1
-        , Swap
         , Sub
         , Call "fact"
         , Mul
@@ -521,7 +539,6 @@ test6 = [ Label "fact"
         , JumpIf "fact_helper_ret"
         , Dup
         , Push 1
-        , Swap
         , Sub
         , PushLocal
         , Mul

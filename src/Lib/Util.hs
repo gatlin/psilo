@@ -1,10 +1,12 @@
 module Lib.Util where
 
+import Prelude hiding (lookup)
 import Lib.Syntax
 import Data.Set (Set)
 import qualified Data.Set as S
 import Data.Monoid
-import Prelude hiding (lookup)
+import Control.Monad.Free
+import Control.Monad.Reader
 
 builtin_syms :: Set Symbol
 builtin_syms = S.fromList
