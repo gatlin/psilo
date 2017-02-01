@@ -4,7 +4,6 @@ module Lib.REPL where
 
 import Prelude hiding (map, take)
 import qualified Prelude as P
-import Lib.Interpreter
 import Lib.Runtime
 import Lib.Parser
 import Lib.FileEval

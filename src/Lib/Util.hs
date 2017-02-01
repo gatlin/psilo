@@ -1,17 +1,9 @@
-module Lib.Interpreter where
+module Lib.Util where
 
-import Lib.Machine
 import Lib.Syntax
-import qualified Lib.Runtime as R
-import Control.Monad.Free
-import Control.Monad.Reader
-import Control.Monad.State
-import Control.Monad (forM, forM_, filterM)
 import Data.Set (Set)
-import Data.Monoid
 import qualified Data.Set as S
-import qualified Data.Map as M
-
+import Data.Monoid
 import Prelude hiding (lookup)
 
 builtin_syms :: Set Symbol

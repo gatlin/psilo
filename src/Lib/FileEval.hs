@@ -4,7 +4,6 @@ module Lib.FileEval where
 
 import Lib.Syntax
 import Lib.Runtime
-import Lib.Interpreter
 import Lib.Parser
 import Control.Monad
 import Data.Text (Text)
