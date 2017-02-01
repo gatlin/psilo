@@ -79,5 +79,3 @@ compile expr = reverse (go expr []) where
 -}
 
 -- | Interpret an 'CoreExpr ()' in a 'Runtime' to produce a result 'Value'
-interpret :: CoreExpr () -> R.Runtime R.Value
-interpret _ = return R.NopV

@@ -15,7 +15,7 @@ However,
 * The 'MachineT' type is a monad transformer
 -}
 
-module Lib.Machine.Stack
+module Lib.Compiler.StackVM.Machine
     ( MachineT(..)
     , runMachine
     , Asm(..)

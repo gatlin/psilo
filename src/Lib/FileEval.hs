@@ -13,12 +13,17 @@ import qualified Data.Text.IO as TextIO
 import Tubes
 
 load_defns :: [CoreExpr ()] -> RuntimeState -> IO RuntimeState
+load_defns _ x = return x
+{-
 load_defns [] rtState = return rtState
 load_defns (defn:defns) rtState = do
     (_, rtState') <- runRuntime rtState $ interpret defn
     load_defns defns rtState'
+-}
 
 interpret_file :: FilePath -> IO ()
+interpret_file _ = return ()
+{-
 interpret_file inFile = do
     file_contents <- TextIO.readFile inFile
     defns <- parse_multi file_contents
@@ -29,3 +34,4 @@ interpret_file inFile = do
         Just main_expr -> do
             (result, _) <- runRuntime rtState $ interpret main_expr
             putStrLn . show $ result
+-}

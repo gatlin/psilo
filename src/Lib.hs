@@ -1,6 +1,6 @@
 module Lib
     ( replMain
-    , interpret
+--    , interpret
     , interpret_file
     , parse_expr
     , parse_multi
