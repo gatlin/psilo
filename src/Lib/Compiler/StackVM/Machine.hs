@@ -145,7 +145,7 @@ newMemory sz = Memory $ V.replicate sz 0
 type CallStack = [(Location, LocalData)]
 
 newCallStack :: CallStack
-newCallStack = []
+newCallStack = [(0, newLocalData)]
 
 -- | The actual machine definition
 data MachineState = M
@@ -316,7 +316,7 @@ execute' (Dup) = do
     modify $ mapStack (stackPush (stackPeek stack))
 
 execute' (Swap) = modify $ mapStack stackSwap
-
+{-
 execute' (PushLocal) = do
     stack <- gets machineStack
     modify $ mapStack stackPop .
@@ -328,7 +328,7 @@ execute' (PopLocal) = do
     let local = machineLocalData m
     let (v, lds) = localPop local
     modify $ mapLocal (const lds) . mapStack (stackPush v)
-
+-}
 execute' (ReadLocal n) = do
     local <- gets machineLocalData
     let value = localPeek local (fromIntegral n)
