@@ -1,6 +1,9 @@
 module Lib.Compiler.StackVM
     ( run
     , codegen
+    , stackPeek
+    , MachineT(..)
+    , MachineState(..)
     )
 where
 

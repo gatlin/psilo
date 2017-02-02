@@ -28,6 +28,8 @@ module Lib.Compiler.StackVM.Machine
     , envFrom
     , run
     , execute
+    , stackPeek
+    , MachineState(..)
     )
 where
 

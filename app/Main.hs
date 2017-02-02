@@ -6,6 +6,7 @@ import Lib
 
 data CmdLnOpts = CmdLnOpts
     { inputFile :: Maybe String
+    , debugOut :: Bool
     , execRepl  :: Bool
     } deriving (Show)
 
@@ -15,6 +16,10 @@ optParser = CmdLnOpts
          (long "in")
       <> (metavar "FILE_INPUT")
       <> (help "Path to input file."))
+    <*> (switch $
+         (long "debug")
+      <> (short 'd')
+      <> (help "Enable debug output"))
     <*> (switch $
          (long "repl")
       <> (short 'r')
@@ -30,4 +35,4 @@ main = execParser opts >>= begin where
 begin :: CmdLnOpts -> IO ()
 begin cmdLnOpts = case inputFile cmdLnOpts of
     Nothing -> replMain
-    Just inFile -> interpret_file inFile
+    Just inFile -> interpret_file (debugOut cmdLnOpts)  inFile
