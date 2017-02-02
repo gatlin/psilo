@@ -74,10 +74,10 @@ gensym = do
     modify $ \cc -> cc { gensymValue = gs + 1 }
     return gs
 
-codegen :: CoreExpr () -> IO [Asm]
+codegen :: MonadIO m => CoreExpr () -> m [Asm]
 codegen expr = runCodegenT newCodegenContext newCodegenState (go expr) where
 
-    go :: CoreExpr () -> CodegenT IO [ Asm ]
+    go :: MonadIO m => CoreExpr () -> CodegenT m [ Asm ]
     go (Free (IntC n)) = return [ Push (fromInteger n) ]
     go (Free (BoolC b)) = return [ Push $ if b then 0x1 else 0x0 ]
 
@@ -140,15 +140,7 @@ codegen expr = runCodegenT newCodegenContext newCodegenState (go expr) where
         where se = (envFrom syms) <> (symbolEnv cc)
               hb = (heapBase cc) + (length syms)
 
-    push_on_stack :: [ CoreExpr () ] -> CodegenT IO [ Asm ]
+    push_on_stack :: MonadIO m => [ CoreExpr () ] -> CodegenT m [ Asm ]
     push_on_stack exprs = do
         exprs' <- forM exprs go
         return $ concat exprs'
-{-
-    go (Free (ClosC args body)) = local extendEnv $ args' ++ body'
-        where numbered_args :: [(Symbol, Location)]
-              numbered_args = zip args [0..]
--}
-
-optimize :: [ Asm ] -> [ Asm ]
-optimize = id
