@@ -3,14 +3,14 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 {- |
-This is heavily inspired by
+This began as and is heavily inspired by
 
     https://github.com/taiki45/hs-vm/
 
 However,
 
 * Some terminology has changed
-* The first 8 memory cells are (by convention) reserved to act as registers
+* The local data stack is more like a set of registers
 * The ISA has been expanded
 * The 'MachineT' type is a monad transformer
 -}
