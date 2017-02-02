@@ -85,7 +85,7 @@ codegen expr = runCodegenT newCodegenContext newCodegenState (go expr) where
         env <- asks symbolEnv
         hb <- asks heapBase
         case safeEnvGet s env of
-            Just loc -> return [ LoadI loc ]
+            Just loc -> return [ ReadLocal loc ]
             Nothing  -> error $ "sym = " ++ s ++ ", Env = " ++ show env ++
                 ", heap pointer = " ++ show hb
 
@@ -110,7 +110,7 @@ codegen expr = runCodegenT newCodegenContext newCodegenState (go expr) where
 
     go (Free (ClosC args body)) = do
         hb <- asks heapBase
-        let numbered_args = zip args [hb..]
+        let numbered_args = zip (reverse args) [0..]
         body' <- local (store_args numbered_args) $ do
             b <- go body
             let b' = reverse b
@@ -121,8 +121,8 @@ codegen expr = runCodegenT newCodegenContext newCodegenState (go expr) where
                         Just True -> return $ reverse $ Jump sym : rest
                         _ -> return b
                 _ -> return b
-        args' <- forM (fmap snd (reverse numbered_args)) $ \loc -> return
-            [ StoreI loc, Pop ]
+        args' <- forM (fmap snd numbered_args) $ \loc -> return
+            [ WriteLocal loc ]
         -- for tail call elimination: is the last thing in body' a Call?
         return $ (concat args') ++ body' ++ [ Ret ]
 

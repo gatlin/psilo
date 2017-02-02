@@ -107,26 +107,20 @@ instance Monoid Stack where
     mempty = newStack
     (Stack s1) `mappend` (Stack s2) = Stack $ s1 `mappend` s2
 
--- | Local Stack
-newtype LocalStack = LocalStack {
-    unLocalStack :: [Value]
+-- | Local Data
+newtype LocalData = LocalData {
+    unLocalData :: [Value]
     } deriving (Show)
 
-localPush :: Value -> LocalStack -> LocalStack
-localPush v (LocalStack vs) = LocalStack $ v : vs
+localPeek :: LocalData -> Int -> Value
+localPeek (LocalData xs) idx = xs !! idx
 
-localPop :: LocalStack -> (Value, LocalStack)
-localPop (LocalStack (v:vs)) = (v, LocalStack vs)
+newLocalData :: LocalData
+newLocalData = LocalData []
 
-localPeek :: LocalStack -> Value
-localPeek (LocalStack (x:_)) = x
-
-newLocalStack :: LocalStack
-newLocalStack = LocalStack []
-
-instance Monoid LocalStack where
-    mempty = newLocalStack
-    (LocalStack l1) `mappend` (LocalStack l2) = LocalStack $
+instance Monoid LocalData where
+    mempty = newLocalData
+    (LocalData l1) `mappend` (LocalData l2) = LocalData $
         l1 `mappend` l2
 
 -- | A vector-based heap implementation
@@ -137,18 +131,18 @@ newtype Memory = Memory {
 instance Show Memory where
     show (Memory mem) = "Memory<" ++ (show $ V.length mem) ++ ">"
 
-heapSet :: Location -> Value -> Memory -> Memory
-heapSet loc val (Memory mem) = Memory $ mem V.// [(loc, val)]
+memorySet :: Location -> Value -> Memory -> Memory
+memorySet loc val (Memory mem) = Memory $ mem V.// [(loc, val)]
 
-heapGet :: Location -> Memory -> Value
-heapGet loc (Memory mem) = mem ! loc
+memoryGet :: Location -> Memory -> Value
+memoryGet loc (Memory mem) = mem ! loc
 
 newMemory :: Int {- ^ Size -} -> Memory
 newMemory sz = Memory $ V.replicate sz 0
 
 -- | Call stack. Not a newtype because ultimately the machine is the wrapper
 -- around this structure.
-type CallStack = [(Location, LocalStack)]
+type CallStack = [(Location, LocalData)]
 
 newCallStack :: CallStack
 newCallStack = []
@@ -159,7 +153,7 @@ data MachineState = M
     , machineStack :: Stack
     , machineMemory :: Memory
     , machineCallStack :: CallStack
-    , machineLocalStack :: LocalStack
+    , machineLocalData :: LocalData
     , machineLabels :: Env
     } deriving (Show)
 
@@ -178,12 +172,12 @@ runMachine :: Monad m => MachineState -> MachineT m a -> m (a, MachineState)
 runMachine ms m = runStateT (unMachineT m) ms
 
 newMachineState :: Int {- ^ Memory size -} -> MachineState
-newMachineState heapSz = M
+newMachineState memorySz = M
     0
     newStack
-    (newMemory heapSz)
+    (newMemory memorySz)
     newCallStack
-    newLocalStack
+    newLocalData
     mempty
 
 setCounter :: Int -> MachineState -> MachineState
@@ -191,7 +185,7 @@ setCounter c (M _ st hp cs ls env) = M c st hp cs ls env
 
 callStackPush :: Int -> MachineState -> MachineState
 callStackPush c (M pc st hp cs ls env) =
-    M pc st hp ((c, ls):cs) newLocalStack env
+    M pc st hp ((c, ls):cs) newLocalData env
 
 callStackPop :: MachineState -> (Int, MachineState)
 callStackPop (M pc st hp ((c,ls):cs) _ env) =
@@ -209,7 +203,7 @@ mapMemory :: (Memory -> Memory) -> MachineState -> MachineState
 f `mapMemory` (M pc st hp cs ls env) =
     M pc st (f hp) cs ls env
 
-mapLocal :: (LocalStack -> LocalStack) -> MachineState -> MachineState
+mapLocal :: (LocalData -> LocalData) -> MachineState -> MachineState
 f `mapLocal` (M pc st hp cs ls env) =
     M pc st hp cs (f ls) env
 
@@ -240,8 +234,8 @@ data Asm
     | Pop             -- ^ Pop and discard value from stack
     | Dup             -- ^ Duplicate top value on stack
     | Swap            -- ^ Swap the top two values on the stack
-    | PushLocal       -- ^ Push value to local stack
-    | PopLocal        -- ^ Pop value from local stack
+    | ReadLocal Int   -- ^ See [2] below this definition
+    | WriteLocal Int  -- ^ See [2] below this definition
     | Label Symbol    -- ^ Set label and save current position
     | Jump Symbol     -- ^ Unconditional jump
     | JumpIf Symbol   -- ^ Jump if first stack value is non-zero. Then discard.
@@ -252,6 +246,8 @@ data Asm
 {-
 [1]: Like 'StoreI' and 'LoadI' but the locations are not hardcoded, but instead
 the top stack value is the storage location, and the second is the actual value.
+
+[2]: Reading and writing local stack values. 
 -}
 
 -- | Top level instruction execution.
@@ -294,23 +290,23 @@ execute' (Not) = do
 
 execute' (StoreI loc) = do
     stack <- gets machineStack
-    modify $ mapMemory (heapSet loc (stackPeek stack))
+    modify $ mapMemory (memorySet loc (stackPeek stack))
 
 execute' (LoadI loc) = do
-    heap <- gets machineMemory
-    modify $ mapStack (stackPush (heapGet loc heap))
+    memory <- gets machineMemory
+    modify $ mapStack (stackPush (memoryGet loc memory))
 
 execute' (Store) = do
     m <- get
     let (loc, val) = (\(Stack (x:y:_)) -> (x, y)) $ machineStack m
-    put $ heapSet (fromIntegral loc) val `mapMemory` m
+    put $ memorySet (fromIntegral loc) val `mapMemory` m
 
 execute' (Load) = do
     stack <- gets machineStack
-    heap <- gets machineMemory
+    memory <- gets machineMemory
     let loc = stackPeek stack
     let loc' = fromIntegral loc
-    modify $ mapStack (stackPush (heapGet loc' heap))
+    modify $ mapStack (stackPush (memoryGet loc' memory))
     return ()
 
 execute' (Push v) = modify $ mapStack (stackPush v)
@@ -329,9 +325,21 @@ execute' (PushLocal) = do
 execute' (PopLocal) = do
     m <- get
     let stack = machineStack m
-    let local = machineLocalStack m
+    let local = machineLocalData m
     let (v, lds) = localPop local
     modify $ mapLocal (const lds) . mapStack (stackPush v)
+
+execute' (ReadLocal n) = do
+    local <- gets machineLocalData
+    let value = localPeek local (fromIntegral n)
+    modify $ mapStack (stackPush value)
+
+execute' (WriteLocal n) = do
+    LocalData local <- gets machineLocalData
+    stack <- gets machineStack
+    let (before, after) = splitAt n local
+    let local' = LocalData $ before ++ [stackPeek stack] ++ (drop 1 after)
+    modify $ mapStack stackPop . mapLocal (const local')
 
 execute' (Label _) = return ()
 
