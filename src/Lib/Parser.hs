@@ -10,6 +10,7 @@ import Control.Applicative
 import Data.Char (isDigit, isAlpha)
 import Control.Monad (join)
 import Control.Monad.IO.Class
+import Control.Monad.Free
 import Lib.Syntax
 
 num_parser :: Parser (CoreExpr a)
@@ -148,7 +149,7 @@ parse_expr input = do
                                   <|> expr_parser) input
     case parse_result of
         Left _ -> return Nothing
-        Right result -> return $ Just result
+        Right result -> return $ Just $ tailRec result
 
 parse_multi
     :: MonadIO m
@@ -161,4 +162,22 @@ parse_multi inp = do
         Left reason -> do
             liftIO . putStrLn $ "Parse failure: " ++ reason
             return []
-        Right result -> return result
+        Right result -> return $ fmap tailRec result
+
+-- identify tail recursive calls and replace them with a special form
+tailRec :: CoreExpr () -> CoreExpr ()
+tailRec (Free (DefC sym val)) = Free (DefC sym (go sym val)) where
+    go :: Symbol -> CoreExpr () -> CoreExpr ()
+
+    go sym expr@(Free (ClosC args body)) = Free (ClosC args (go' sym body))
+    go _ other = other
+
+    go' sym expr@(Free (IfC c t e)) = Free (IfC c (go' sym t) (go' sym e))
+
+    go' sym expr@(Free (AppC (Free (IdC fun)) ops))
+        | sym == fun = Free (TailRecC ops)
+        | otherwise = expr
+
+    go' _ other = other
+
+tailRec other = other

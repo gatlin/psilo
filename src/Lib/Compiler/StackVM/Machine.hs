@@ -28,13 +28,6 @@ module Lib.Compiler.StackVM.Machine
     , envFrom
     , run
     , execute
-    , test1
-    , test2
-    , test3
-    , test4
-    , test5
-    , test6
-    , test7
     )
 where
 
@@ -99,7 +92,7 @@ stackPeek (Stack (x:_)) = x
 
 -- | Apply the operator to the first two stack values as operands
 stackBinOp :: (Value -> Value -> Value) -> Stack -> Stack
-stackBinOp op (Stack (x:y:rest)) = Stack $ op x y : rest
+stackBinOp op (Stack (x:y:rest)) = Stack $ op y x : rest
 
 stackSwap :: Stack -> Stack
 stackSwap (Stack (x:y:rest)) = Stack $ y : (x : rest)
@@ -137,21 +130,21 @@ instance Monoid LocalStack where
         l1 `mappend` l2
 
 -- | A vector-based heap implementation
-newtype Heap = Heap {
-    unHeap :: Vector Value
+newtype Memory = Memory {
+    unMemory :: Vector Value
     }
 
-instance Show Heap where
-    show (Heap mem) = "Heap<" ++ (show $ V.length mem) ++ ">"
+instance Show Memory where
+    show (Memory mem) = "Memory<" ++ (show $ V.length mem) ++ ">"
 
-heapSet :: Location -> Value -> Heap -> Heap
-heapSet loc val (Heap mem) = Heap $ mem V.// [(loc, val)]
+heapSet :: Location -> Value -> Memory -> Memory
+heapSet loc val (Memory mem) = Memory $ mem V.// [(loc, val)]
 
-heapGet :: Location -> Heap -> Value
-heapGet loc (Heap mem) = mem ! loc
+heapGet :: Location -> Memory -> Value
+heapGet loc (Memory mem) = mem ! loc
 
-newHeap :: Int {- ^ Size -} -> Heap
-newHeap sz = Heap $ V.replicate sz 0
+newMemory :: Int {- ^ Size -} -> Memory
+newMemory sz = Memory $ V.replicate sz 0
 
 -- | Call stack. Not a newtype because ultimately the machine is the wrapper
 -- around this structure.
@@ -164,7 +157,7 @@ newCallStack = []
 data MachineState = M
     { machinePC :: Location
     , machineStack :: Stack
-    , machineHeap :: Heap
+    , machineMemory :: Memory
     , machineCallStack :: CallStack
     , machineLocalStack :: LocalStack
     , machineLabels :: Env
@@ -184,11 +177,11 @@ type Machine = MachineT IO
 runMachine :: Monad m => MachineState -> MachineT m a -> m (a, MachineState)
 runMachine ms m = runStateT (unMachineT m) ms
 
-newMachineState :: Int {- ^ Heap size -} -> MachineState
+newMachineState :: Int {- ^ Memory size -} -> MachineState
 newMachineState heapSz = M
     0
     newStack
-    (newHeap heapSz)
+    (newMemory heapSz)
     newCallStack
     newLocalStack
     mempty
@@ -212,8 +205,8 @@ mapStack :: (Stack -> Stack) -> MachineState -> MachineState
 f `mapStack` (M pc st hp cs ls env) =
     M pc (f st) hp cs ls env
 
-mapHeap :: (Heap -> Heap) -> MachineState -> MachineState
-f `mapHeap` (M pc st hp cs ls env) =
+mapMemory :: (Memory -> Memory) -> MachineState -> MachineState
+f `mapMemory` (M pc st hp cs ls env) =
     M pc st (f hp) cs ls env
 
 mapLocal :: (LocalStack -> LocalStack) -> MachineState -> MachineState
@@ -233,11 +226,11 @@ data Asm
     | Mul             -- ^ Multiply stack values
     | Div             -- ^ Divide stack values
     | Mod             -- ^ Modulo operator
-    | Lt              -- ^ first stack value < second stack value
-    | Le              -- ^ first stack value <= second stack value
-    | Gt              -- ^ first stack value > second stack value
-    | Ge              -- ^ first stack value >= second stack value
-    | Eq              -- ^ first stack value == second stack value
+    | Lt              -- ^ second stack value < first stack value
+    | Le              -- ^ '' <= ''
+    | Gt              -- ^ '' > ''
+    | Ge              -- ^ '' >= ''
+    | Eq              -- ^ '' == ''
     | Not             -- ^ Turnover bool: non-zero => 0, 0 => 1
     | StoreI Location -- ^ Store top of stack to immediate location
     | LoadI Location  -- ^ Push value at immediate location onto stack
@@ -277,7 +270,7 @@ setLabel _ m = incrPC m
 
 execute' :: Monad m => Asm -> MachineT m ()
 execute' (Add) = modify (mapStack (stackBinOp (+))) >> return ()
-execute' (Sub) = modify (mapStack (stackBinOp (flip (-)))) >> return ()
+execute' (Sub) = modify (mapStack (stackBinOp (-))) >> return ()
 execute' (Mul) = modify (mapStack (stackBinOp (*))) >> return ()
 execute' (Div) = modify (mapStack (stackBinOp div)) >> return ()
 execute' (Mod) = modify (mapStack (stackBinOp mod)) >> return ()
@@ -301,20 +294,20 @@ execute' (Not) = do
 
 execute' (StoreI loc) = do
     stack <- gets machineStack
-    modify $ mapHeap (heapSet loc (stackPeek stack))
+    modify $ mapMemory (heapSet loc (stackPeek stack))
 
 execute' (LoadI loc) = do
-    heap <- gets machineHeap
+    heap <- gets machineMemory
     modify $ mapStack (stackPush (heapGet loc heap))
 
 execute' (Store) = do
     m <- get
     let (loc, val) = (\(Stack (x:y:_)) -> (x, y)) $ machineStack m
-    put $ heapSet (fromIntegral loc) val `mapHeap` m
+    put $ heapSet (fromIntegral loc) val `mapMemory` m
 
 execute' (Load) = do
     stack <- gets machineStack
-    heap <- gets machineHeap
+    heap <- gets machineMemory
     let loc = stackPeek stack
     let loc' = fromIntegral loc
     modify $ mapStack (stackPush (heapGet loc' heap))
@@ -399,163 +392,3 @@ run' is ms
           run' is ms'
     where pc = machinePC ms
           end = ((V.length is) ==)
-
--- * Some tests
-
-test1 :: [Asm]
-test1 = [ Label "sub5"
-        , Push 5
-        , Sub
-        , Ret
-        , Label "main"
-        , Push 11
-        , Call "sub5"
-        ]
-
-test2 :: [Asm]
-test2 = [ Label "sub5"
-        , Push 5
-        , Sub
-        , Ret
-        , Label "store_value"
-        -- assumption: stack is address and then value
-        , Store
-        , Pop
-        , Pop
-        , Ret
-        , Label "main"
-        , Push 6
-        , Call "sub5"
-        , Push 17
-        , Call "store_value"
-        ]
-
--- non-tail-recursive fibonacci
-test3 :: [Asm]
-test3 = [ Label "fib"           -- "n" is on the stack
-        , Dup                   -- duplicate it
-        , Push 0              -- push a 0
-        , Eq                    -- replace with 1 if n=0, else 0
-        , JumpIf "fib_finished" -- if 1, n=0 and we are done
-        , Dup                   -- duplicate "n" again
-        , Push 1                -- push a 1
-        , Eq                    -- compare again
-        , JumpIf "fib_finished" -- if 1, n=1 and we are finished
-        , Jump "fib_continue"   -- continue
-        , Label "fib_finished"  -- JumpIf pops the stack, n is already at top
-        , Ret                   -- ... so return it
-        , Label "fib_continue"
-        , Dup                   -- duplicate "n"
-        , PushLocal             -- \
-        , Push 1                --  +- put a 1 on the stack between the "n"s
-        , PopLocal              -- /
-        , Swap
-        , Sub                   -- subtract, putting "n-1" on the stack
-        , PushLocal             -- set this aside
-        , PushLocal             -- \
-        , Push 2                --  +- put a 2 on the stack before the "n"
-        , PopLocal              -- /
-        , Swap
-        , Sub                   -- subtract, putting "n-2" on the stack
-        , PopLocal              -- put the "n-1" back on the stack
-        , Call "fib"            -- call fib(n-1)
-        , PushLocal             -- set the result aside
-        , Call "fib"            -- call fib(n-2), since "n-2" is on the stack
-        , PopLocal              -- push fib(n-1) back on the stack
-        , Add                   -- add these two together
-        , Ret                   -- return
-        , Label "main"
-        , Push 10
-        , Call "fib"
-        ]
-
--- tail-recursive fibonacci
-test4 :: [Asm]               -- top of stack <-----> bottom of stack
-test4 = [ Label "fib"        -- n
-        , PushLocal          -- _
-        , Push 0             -- 0
-        , Push 1             -- 1 -> 0
-        , PopLocal           -- n -> 1 -> 0
-        , Call "fib_rec"     -- n -> A -> B
-        , Pop                -- A -> B
-        , Pop                -- B
-        , Ret
-        , Label "fib_rec"    -- n -> A -> B
-        , Dup                -- n -> n -> A -> B
-        , Push 0             -- 0 -> n -> n -> A -> B
-        , Eq                 -- t/f -> n -> A -> B
-        , JumpIf "fib_done"  -- n -> A -> B
-        , PushLocal          -- A -> B
-        , Dup                -- A -> A -> B
-        , PushLocal          -- A -> B
-        , Add                -- (A+B)
-        , PopLocal           -- A -> (A+B)
-        , Swap               -- (A+B) -> A
-        , Push 1             -- 1 -> (A+B) -> A
-        , PopLocal           -- n -> 1 -> (A+B) -> A
-        , Sub                -- (n-1) -> (A+B) -> A
-        , Jump "fib_rec"
-        , Label "fib_done"   -- n -> A -> B
-        , Ret
-        , Label "main"
-        , Push 8
-        , Call "fib"
-        ]
-
--- non-tail-recursive factorial
-test5 :: [Asm]
-test5 = [ Label "fact"
-        , Dup
-        , Push 1
-        , Eq
-        , JumpIf "fact_done"
-        , Dup
-        , Push 1
-        , Sub
-        , Call "fact"
-        , Mul
-        , Ret
-        , Label "fact_done"
-        , Ret
-        , Label "main"
-        , Push 5
-        , Call "fact"
-        ]
-
--- tail-recursive factorial
-test6 :: [Asm]
-test6 = [ Label "fact"
-        , PushLocal
-        , Push 1
-        , PopLocal
-        , Call "fact_helper" -- (fact-helper 1 n)
-        , Ret
-        , Label "fact_helper"
-        , Dup  -- stack contains "product" and "n" and "n"
-        , PushLocal
-        , Push 2
-        , PopLocal
-        , Lt
-        , JumpIf "fact_helper_ret"
-        , Dup
-        , Push 1
-        , Sub
-        , PushLocal
-        , Mul
-        , PopLocal
-        , Jump "fact_helper"
-        , Label "fact_helper_ret"
-        , Pop
-        , Ret
-        , Label "main"
-        , Push 5
-        , Call "fact"
-        ]
-
-test7 :: [Asm]
-test7 = [ Label "main"
-        , Push 10
-        , Push 17
-        , Store
-        , Load
-        ]

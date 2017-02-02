@@ -20,6 +20,7 @@ data CoreAst a
     | ClosC { closCArgs :: [Symbol], closCBody :: a }
     | IfC { ifCond :: a, ifThen :: a, ifElse :: a }
     | DefC { defSym :: Symbol, defValue :: a }
+    | TailRecC { tailRecArgs :: [a] }
     deriving (Functor, Show)
 
 type CoreExpr = Free CoreAst
