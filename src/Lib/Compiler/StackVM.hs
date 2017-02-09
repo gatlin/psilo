@@ -1,4 +1,4 @@
-module Lib.Compiler.StackVM
+ module Lib.Compiler.StackVM
     ( run
     , codegen
     , stackPeek
