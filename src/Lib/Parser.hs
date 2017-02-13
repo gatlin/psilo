@@ -164,6 +164,11 @@ parse_multi inp = do
             return []
         Right result -> return $ fmap tailRec result
 
+-- | Remove ";" comments from source code
+removeComments :: Text -> Text
+removeComments = Text.unlines . fmap fst . fmap breakComment . Text.lines
+    where breakComment = Text.break (\c -> c == ';')
+
 -- identify tail recursive calls and replace them with a special form
 tailRec :: CoreExpr () -> CoreExpr ()
 tailRec (Free (DefC sym val)) = Free (DefC sym (go sym val)) where

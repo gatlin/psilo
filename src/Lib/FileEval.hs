@@ -23,7 +23,7 @@ load_defns (defn:defns) rtState = do
 interpret_file :: Bool -> FilePath -> IO ()
 interpret_file optDebug inFile = do
     file_contents <- TextIO.readFile inFile
-    defns <- parse_multi file_contents
+    defns <- parse_multi $ removeComments file_contents
     compiled <- mapM codegen defns >>= return . concat
     -- make sure to not execute main's return
     st <- run (take ((length compiled) - 1) compiled)
