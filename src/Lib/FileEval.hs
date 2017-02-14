@@ -20,12 +20,14 @@ load_defns (defn:defns) rtState = do
     load_defns defns rtState'
 -}
 
-interpret_file :: Bool -> FilePath -> IO ()
-interpret_file optDebug inFile = do
+interpret_file :: Bool -> Bool ->  FilePath -> IO ()
+interpret_file optDebug optAsm inFile = do
     file_contents <- TextIO.readFile inFile
     defns <- parse_multi $ removeComments file_contents
     compiled <- mapM codegen defns >>= return . concat
     -- make sure to not execute main's return
     st <- run (take ((length compiled) - 1) compiled)
-    when optDebug $ putStrLn . show $ stackPeek $ machineStack st
+    when optAsm $ forM_ compiled $ putStrLn . show
+    when (optDebug && (not optAsm)) $
+        putStrLn . show $ stackPeek $ machineStack st
     return ()

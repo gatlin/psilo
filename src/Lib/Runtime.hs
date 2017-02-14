@@ -1,5 +1,14 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
+{- |
+I am moving away from this module!
+
+But it is still here because I don't want to deal with all the attendant
+crap just yet!
+
+xoxoxo
+-}
+
 module Lib.Runtime where
 
 import Prelude hiding (lookup)

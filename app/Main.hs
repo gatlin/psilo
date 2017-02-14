@@ -7,6 +7,7 @@ import Lib
 data CmdLnOpts = CmdLnOpts
     { inputFile :: Maybe String
     , debugOut :: Bool
+    , asmDump :: Bool
     , execRepl  :: Bool
     } deriving (Show)
 
@@ -20,6 +21,10 @@ optParser = CmdLnOpts
          (long "debug")
       <> (short 'd')
       <> (help "Enable debug output"))
+    <*> (switch $
+         (long "asm")
+      <> (short 'm')
+      <> (help "Dump generated assembly code (when applicable)"))
     <*> (switch $
          (long "repl")
       <> (short 'r')
@@ -35,4 +40,5 @@ main = execParser opts >>= begin where
 begin :: CmdLnOpts -> IO ()
 begin cmdLnOpts = case inputFile cmdLnOpts of
     Nothing -> replMain
-    Just inFile -> interpret_file (debugOut cmdLnOpts)  inFile
+    Just inFile -> interpret_file (debugOut cmdLnOpts)
+                   (asmDump cmdLnOpts) inFile

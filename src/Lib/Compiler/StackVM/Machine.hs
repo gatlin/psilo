@@ -42,6 +42,7 @@ import qualified Data.Map as M
 import Data.Monoid
 import Data.Maybe (fromJust)
 import Data.Word
+import Data.Bits
 
 import Control.Monad
 import Control.Monad.Trans
@@ -51,6 +52,8 @@ import Control.Monad.State
 import Lib.Syntax
 
 type Location = Int
+
+-- | This VM has 16-bit words.
 type Value = Word16
 
 -- | Mapping from symbols to locations. Serves double duty in the VM as both the
@@ -94,7 +97,7 @@ stackPeek (Stack (x:_)) = x
 
 -- | Apply the operator to the first two stack values as operands
 stackBinOp :: (Value -> Value -> Value) -> Stack -> Stack
-stackBinOp op (Stack (x:y:rest)) = Stack $ op y x : rest
+stackBinOp op (Stack (x:y:rest)) = Stack $ op x y : rest
 
 stackSwap :: Stack -> Stack
 stackSwap (Stack (x:y:rest)) = Stack $ y : (x : rest)
@@ -218,9 +221,7 @@ f `mapLabels` (M pc st hp cs ls env) =
 -- | The assembly instructions for the stack machine
 data Asm
     = Add             -- ^ Add stack values
-    | Sub             -- ^ Subtract stack values
     | Mul             -- ^ Multiply stack values
-    | Div             -- ^ Divide stack values
     | Mod             -- ^ Modulo operator
     | Lt              -- ^ second stack value < first stack value
     | Le              -- ^ '' <= ''
@@ -228,6 +229,12 @@ data Asm
     | Ge              -- ^ '' >= ''
     | Eq              -- ^ '' == ''
     | Not             -- ^ Turnover bool: non-zero => 0, 0 => 1
+    | And             -- ^ Bitwise AND of the top two stack values
+    | Or              -- ^ Bitwise OR of the top two stack values
+    | Xor             -- ^ Bitwise XOR of the top two stack values
+    | Comp            -- ^ Bitwise complement of the top stack value
+    | ShiftL          -- ^ Shift top stack value left by value under it
+    | ShiftR          -- ^ Shift top stack value right by value under it
     | StoreI Location -- ^ Store top of stack to immediate location
     | LoadI Location  -- ^ Push value at immediate location onto stack
     | Store           -- ^ See [1] below this definition
@@ -243,14 +250,47 @@ data Asm
     | JumpIf Symbol   -- ^ Jump if first stack value is non-zero. Then discard.
     | Call Symbol     -- ^ Store current PC and jump to function.
     | Ret             -- ^ Return from calling point
-    deriving (Show)
 
 {-
 [1]: Like 'StoreI' and 'LoadI' but the locations are not hardcoded, but instead
 the top stack value is the storage location, and the second is the actual value.
 
-[2]: Reading and writing local stack values. 
+[2]: Read and write to the local "stack" (which needs to be renamed). "read"
+pushes the value from the local onto the main stack while "write" pops the top
+of the stack and inserts the value at the chosen index.
 -}
+
+instance Show Asm where
+    show (Add) = "add"
+    show (Mul) = "mul"
+    show (Mod) = "modulo"
+    show (Lt)  = "lt"
+    show (Le)  = "lte"
+    show (Gt)  = "gt"
+    show (Ge)  = "gte"
+    show (Eq)  = "eq"
+    show (Not) = "not"
+    show (And) = "and"
+    show (Or)  = "or"
+    show (Xor) = "xor"
+    show (Comp) = "comp"
+    show (ShiftL) = "shiftl"
+    show (ShiftR) = "shiftr"
+    show (StoreI loc) = "storei " ++ (show loc)
+    show (LoadI loc) = "loadi " ++ (show loc)
+    show (Store) = "store"
+    show (Load) = "load"
+    show (Push val) = "push " ++ (show val)
+    show (Pop) = "pop"
+    show (Dup) = "dup"
+    show (Swap) = "swap"
+    show (ReadLocal val) = "read " ++ (show val)
+    show (WriteLocal val) = "write " ++ (show val)
+    show (Label sym) = "label ." ++ sym
+    show (Jump sym) = "jump ." ++ sym
+    show (JumpIf sym) = "jumpif ." ++ sym
+    show (Call sym) = "call ." ++ sym
+    show (Ret) = "return"
 
 -- | Top level instruction execution.
 execute :: Monad m => Asm -> MachineT m ()
@@ -266,12 +306,18 @@ setLabel (Label l) m = incrPC $ const (envSet l c ls) `mapLabels` m
           ls = machineLabels m
 setLabel _ m = incrPC m
 
+shiftL' a b = shiftL a (fromInteger . toInteger $ b)
+shiftR' a b = shiftR a (fromInteger . toInteger $ b)
+
 execute' :: Monad m => Asm -> MachineT m ()
 execute' (Add) = modify (mapStack (stackBinOp (+))) >> return ()
-execute' (Sub) = modify (mapStack (stackBinOp (-))) >> return ()
 execute' (Mul) = modify (mapStack (stackBinOp (*))) >> return ()
-execute' (Div) = modify (mapStack (stackBinOp div)) >> return ()
 execute' (Mod) = modify (mapStack (stackBinOp mod)) >> return ()
+execute' (And) = modify (mapStack (stackBinOp (.&.))) >> return ()
+execute' (Or)  = modify (mapStack (stackBinOp (.|.))) >> return ()
+execute' (Xor) = modify (mapStack (stackBinOp xor)) >> return ()
+execute' (ShiftL) = modify (mapStack (stackBinOp shiftL')) >> return ()
+execute' (ShiftR) = modify (mapStack (stackBinOp shiftR')) >> return ()
 
 execute' (Lt) = modify (mapStack (stackBinOp (boolToValue <.> (<))))
 
@@ -288,6 +334,10 @@ execute' (Not) = do
             0 -> 1
             _ -> 0
     modify $ mapStack (stackApp invNum)
+    return ()
+
+execute' (Comp) = do
+    modify $ mapStack (stackApp complement)
     return ()
 
 execute' (StoreI loc) = do

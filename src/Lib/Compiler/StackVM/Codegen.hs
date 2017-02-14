@@ -15,17 +15,21 @@ import Control.Monad.State
 import Control.Monad.IO.Class
 
 asm_ops :: Symbol -> Maybe Asm
-asm_ops "+" = Just Add
-asm_ops "*" = Just Mul
-asm_ops "-" = Just Sub
-asm_ops "/" = Just Div
-asm_ops "%" = Just Mod
-asm_ops "<" = Just Lt
-asm_ops "<=" = Just Le
-asm_ops ">" = Just Gt
-asm_ops ">=" = Just Ge
-asm_ops "=" = Just Eq
+asm_ops "add" = Just Add
+asm_ops "mul" = Just Mul
+asm_ops "modulo" = Just Mod
+asm_ops "lt" = Just Lt
+asm_ops "lte" = Just Le
+asm_ops "gt" = Just Gt
+asm_ops "gte" = Just Ge
+asm_ops "eq" = Just Eq
 asm_ops "not" = Just Not
+asm_ops "&" = Just And
+asm_ops "|" = Just Or
+asm_ops "^" = Just Xor
+asm_ops "comp" = Just Comp
+asm_ops ">>" = Just ShiftR
+asm_ops "<<" = Just ShiftL
 asm_ops _ = Nothing
 
 data CodegenContext = CodegenContext
@@ -78,7 +82,7 @@ codegen :: MonadIO m => CoreExpr () -> m [Asm]
 codegen expr = runCodegenT newCodegenContext newCodegenState (go expr) where
 
     go :: MonadIO m => CoreExpr () -> CodegenT m [ Asm ]
-    go (Free (IntC n)) = return [ Push (fromInteger n) ]
+    go (Free (IntC n)) = return [ Push $ fromInteger n ]
     go (Free (BoolC b)) = return [ Push $ if b then 0x1 else 0x0 ]
 
     go (Free (IdC s)) = do
@@ -95,22 +99,21 @@ codegen expr = runCodegenT newCodegenContext newCodegenState (go expr) where
         return $ (Label sym) : body
 
     go (Free (AppC fun operands)) = do
-        operands' <- push_on_stack operands
+        operands' <- push_on_stack (reverse operands)
         case fun of
             (Free (IdC sym)) -> case asm_ops sym of
                 Just op -> return $ operands' ++ [ op ]
                 Nothing -> return $ operands' ++ [ Call sym ]
 
     go (Free (TailRecC operands)) = do
-        operands' <- push_on_stack operands
+        operands' <- push_on_stack (reverse operands)
         mTld <- gets currTopLevel
         case mTld of
             Nothing -> error $ "Cannot make tail-recursive call"
             Just tld -> return $ operands' ++ [ Jump tld ]
 
     go (Free (ClosC args body)) = do
-        hb <- asks heapBase
-        let numbered_args = zip (reverse args) [0..]
+        let numbered_args = zip args [0..]
         body' <- local (store_args numbered_args) $ do
             b <- go body
             let b' = reverse b

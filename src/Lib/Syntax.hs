@@ -10,6 +10,20 @@ import qualified Data.Text as T
 
 type Symbol = String
 
+-- | The psilo core syntax tree
+-- Expressions represented in terms of 'CoreAst' have been parsed from surface
+-- syntax, all macro transformations have been applied, and they are ready to be
+-- given to code generators.
+--
+-- For the sake of efficiency some branches exist to aid with parsing and code
+-- generation. For instance, in addition to bare identifiers ('IdC') a few
+-- special case terms exist for symbols which are reserved for other purposes,
+-- such as fixed point numbers ('IntC'), floating point numbers ('DoubleC'),
+-- boolean values ('BoolC'), etc.
+--
+-- For code generators which support it the 'TailRecC' term also exists. It is
+-- simple enough for a code generator which does not support tail recursion
+-- elimination to replace such terms with 'AppC' terms.
 data CoreAst a
     = IntC { intC :: Integer }
     | DoubleC { doubleC :: Double }
@@ -23,6 +37,8 @@ data CoreAst a
     | TailRecC { tailRecArgs :: [a] }
     deriving (Functor, Show)
 
+-- | The free monad of a 'CoreAst' is a DSL which may aid in constructing psilo
+-- expressions for code generation.
 type CoreExpr = Free CoreAst
 
 aInt :: (MonadFree CoreAst m) => Integer -> m a
