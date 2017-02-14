@@ -249,6 +249,7 @@ data Asm
     | Jump Symbol     -- ^ Unconditional jump
     | JumpIf Symbol   -- ^ Jump if first stack value is non-zero. Then discard.
     | Call Symbol     -- ^ Store current PC and jump to function.
+    | CallA           -- ^ Store PC and jump to function at address on stack
     | Ret             -- ^ Return from calling point
 
 {-
@@ -290,6 +291,7 @@ instance Show Asm where
     show (Jump sym) = "jump ." ++ sym
     show (JumpIf sym) = "jumpif ." ++ sym
     show (Call sym) = "call ." ++ sym
+    show (CallA) = "calla"
     show (Ret) = "return"
 
 -- | Top level instruction execution.
@@ -297,6 +299,7 @@ execute :: Monad m => Asm -> MachineT m ()
 execute i@(Jump _)= execute' i
 execute i@(JumpIf _) = execute' i
 execute i@(Call _) = execute' i
+execute i@(CallA) = execute' i
 execute (Ret) = execute' Ret
 execute i = execute' i >> modify incrPC
 
@@ -414,6 +417,12 @@ execute' (Call n) = do
         labels = machineLabels m
         target = envGet n labels
     modify $ setCounter target . callStackPush current
+
+execute' (CallA) = do
+    stack <- gets machineStack
+    pc <- gets machinePC
+    let target = fromIntegral $ stackPeek stack
+    modify $ setCounter target . callStackPush pc . mapStack stackPop
 
 execute' (Ret) = do
     m <- get
