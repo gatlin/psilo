@@ -11,7 +11,6 @@ import Control.Monad (forM_)
 import Tubes
 import Lib.Parser
 import Lib.Syntax
-import Lib.Runtime
 import Lib.REPL
 import Lib.FileEval
 import Lib.Compiler.StackVM

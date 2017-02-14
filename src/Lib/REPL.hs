@@ -4,7 +4,6 @@ module Lib.REPL where
 
 import Prelude hiding (map, take)
 import qualified Prelude as P
-import Lib.Runtime
 import Lib.Parser
 import Lib.FileEval
 import System.Console.Haskeline
@@ -20,6 +19,8 @@ import Tubes
 ltrim = dropWhile isSpace
 
 replMain :: IO ()
+replMain = putStrLn "The REPL isn't finished yet!"
+{-
 replMain = runInputT defaultSettings (loop defaultRuntimeState) where
     loop rtState = do
         minput <- getInputLine "% "
@@ -51,4 +52,5 @@ replMain = runInputT defaultSettings (loop defaultRuntimeState) where
                             interpret parsed
                         liftIO . putStrLn . show $ result
                         loop rtState'
+-}
 -}
