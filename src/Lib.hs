@@ -7,8 +7,6 @@ module Lib
     ) where
 
 import Prelude hiding (map, take, filter, sequence, mapM)
-import Control.Monad (forM_)
-import Tubes
 import Lib.Parser
 import Lib.Syntax
 import Lib.REPL

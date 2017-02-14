@@ -21,7 +21,6 @@ library
                        Lib.Compiler.StackVM.Codegen,
                        Lib.Compiler.StackVM.Machine
   build-depends:       base >= 4.7 && < 5,
-                       tubes,
                        comonad,
                        mtl,
                        transformers,
