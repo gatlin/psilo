@@ -78,10 +78,9 @@ gensym = do
     modify $ \cc -> cc { gensymValue = gs + 1 }
     return gs
 
-codegen :: MonadIO m => CoreExpr () -> m [Asm]
-codegen expr = runCodegenT newCodegenContext newCodegenState (go expr) where
+codegen :: MonadIO m => CoreExpr () -> CodegenT m [Asm]
+codegen expr = go expr where
 
-    go :: MonadIO m => CoreExpr () -> CodegenT m [ Asm ]
     go (Free (IntC n)) = return [ Push $ fromInteger n ]
     go (Free (BoolC b)) = return [ Push $ if b then 0x1 else 0x0 ]
 

@@ -250,6 +250,7 @@ data Asm
     | JumpIf Symbol   -- ^ Jump if first stack value is non-zero. Then discard.
     | Call Symbol     -- ^ Store current PC and jump to function.
     | CallA           -- ^ Store PC and jump to function at address on stack
+    | LoadA Symbol    -- ^ Push the address of the given symbol on the stack
     | Ret             -- ^ Return from calling point
 
 {-
@@ -292,6 +293,7 @@ instance Show Asm where
     show (JumpIf sym) = "jumpif ." ++ sym
     show (Call sym) = "call ." ++ sym
     show (CallA) = "calla"
+    show (LoadA sym) = "loada ." ++ sym
     show (Ret) = "return"
 
 -- | Top level instruction execution.
@@ -423,6 +425,10 @@ execute' (CallA) = do
     pc <- gets machinePC
     let target = fromIntegral $ stackPeek stack
     modify $ setCounter target . callStackPush pc . mapStack stackPop
+
+execute' (LoadA sym) = do
+    labels <- gets machineLabels
+    modify $ mapStack (stackPush $ fromIntegral (envGet sym labels))
 
 execute' (Ret) = do
     m <- get

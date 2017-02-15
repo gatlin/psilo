@@ -2,6 +2,9 @@
     ( run
     , codegen
     , stackPeek
+    , newCodegenContext
+    , newCodegenState
+    , runCodegenT
     , MachineT(..)
     , MachineState(..)
     )
