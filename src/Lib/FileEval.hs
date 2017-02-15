@@ -20,9 +20,6 @@ interpret_file :: Bool -> Bool ->  FilePath -> IO ()
 interpret_file optDebug optAsm inFile = do
     file_contents <- TextIO.readFile inFile
     defns <- parse_multi $ removeComments file_contents
---    compiled <- mapM codegen defns >>= return . concat
---foldM (\ds c -> codegen c >>= \c' -> return $ c' : ds) [] defns
-    -- make sure to not execute main's return
     compiled' <- runCodegenT newCodegenContext newCodegenState $ do
         compiled <- foldM (\ds c -> codegen c >>= \c' -> return $ c' : ds) [] defns
         return $ concat . reverse $ compiled
