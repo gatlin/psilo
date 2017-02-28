@@ -114,19 +114,17 @@ instance Monoid Stack where
 
 -- | Local Data
 newtype LocalData = LocalData {
-    unLocalData :: [Value]
+    unLocalData :: Vector Value
     } deriving (Show)
 
-localPeek :: LocalData -> Int -> Value
-localPeek (LocalData xs) idx = xs !! idx
+localRead :: LocalData -> Int -> Value
+localRead (LocalData vs) idx = vs ! idx
+
+localWrite :: Int -> Value -> LocalData -> LocalData
+localWrite idx val (LocalData vs) = LocalData $ vs V.// [(idx, val)]
 
 newLocalData :: LocalData
-newLocalData = LocalData []
-
-instance Monoid LocalData where
-    mempty = newLocalData
-    (LocalData l1) `mappend` (LocalData l2) = LocalData $
-        l1 `mappend` l2
+newLocalData = LocalData $ V.replicate 16 0
 
 -- | A vector-based heap implementation
 newtype Memory = Memory {
@@ -220,9 +218,12 @@ f `mapLabels` (M pc st hp cs ls env) =
 
 -- | The assembly instructions for the stack machine
 data Asm
-    = Add             -- ^ Add stack values
-    | Mul             -- ^ Multiply stack values
-    | Mod             -- ^ Modulo operator
+    = Add16           -- ^ 16-bit addition
+    | Mul16           -- ^ 16-bit multiplication
+    | Mod16           -- ^ 16-bit modulus
+    | Add32           -- ^ 32-bit addition
+    | Mul32           -- ^ 32-bit multiplication
+    | Mod32           -- ^ 32-bit modulus
     | Lt              -- ^ second stack value < first stack value
     | Le              -- ^ '' <= ''
     | Gt              -- ^ '' > ''
@@ -263,9 +264,12 @@ of the stack and inserts the value at the chosen index.
 -}
 
 instance Show Asm where
-    show (Add) = "add"
-    show (Mul) = "mul"
-    show (Mod) = "modulo"
+    show (Add16) = "add16"
+    show (Mul16) = "mul16"
+    show (Mod16) = "modulo16"
+    show (Add32) = "add32"
+    show (Mul32) = "mul32"
+    show (Mod32) = "modulo32"
     show (Lt)  = "lt"
     show (Le)  = "lte"
     show (Gt)  = "gt"
@@ -314,10 +318,36 @@ setLabel _ m = incrPC m
 shiftL' a b = shiftL a (fromInteger . toInteger $ b)
 shiftR' a b = shiftR a (fromInteger . toInteger $ b)
 
+-- | Pop a 32-bit integer off a stack
+pop32 :: Monad m => MachineT m [Value]
+pop32 = do
+    stack <- gets machineStack
+    let result_be = stackPeek stack
+    let stack' = stackPop stack
+    let result_le = stackPeek stack'
+    modify $ mapStack stackPop
+    return [result_be, result_le]
+
+binOp32 :: Monad m => (Word32 -> Word32 -> Word32) -> MachineT m ()
+binOp32 op = do
+    opA_s <- pop32 >>= return . map fromIntegral
+    let opA = ((opA_s !! 0)`shiftL` 16) .|. (opA_s !! 1)
+    opB_s <- pop32 >>= return . map fromIntegral
+    let opB = ((opB_s !! 0)`shiftL` 16) .|. (opB_s !! 1)
+    let result = op opA opB :: Word32
+    let result_s = [result .&. 0xFF, (result .&. 0xFF00) `shiftR` 16]
+    modify $ mapStack (stackPush $ fromIntegral $ result_s !! 0)
+        . mapStack (stackPush $ fromIntegral $ result_s !! 1)
+
 execute' :: Monad m => Asm -> MachineT m ()
-execute' (Add) = modify (mapStack (stackBinOp (+))) >> return ()
-execute' (Mul) = modify (mapStack (stackBinOp (*))) >> return ()
-execute' (Mod) = modify (mapStack (stackBinOp mod)) >> return ()
+execute' (Add16) = modify (mapStack (stackBinOp (+))) >> return ()
+execute' (Mul16) = modify (mapStack (stackBinOp (*))) >> return ()
+execute' (Mod16) = modify (mapStack (stackBinOp mod)) >> return ()
+
+execute' (Add32) = binOp32 (+) >> return ()
+execute' (Mul32) = binOp32 (*) >> return ()
+execute' (Mod32) = binOp32 mod >> return ()
+
 execute' (And) = modify (mapStack (stackBinOp (.&.))) >> return ()
 execute' (Or)  = modify (mapStack (stackBinOp (.|.))) >> return ()
 execute' (Xor) = modify (mapStack (stackBinOp xor)) >> return ()
@@ -388,15 +418,20 @@ execute' (PopLocal) = do
 -}
 execute' (ReadLocal n) = do
     local <- gets machineLocalData
-    let value = localPeek local (fromIntegral n)
+    let value = localRead local (fromIntegral n)
     modify $ mapStack (stackPush value)
 
 execute' (WriteLocal n) = do
+    local <- gets machineLocalData
+    stack <- gets machineStack
+    let local' = localWrite n (stackPeek stack) local
+    modify $ mapStack stackPop . mapLocal (const local')
+    {-
     LocalData local <- gets machineLocalData
     stack <- gets machineStack
     let (before, after) = splitAt n local
     let local' = LocalData $ before ++ [stackPeek stack] ++ (drop 1 after)
-    modify $ mapStack stackPop . mapLocal (const local')
+    modify $ mapStack stackPop . mapLocal (const local')-}
 
 execute' (Label _) = return ()
 

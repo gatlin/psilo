@@ -15,9 +15,12 @@ import Control.Monad.State
 import Control.Monad.IO.Class
 
 asm_ops :: Symbol -> Maybe Asm
-asm_ops "add" = Just Add
-asm_ops "mul" = Just Mul
-asm_ops "modulo" = Just Mod
+asm_ops "add16" = Just Add16
+asm_ops "mul16" = Just Mul16
+asm_ops "modulo16" = Just Mod16
+asm_ops "add32" = Just Add32
+asm_ops "mul32" = Just Mul32
+asm_ops "modulo32" = Just Mod32
 asm_ops "lt" = Just Lt
 asm_ops "lte" = Just Le
 asm_ops "gt" = Just Gt
