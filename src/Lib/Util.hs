@@ -12,6 +12,24 @@ builtin_syms :: Set Symbol
 builtin_syms = S.fromList
     [ "+", "*", "-", "/", "=", "<", ">" ]
 
+-- identify tail recursive calls and replace them with a special form
+tailRec :: CoreExpr () -> CoreExpr ()
+tailRec (Free (DefC sym val)) = Free (DefC sym (go sym val)) where
+    go :: Symbol -> CoreExpr () -> CoreExpr ()
+
+    go sym expr@(Free (ClosC args body)) = Free (ClosC args (go' sym body))
+    go _ other = other
+
+    go' sym expr@(Free (IfC c t e)) = Free (IfC c (go' sym t) (go' sym e))
+
+    go' sym expr@(Free (AppC (Free (IdC fun)) ops))
+        | sym == fun = Free (TailRecC ops)
+        | otherwise = expr
+
+    go' _ other = other
+
+tailRec other = other
+
 -- | Given an expression produce a set of free variable symbols
 free_variables :: CoreExpr () -> Set Symbol -> Set Symbol
 free_variables expr tlds = (flip runReader) tlds $ go expr S.empty where

@@ -12,6 +12,7 @@ import Control.Monad (join)
 import Control.Monad.IO.Class
 import Control.Monad.Free
 import Lib.Syntax
+import Lib.Util
 
 num_parser :: Parser (CoreExpr a)
 num_parser = do
@@ -162,27 +163,9 @@ parse_multi inp = do
         Left reason -> do
             liftIO . putStrLn $ "Parse failure: " ++ reason
             return []
-        Right result -> return $ fmap tailRec result
+        Right result -> return result
 
 -- | Remove ";" comments from source code
 removeComments :: Text -> Text
 removeComments = Text.unlines . fmap fst . fmap breakComment . Text.lines
     where breakComment = Text.break (\c -> c == ';')
-
--- identify tail recursive calls and replace them with a special form
-tailRec :: CoreExpr () -> CoreExpr ()
-tailRec (Free (DefC sym val)) = Free (DefC sym (go sym val)) where
-    go :: Symbol -> CoreExpr () -> CoreExpr ()
-
-    go sym expr@(Free (ClosC args body)) = Free (ClosC args (go' sym body))
-    go _ other = other
-
-    go' sym expr@(Free (IfC c t e)) = Free (IfC c (go' sym t) (go' sym e))
-
-    go' sym expr@(Free (AppC (Free (IdC fun)) ops))
-        | sym == fun = Free (TailRecC ops)
-        | otherwise = expr
-
-    go' _ other = other
-
-tailRec other = other

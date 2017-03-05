@@ -82,7 +82,7 @@ gensym = do
     return gs
 
 codegen :: MonadIO m => CoreExpr () -> CodegenT m [Asm]
-codegen expr = go expr where
+codegen expr = go (tailRec expr) where
 
     go (Free (IntC n)) = return [ Push $ fromInteger n ]
     go (Free (BoolC b)) = return [ Push $ if b then 0x1 else 0x0 ]

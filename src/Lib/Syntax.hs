@@ -1,12 +1,20 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 module Lib.Syntax where
 
 import Control.Monad.Free
 import Data.Text (Text)
 import qualified Data.Text as T
+
+-- * TODO
+-- Different phases of compilation really need different syntax trees. For now
+-- things are simple enough that I can, eg, make sure no 'TailRecC' values go
+-- into the type checker. At some point, however, it'll be necessary to define
+-- different grammars for different purposes.
 
 type Symbol = String
 
@@ -35,7 +43,7 @@ data CoreAst a
     | IfC { ifCond :: a, ifThen :: a, ifElse :: a }
     | DefC { defSym :: Symbol, defValue :: a }
     | TailRecC { tailRecArgs :: [a] }
-    deriving (Functor, Show)
+    deriving (Functor, Foldable, Traversable, Show, Eq, Ord)
 
 -- | The free monad of a 'CoreAst' is a DSL which may aid in constructing psilo
 -- expressions for code generation.
