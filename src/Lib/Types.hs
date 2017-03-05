@@ -60,7 +60,9 @@ data Type
 instance Show Type where
     show (TVar i) = "t" ++ (show i)
     show (TSym k) = k
-    show (TList ts) = concat $ intersperse " " $ fmap show ts
+    show (TList ts) = "(" ++
+                      (concat $ intersperse " " $ fmap show ts) ++
+                      ")"
 
 -- * Type inference
 
