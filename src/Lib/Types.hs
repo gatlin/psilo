@@ -6,10 +6,17 @@
 module Lib.Types
 where
 
+-- |
+-- Inspiration for this code came from
+--   https://brianmckenna.org/blog/type_annotation_cofree
+--
+-- It has been modified for a slightly different type and more flexible type
+-- grammar.
+
 import Control.Monad (forM_, forM, foldM, liftM2, zipWithM, mapAndUnzipM)
 import Control.Monad.Free
 import Control.Monad.State hiding (sequence)
-import Data.List (nub, union)
+import Data.List (nub, union, intersperse)
 import Data.Maybe (isNothing, fromMaybe)
 import Data.Monoid
 
@@ -48,13 +55,21 @@ data Type
     = TVar Int
     | TSym String
     | TList [Type]
-    deriving (Show, Eq)
+    deriving (Eq)
+
+instance Show Type where
+    show (TVar i) = "t" ++ (show i)
+    show (TSym k) = k
+    show (TList ts) = concat $ intersperse " " $ fmap show ts
 
 -- * Type inference
 
+-- | TODO there are more kinds of constraint than just this
 data Constraint = EqualityConstraint Type Type
     deriving (Show)
 
+-- | The result of inferring a type is a set of constraints and a set of
+-- assumptions about the remaining type variables.
 data TypeResult = TypeResult
     { constraints :: [Constraint]
     , assumptions :: M.Map String [Type]
@@ -71,13 +86,21 @@ instance Monoid TypeResult where
         constraints = constraints a `mappend` constraints b,
         assumptions = assumptions a `mappend` assumptions b }
 
+-- | The state of our type inference engine
 data TypeState t m = TypeState
     { varId :: Int
     , memo :: M.Map t m
     }
 
+defaultTypeState = TypeState {
+    varId = 0,
+    memo = M.empty
+    }
+
 type TypeCheck t = State (TypeState t (Type, TypeResult)) (Type, TypeResult)
 type Untyped = Cofree CoreAst ()
+type Attributed = Cofree CoreAst (Type, TypeResult)
+type Typed = Cofree CoreAst Type
 
 freshVarId :: State (TypeState t m) Type
 freshVarId = do
@@ -96,21 +119,16 @@ co :: Functor f => Free f t -> Cofree f ()
 co (Free f) = () :< fmap co f
 
 -- | Walk an expression tree and generate type constraints
-attribute :: Untyped -> Cofree CoreAst (Type, TypeResult)
-attribute c =
-    let initial = TypeState { memo = M.empty, varId = 0 }
-    in  evalState (sequence $ extend (memoizedTC generateConstraints) c) initial
-
--- | Similar to 'attribute' but the initial 'TypeState' is an argument
-attributeWith
+attribute
     :: TypeState Untyped (Type, TypeResult)
     -> Untyped
-    -> Cofree CoreAst (Type, TypeResult)
-attributeWith ts c = evalState
-    (sequence $ extend (memoizedTC generateConstraints) c) ts
+    -> Attributed
+attribute ts c =
+    let initial = TypeState { memo = M.empty, varId = 0 }
+    in  evalState (sequence $ extend (memoizedTC generateConstraints) c) ts
 
 -- | Generate the constraints for the type inference algorithm
-generateConstraints :: Cofree CoreAst () -> TypeCheck (Cofree CoreAst ())
+generateConstraints :: Cofree CoreAst () -> TypeCheck Untyped
 generateConstraints (() :< IntC _) = return (TSym "Int", mempty)
 generateConstraints (() :< DoubleC _) = return (TSym "Float", mempty)
 generateConstraints (() :< BoolC _) = return (TSym "Boolean", mempty)
@@ -182,11 +200,13 @@ unify (TList (a:as)) (TList (b:bs)) = do
                        (substitute unified_heads (TList bs))) $
         Just unified_heads
 
+unify _ _ = Nothing
+
 -- | Gives a local type inference for a 'CoreExpr'
-inferType :: CoreExpr () -> Maybe (Cofree CoreAst Type)
+inferType :: CoreExpr () -> Maybe Typed
 inferType expr =
     let expr' = co expr
-        result = attribute expr'
+        result = attribute defaultTypeState expr'
         (r :< _) = result
         maybeSubs = solveConstraints . constraints $ snd r
     in  fmap (\subs -> fmap (substitute subs . fst) result) maybeSubs
