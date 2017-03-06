@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Lib.Types
 where
@@ -13,19 +14,21 @@ where
 -- It has been modified for a slightly different type and more flexible type
 -- grammar.
 
-import Control.Monad (forM_, forM, foldM, liftM2, zipWithM, mapAndUnzipM)
+import Control.Monad (forM_, forM, foldM, liftM2, zipWithM, mapAndUnzipM, when)
 import Control.Monad.Free
 import Control.Monad.State hiding (sequence)
 import Data.List (nub, union, intersperse)
-import Data.Maybe (isNothing, fromMaybe)
+import Data.Maybe (isNothing, fromMaybe, fromJust, isJust)
 import Data.Monoid
 
 import Control.Comonad
 import Control.Comonad.Cofree
 import Data.Foldable (Foldable, fold)
-import qualified Data.Map as M
+import qualified Data.Map.Lazy as M
 
 import Lib.Syntax
+import Lib.Parser (parse_expr, parse_multi)
+import qualified Data.Text as T
 
 -- * Type term language
 
@@ -67,7 +70,8 @@ instance Show Type where
 -- * Type inference
 
 -- | TODO there are more kinds of constraint than just this
-data Constraint = EqualityConstraint Type Type
+data Constraint
+    = EqualityConstraint Type Type
     deriving (Show)
 
 -- | The result of inferring a type is a set of constraints and a set of
@@ -88,21 +92,34 @@ instance Monoid TypeResult where
         constraints = constraints a `mappend` constraints b,
         assumptions = assumptions a `mappend` assumptions b }
 
+co :: Functor f => Free f t -> Cofree f ()
+co (Free f) = () :< fmap co f
+
+type Untyped = Cofree CoreAst ()
+type Attributed = Cofree CoreAst (Type, TypeResult)
+type Typed = Cofree CoreAst Type
+
 -- | The state of our type inference engine
 data TypeState t m = TypeState
     { varId :: Int
     , memo :: M.Map t m
+    , definitions :: M.Map Symbol Type
+    }
+
+makeInitialTypeState :: [(Symbol, Type)] -> TypeState t m
+makeInitialTypeState defns = TypeState {
+    varId = length defns,
+    memo = M.empty,
+    definitions = M.fromList defns
     }
 
 defaultTypeState = TypeState {
     varId = 0,
-    memo = M.empty
+    memo = M.empty,
+    definitions = M.empty
     }
 
 type TypeCheck t = State (TypeState t (Type, TypeResult)) (Type, TypeResult)
-type Untyped = Cofree CoreAst ()
-type Attributed = Cofree CoreAst (Type, TypeResult)
-type Typed = Cofree CoreAst Type
 
 freshVarId :: State (TypeState t m) Type
 freshVarId = do
@@ -117,17 +134,13 @@ memoizedTC f c = gets memo >>= maybe memoize return . M.lookup c where
         modify $ \s -> s { memo = M.insert c r $ memo s }
         return r
 
-co :: Functor f => Free f t -> Cofree f ()
-co (Free f) = () :< fmap co f
-
 -- | Walk an expression tree and generate type constraints
 attribute
     :: TypeState Untyped (Type, TypeResult)
     -> Untyped
     -> Attributed
-attribute ts c =
-    let initial = TypeState { memo = M.empty, varId = 0 }
-    in  evalState (sequence $ extend (memoizedTC generateConstraints) c) ts
+attribute ts c = evalState (sequence $
+                            extend (memoizedTC generateConstraints) c) ts
 
 -- | Generate the constraints for the type inference algorithm
 generateConstraints :: Cofree CoreAst () -> TypeCheck Untyped
@@ -136,10 +149,13 @@ generateConstraints (() :< DoubleC _) = return (TSym "Float", mempty)
 generateConstraints (() :< BoolC _) = return (TSym "Boolean", mempty)
 
 generateConstraints (() :< IdC i) = do
-    var <- freshVarId
-    return (var, TypeResult {
+    ds <- gets definitions
+    ty <- case M.lookup i ds of
+        Nothing -> freshVarId
+        Just ty -> return ty
+    return (ty, TypeResult {
                    constraints = [],
-                   assumptions = M.singleton i [var]
+                   assumptions = M.singleton i [ty]
                    })
 
 generateConstraints (() :< ClosC argSyms body) = do
@@ -167,48 +183,84 @@ generateConstraints (() :< AppC op erands) = do
     (tys, results)  <- mapAndUnzipM (memoizedTC generateConstraints) erands
     let results' = foldl (<>) mempty results
     return (var, (snd op') <> results' <> TypeResult {
-                   constraints = [EqualityConstraint (fst op') (
-                                 TList $ [TSym "->"] <> tys <> [var])],
+                   constraints = [EqualityConstraint (fst op')
+                                 (TList $ [TSym "->"] <> tys <> [var])],
                    assumptions = mempty
                    })
 
+-- this one obviously needs to be done
+--generateConstraints (() :< IfC c t e)
+
+-- this case and the 'IdC' case should be coordinated so that top level
+--definitions and builtins are mutually visible.
+--generateConstraints (() :< DefC sym expr)
+
+
+type Frame = M.Map Int Type
+
 -- | Get the concrete 'Type' value for any non-constants from a mapping
-substitute :: M.Map Int Type -> Type -> Type
+substitute :: Frame -> Type -> Type
 substitute subs v@(TVar i) = maybe v (substitute subs) $ M.lookup i subs
 substitute subs (TList ts) = TList $ map (substitute subs) ts
 substitute _ t = t
 
 -- | Attempt a mapping from type variables to types given a list of constraints
-solveConstraints :: [Constraint] -> Maybe (M.Map Int Type)
+solveConstraints :: [Constraint] -> Maybe Frame
 solveConstraints =
     foldl (\b a -> liftM2 mappend (solve b a) b) $ Just M.empty
-    where solve maybeSubs (EqualityConstraint a b) = do
-              subs <- maybeSubs
-              unify (substitute subs a) (substitute subs b)
+    where solve maybeSubs (EqualityConstraint a b) =
+              unify a b maybeSubs
 
--- | Simple unification for 'Type' values.
-unify :: Type -> Type -> Maybe (M.Map Int Type)
-unify (TVar i) b = Just $ M.singleton i b
-unify a (TVar i) = Just $ M.singleton i a
+-- | Simple unification for 'Type' values
+unify :: Type -> Type -> Maybe Frame -> Maybe Frame
+unify t1 t2 frame
+    | isNothing frame = Nothing
+    | t1 == t2 = frame
+    | otherwise = go t1 t2 where
 
-unify (TSym a) (TSym b)
-    | a == b = Just M.empty
-    | otherwise = Nothing
+          go (TVar _) t2 = unify_var t1 t2 frame
+          go t1 (TVar _) = unify_var t2 t1 frame
 
-unify (TList (a:as)) (TList (b:bs)) = do
-    unified_heads <- unify a b
-    liftM2 mappend (unify
-                       (substitute unified_heads (TList as))
-                       (substitute unified_heads (TList bs))) $
-        Just unified_heads
+          go (TList (a:as)) (TList (b:bs)) =
+              unify (TList as) (TList bs)  $ unify a b frame
 
-unify _ _ = Nothing
+          go _ _ = Nothing
 
--- | Gives a local type inference for a 'CoreExpr'
-inferType :: CoreExpr () -> Maybe Typed
-inferType expr =
-    let expr' = co expr
-        result = attribute defaultTypeState expr'
-        (r :< _) = result
-        maybeSubs = solveConstraints . constraints $ snd r
-    in  fmap (\subs -> fmap (substitute subs . fst) result) maybeSubs
+unify_var :: Type -> Type -> Maybe Frame -> Maybe Frame
+unify_var var@(TVar n) val frame
+    | isNothing frame = Nothing
+    | var == val = frame
+    | otherwise = case M.lookup n (fromJust frame) of
+                      Nothing -> if occurs_check var val frame
+                                    then fmap (M.insert n val) frame
+                                    else Nothing
+                      Just val' -> unify val' val frame
+
+occurs_check :: Type -> Type -> Maybe Frame -> Bool
+occurs_check var@(TVar x) val (Just frame) = go val where
+    go (TSym _) = True
+    go (TVar y)
+        | var == val = True
+        | otherwise = case M.lookup y frame of
+                          Nothing -> True
+                          Just v' -> go v'
+    go (TList (x:xs)) = and [ go x, go (TList xs) ]
+    go (TList []) = True
+
+num_type = TList [ TSym "Num", TVar 0 ]
+mul_type = TList [ TSym "->", num_type, num_type, num_type ]
+tyState = makeInitialTypeState [("*", mul_type)]
+
+test :: IO ()
+test = do
+    defns <- parse_multi "(defun square (x) (* x x)) (def four (square 2))"
+    forM_ defns $ \(Free (DefC sym expr)) -> do
+        let expr' = co expr
+        let attributed = attribute tyState expr'
+        let cs = constraints $ snd $ extract attributed
+        putStrLn . show $ cs
+        let solved = solveConstraints cs
+        let results = fmap (\subs -> fmap (substitute subs . fst)
+                               attributed) solved
+        when (isJust results) $
+            putStrLn $ sym ++ " : " ++ (show (extract (fromJust results)))

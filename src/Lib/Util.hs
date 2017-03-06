@@ -37,7 +37,7 @@ free_variables expr tlds = (flip runReader) tlds $ go expr S.empty where
     go (Free (IntC _)) fvs = return fvs
     go (Free (DoubleC _)) fvs = return fvs
     go (Free (BoolC _)) fvs = return fvs
-    go (Free (StringC _)) fvs = return fvs
+--    go (Free (StringC _)) fvs = return fvs
     go (Free (IfC c t e)) fvs = do
         c_fvs <- go c fvs
         t_fvs <- go t c_fvs

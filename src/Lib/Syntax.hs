@@ -36,7 +36,7 @@ data CoreAst a
     = IntC { intC :: Integer }
     | DoubleC { doubleC :: Double }
     | BoolC { boolC :: Bool }
-    | StringC { stringC :: Text }
+--    | StringC { stringC :: Text }
     | IdC { idC :: Symbol }
     | AppC { appFun :: a, appArgs :: [a] }
     | ClosC { closCArgs :: [Symbol], closCBody :: a }
@@ -58,8 +58,8 @@ aDouble d = liftF $ DoubleC d
 aBool :: (MonadFree CoreAst m) => Bool -> m a
 aBool b = liftF $ BoolC b
 
-aString :: (MonadFree CoreAst m) => Text -> m a
-aString s = liftF $ StringC s
+--aString :: (MonadFree CoreAst m) => Text -> m a
+--aString s = liftF $ StringC s
 
 aId :: (MonadFree CoreAst m) => Symbol -> m a
 aId s = liftF $ IdC s

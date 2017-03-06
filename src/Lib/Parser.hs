@@ -42,12 +42,14 @@ id_parser = do
     the_sym <- sym
     return $ aId the_sym
 
+{-
 string_parser :: Parser (CoreExpr a)
 string_parser = do
     char '"'
     str <- many' $ notChar '"'
     char '"'
     return $ aString $ Text.pack str
+-}
 
 bool_parser :: Parser (CoreExpr a)
 bool_parser = do
@@ -127,7 +129,7 @@ expr_parser = (parens clos_parser)
           <|> bool_parser
           <|> id_parser
           <|> num_parser
-          <|> string_parser
+--          <|> string_parser
           <|> (parens app_parser)
 
 toplevel_parser :: Parser (CoreExpr a)
@@ -145,12 +147,13 @@ parse_expr
     => Text
     -> m (Maybe (CoreExpr ()))
 parse_expr input = do
-    let parse_result = parseOnly ((parens def_parser)
-                                  <|> (parens defun_parser)
-                                  <|> expr_parser) input
+    let parse_result = parseOnly ((parens defun_parser) <|>
+                                  (parens def_parser) <|>
+                                  (parens expr_parser)) input
+
     case parse_result of
         Left _ -> return Nothing
-        Right result -> return $ Just $ tailRec result
+        Right result -> return $ Just result
 
 parse_multi
     :: MonadIO m
