@@ -147,13 +147,12 @@ parse_expr
     => Text
     -> m (Maybe (CoreExpr ()))
 parse_expr input = do
-    let parse_result = parseOnly ((parens defun_parser) <|>
-                                  (parens def_parser) <|>
-                                  (parens expr_parser)) input
-
+    let parse_result = parseOnly ((parens def_parser)
+                                  <|> (parens defun_parser)
+                                  <|> expr_parser) input
     case parse_result of
         Left _ -> return Nothing
-        Right result -> return $ Just result
+        Right result -> return $ Just $ tailRec result
 
 parse_multi
     :: MonadIO m
