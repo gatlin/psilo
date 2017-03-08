@@ -4,6 +4,8 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-# LANGUAGE FlexibleContexts #-}
+
 module Lib.Types
 where
 
@@ -63,9 +65,8 @@ data Type
 instance Show Type where
     show (TVar i) = "t" ++ (show i)
     show (TSym k) = k
-    show (TList ts) = "(" ++
-                      (concat $ intersperse " " $ fmap show ts) ++
-                      ")"
+    show (TList ts) =
+        "(" ++ (concat $ intersperse " " $ fmap show ts) ++ ")"
 
 -- * Type inference
 
@@ -103,20 +104,13 @@ type Typed = Cofree CoreAst Type
 data TypeState t m = TypeState
     { varId :: Int
     , memo :: M.Map t m
-    , definitions :: M.Map Symbol Type
-    }
-
-makeInitialTypeState :: [(Symbol, Type)] -> TypeState t m
-makeInitialTypeState defns = TypeState {
-    varId = length defns,
-    memo = M.empty,
-    definitions = M.fromList defns
+    , builtins :: M.Map Symbol Type
     }
 
 defaultTypeState = TypeState {
     varId = 0,
     memo = M.empty,
-    definitions = M.empty
+    builtins = M.empty
     }
 
 type TypeCheck t = State (TypeState t (Type, TypeResult)) (Type, TypeResult)
@@ -137,10 +131,12 @@ memoizedTC f c = gets memo >>= maybe memoize return . M.lookup c where
 -- | Walk an expression tree and generate type constraints
 attribute
     :: TypeState Untyped (Type, TypeResult)
-    -> Untyped
-    -> Attributed
-attribute ts c = evalState (sequence $
-                            extend (memoizedTC generateConstraints) c) ts
+    -> [Untyped]
+    -> [Attributed]
+attribute ts cs = evalState go ts where
+    go = forM cs $ \c ->
+        sequence $ extend (memoizedTC generateConstraints) c
+
 
 -- | Generate the constraints for the type inference algorithm
 generateConstraints :: Cofree CoreAst () -> TypeCheck Untyped
@@ -149,13 +145,14 @@ generateConstraints (() :< DoubleC _) = return (TSym "Float", mempty)
 generateConstraints (() :< BoolC _) = return (TSym "Boolean", mempty)
 
 generateConstraints (() :< IdC i) = do
-    ds <- gets definitions
-    ty <- case M.lookup i ds of
+--    var <- freshVarId
+    bs <- gets builtins
+    var <- case M.lookup i bs of
         Nothing -> freshVarId
         Just ty -> return ty
-    return (ty, TypeResult {
+    return (var, TypeResult {
                    constraints = [],
-                   assumptions = M.singleton i [ty]
+                   assumptions = M.singleton i [var]
                    })
 
 generateConstraints (() :< ClosC argSyms body) = do
@@ -188,13 +185,25 @@ generateConstraints (() :< AppC op erands) = do
                    assumptions = mempty
                    })
 
--- this one obviously needs to be done
---generateConstraints (() :< IfC c t e)
+generateConstraints (() :< IfC c t e) = do
+    var <- freshVarId
+    cr <- memoizedTC generateConstraints c
+    tr <- memoizedTC generateConstraints t
+    er <- memoizedTC generateConstraints e
+    return (fst tr, snd cr <> snd tr <> snd er <> TypeResult {
+                   constraints = [ EqualityConstraint (fst tr) (fst er),
+                                   EqualityConstraint var (fst tr),
+                                   EqualityConstraint (fst cr) (TSym "Boolean")
+                                 ],
+                   assumptions = mempty
+                   })
 
--- this case and the 'IdC' case should be coordinated so that top level
---definitions and builtins are mutually visible.
---generateConstraints (() :< DefC sym expr)
-
+generateConstraints (() :< DefC sym expr) = do
+    (t, tr) <- memoizedTC generateConstraints expr
+    return (TSym sym, tr <> TypeResult {
+                   constraints = [ ],
+                   assumptions = mempty
+                   })
 
 type Frame = M.Map Int Type
 
@@ -208,8 +217,9 @@ substitute _ t = t
 solveConstraints :: [Constraint] -> Maybe Frame
 solveConstraints =
     foldl (\b a -> liftM2 mappend (solve b a) b) $ Just M.empty
-    where solve maybeSubs (EqualityConstraint a b) =
-              unify a b maybeSubs
+    where solve maybeSubs (EqualityConstraint a b) = do
+              subs <- maybeSubs
+              unify (substitute subs a) (substitute subs b) maybeSubs
 
 -- | Simple unification for 'Type' values
 unify :: Type -> Type -> Maybe Frame -> Maybe Frame
@@ -249,18 +259,37 @@ occurs_check var@(TVar x) val (Just frame) = go val where
 
 num_type = TList [ TSym "Num", TVar 0 ]
 mul_type = TList [ TSym "->", num_type, num_type, num_type ]
-tyState = makeInitialTypeState [("*", mul_type)]
 
 test :: IO ()
 test = do
-    defns <- parse_multi "(defun square (x) (* x x)) (def four (square 2))"
-    forM_ defns $ \(Free (DefC sym expr)) -> do
+    --defns <- parse_multi "(defun square (x) (* x x)) (def four (square 2))"
+    defns <- parse_multi "(defun wut (x) (if x 3 2))"
+    putStrLn . show $ defns
+    putStrLn "***"
+    let tyState = defaultTypeState {
+            builtins = M.fromList [("*", mul_type)],
+            varId = 1 }
+    let defns' = attribute tyState $ fmap co defns
+    forM_ defns' $ \a -> do
+        let cs = constraints $ snd $ extract a
+        putStrLn . show $ cs
+        let solved = solveConstraints cs
+        putStrLn $ "Frame: " ++ (show solved)
+        let results = fmap (\subs -> fmap (substitute subs . fst)
+                           a) solved
+        putStrLn . show $ results
+        putStrLn "---"
+    {-
+    forM_ defns $ \expr -> do
+        putStrLn . show $ expr
         let expr' = co expr
         let attributed = attribute tyState expr'
         let cs = constraints $ snd $ extract attributed
         putStrLn . show $ cs
         let solved = solveConstraints cs
+        putStrLn $ "Frame: " ++ (show solved)
         let results = fmap (\subs -> fmap (substitute subs . fst)
                                attributed) solved
-        when (isJust results) $
-            putStrLn $ sym ++ " : " ++ (show (extract (fromJust results)))
+        putStrLn . show $ results
+        putStrLn "---"
+-}
