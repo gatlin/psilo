@@ -19,7 +19,7 @@ where
 import Control.Monad (forM_, forM, foldM, liftM2, zipWithM, mapAndUnzipM, when)
 import Control.Monad.Free
 import Control.Monad.State hiding (sequence)
-import Data.List (nub, union, intersperse)
+import Data.List (nub, union, intersperse, sort)
 import Data.Maybe (isNothing, fromMaybe, fromJust, isJust)
 import Data.Monoid
 
@@ -62,7 +62,6 @@ data Type
     | TList [Type]
     deriving (Eq)
 
-
 instance Show Type where
     show (TVar i) = "t" ++ (show i)
     show (TSym k) = k
@@ -78,7 +77,11 @@ data Scheme = Scheme [Int] Type
 data Constraint
     = EqualityConstraint Type Type
     | ImplicitConstraint Type Scheme
-    deriving (Show)
+    deriving (Show, Eq)
+
+instance Ord Constraint where
+    (EqualityConstraint _ _) <= (ImplicitConstraint _ _) = True
+    _ <= _ = False
 
 -- | The result of inferring a type is a set of constraints and a set of
 -- assumptions about the remaining type variables.
@@ -95,7 +98,7 @@ instance Monoid TypeResult where
         assumptions = mempty }
 
     mappend a b = TypeResult {
-        constraints = constraints a `mappend` constraints b,
+        constraints = sort $ constraints a `mappend` constraints b,
         assumptions = assumptions a `mappend` assumptions b }
 
 co :: Functor f => Free f t -> Cofree f ()
@@ -231,15 +234,27 @@ substitute subs v@(TVar i) = maybe v (substitute subs) $ M.lookup i subs
 substitute subs (TList ts) = TList $ map (substitute subs) ts
 substitute _ t = t
 
+instantiate :: Scheme -> TypeCheck Untyped Type
+instantiate (Scheme vars t) = do
+    nvars <- mapM (\_ -> freshVarId) vars
+    let s = M.fromList (zip vars nvars)
+    return $ substitute s t
+
 -- | Attempt a mapping from type variables to types given a list of constraints
 solveConstraints :: [Constraint] -> TypeCheck Untyped (Maybe Frame)
-solveConstraints cs = return $
-    foldl (\b a -> liftM2 mappend (solve b a) b) (Just M.empty) cs
-    where solve maybeSubs (EqualityConstraint a b) = do
-              subs <- maybeSubs
-              unify (substitute subs a) (substitute subs b) maybeSubs
+solveConstraints cs = foldM
+    (\b a -> do
+            ba <- solve b a
+            return $ liftM2 mappend ba b)
+    (Just M.empty) cs
+    where solve (Just subs) (EqualityConstraint a b) = do
+              return $ unify (substitute subs a) (substitute subs b) $ Just subs
 
-          solve maybeSubs (ImplicitConstraint a b) = maybeSubs
+          solve (Just subs) (ImplicitConstraint a b) = do
+              c <- instantiate b
+              return $ unify (substitute subs a) (substitute subs c) $ Just subs
+
+          solve Nothing _ = return Nothing
 
 -- | Simple unification for 'Type' values
 unify :: Type -> Type -> Maybe Frame -> Maybe Frame
@@ -294,7 +309,7 @@ infer attr = solveConstraints $ constraints $ snd $ extract attr
 
 test :: IO ()
 test = do
-    defns <- parse_multi "(defun id (x) x) (defun square (x) (* x x)) (def four (square 2))"
+    defns <- parse_multi "(defun id (y) y) (defun square (x) (* x x)) (def four (square 2))"
     --defns <- parse_multi "(defun wut (x) (if x 3 2))"
     putStrLn . show $ defns
     putStrLn "***"
@@ -303,6 +318,8 @@ test = do
             varId = 1 }
 
     let (defns', tyState') = runState (attribute tyState $ fmap co defns) tyState
+    forM_ defns' $ putStrLn . show
+    putStrLn "***"
     let inferred = evalState (fmap (foldl (<>) mempty) $
                    sequence $
                    fmap infer defns') tyState'
