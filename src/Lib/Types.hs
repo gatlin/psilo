@@ -105,7 +105,8 @@ data Constraint
     deriving (Show, Eq)
 
 instance Ord Constraint where
-    (EqualityConstraint _ _) <= (ExplicitConstraint _ _) = True
+    (EqualityConstraint _ _) <= (ImplicitConstraint _ _ _) = True
+    (ExplicitConstraint _ _) <= (ImplicitConstraint _ _ _) = True
     _ <= _ = False
 
 -- | The result of inferring a type is a set of constraints and a set of
@@ -113,6 +114,7 @@ instance Ord Constraint where
 data TypeResult = TypeResult
     { constraints :: [Constraint]
     , assumptions :: M.Map String [Type]
+    , monotypes :: S.Set Int
     }
 
 deriving instance Show TypeResult
@@ -120,11 +122,15 @@ deriving instance Show TypeResult
 instance Monoid TypeResult where
     mempty = TypeResult {
         constraints = mempty,
-        assumptions = mempty }
+        assumptions = mempty,
+        monotypes = S.empty
+        }
 
     mappend a b = TypeResult {
-        constraints = sort $ constraints a `mappend` constraints b,
-        assumptions = assumptions a `mappend` assumptions b }
+        constraints = constraints a `mappend` constraints b,
+        assumptions = assumptions a `mappend` assumptions b,
+        monotypes = monotypes a `S.union` monotypes b
+        }
 
 co :: Functor f => Free f t -> Cofree f ()
 co (Free f) = () :< fmap co f
@@ -195,26 +201,29 @@ generateConstraints (() :< IdC i) = do
                 return ur
     return (var, tr <> TypeResult {
                    constraints = [],
-                   assumptions = M.singleton i [var]
+                   assumptions = M.singleton i [var],
+                   monotypes = S.empty
                    })
 
 generateConstraints (() :< ClosC argSyms body) = do
     br <- memoizedTC generateConstraints body
     (vars, tr) <- foldM
-        (\(vars, TypeResult cs as) arg -> do
-                var <- freshVarId
+        (\(vars, TypeResult cs as ms) arg -> do
+                var@(TVar n) <- freshVarId
                 let cs' = maybe [] (map $ EqualityConstraint var)
                         (M.lookup arg as)
                     as' = M.delete arg as
                 return (vars <> [var], TypeResult {
                                constraints = cs' <> cs,
-                               assumptions = as'
+                               assumptions = as',
+                               monotypes = S.fromList [n]
                                }))
-        ([], TypeResult [] (assumptions (snd br)))
+        ([], TypeResult [] (assumptions (snd br)) S.empty)
         argSyms
     return (TList ([TSym "->"] <> vars <> [fst br]), TypeResult {
                    constraints = constraints (snd br) <> constraints tr,
-                   assumptions = assumptions tr
+                   assumptions = assumptions tr,
+                   monotypes = monotypes tr
                    })
 
 generateConstraints (() :< AppC op erands) = do
@@ -226,7 +235,8 @@ generateConstraints (() :< AppC op erands) = do
                 TList ([TSym "->"] ++ tys ++ [var])) ]
     return (var, (snd op') <> results' <> TypeResult {
                    constraints = cs,
-                   assumptions = mempty
+                   assumptions = mempty,
+                   monotypes = S.empty
                    })
 
 generateConstraints (() :< IfC c t e) = do
@@ -239,17 +249,23 @@ generateConstraints (() :< IfC c t e) = do
                                    EqualityConstraint var (fst tr),
                                    EqualityConstraint (fst cr) (TSym "Boolean")
                                  ],
-                   assumptions = mempty
+                   assumptions = mempty,
+                   monotypes = S.empty
                    })
 
 generateConstraints (() :< DefC sym expr) = do
     var <- freshVarId
     (t, tr) <- memoizedTC generateConstraints expr
-    let s = ftv t -- FIXME this is not the correct construction of this set
+    let m = (monotypes tr) -- FIXME this is not the correct construction of this set
     return (var, tr <> TypeResult {
-                   constraints = [ ImplicitConstraint s var t ],
-                   assumptions = mempty
+                   constraints = [ ImplicitConstraint m t var
+                                 , EqualityConstraint var t],
+                   assumptions = mempty,
+                   monotypes = S.empty
                    })
+
+isTVar (TVar _) = True
+isTVar _ = False
 
 instantiate :: Scheme -> TypeCheck Untyped Type
 instantiate (Scheme vars t) = do
@@ -338,9 +354,10 @@ mul_type = TList [ TSym "->", int_type, int_type, int_type ]
 mul_res = TypeResult [ ExplicitConstraint (TVar 0) $
                        Scheme [0] (TList [ TSym "Num", TVar 0 ] ) ]
           mempty
+          mempty
 
 infer :: Attributed -> TypeCheck Untyped (Maybe Frame)
-infer attr = solveConstraints $ constraints $ snd $ extract attr
+infer attr = solveConstraints $ sort $ constraints $ snd $ extract attr
 
 test :: IO ()
 test = do
