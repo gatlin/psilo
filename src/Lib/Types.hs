@@ -3,8 +3,8 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
-
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Lib.Types
 where
@@ -27,6 +27,7 @@ import Control.Comonad
 import Control.Comonad.Cofree
 import Data.Foldable (Foldable, fold)
 import qualified Data.Map.Lazy as M
+import qualified Data.Set as S
 
 import Lib.Syntax
 import Lib.Parser (parse_expr, parse_multi)
@@ -71,16 +72,40 @@ instance Show Type where
 data Scheme = Scheme [Int] Type
     deriving (Eq, Show)
 
+type Frame = M.Map Int Type
+
+-- | An expression which may contain free type variables
+class Typing t where
+    ftv :: t -> S.Set Int
+    substitute :: Frame -> t -> t
+
+instance Typing Type where
+    ftv (TVar n) = S.singleton n
+    ftv (TSym _) = S.empty
+    ftv (TList ts) = foldl S.union S.empty $ map ftv ts
+
+    -- | Get the concrete 'Type' value for any non-constants from a mapping
+    substitute subs v@(TVar i) = maybe v (substitute subs) $ M.lookup i subs
+    substitute subs (TList ts) = TList $ map (substitute subs) ts
+    substitute _ t = t
+
+instance Typing Scheme where
+    ftv (Scheme vars t) = (ftv t) `S.difference` (S.fromList vars)
+
+    substitute frame (Scheme vars t) = Scheme vars $
+        substitute (foldr M.delete frame vars) t
+
 -- * Type inference
 
 -- | TODO there are more kinds of constraint than just this
 data Constraint
     = EqualityConstraint Type Type
-    | ImplicitConstraint Type Scheme
+    | ExplicitConstraint Type Scheme
+    | ImplicitConstraint (S.Set Int) Type Type
     deriving (Show, Eq)
 
 instance Ord Constraint where
-    (EqualityConstraint _ _) <= (ImplicitConstraint _ _) = True
+    (EqualityConstraint _ _) <= (ExplicitConstraint _ _) = True
     _ <= _ = False
 
 -- | The result of inferring a type is a set of constraints and a set of
@@ -149,7 +174,6 @@ attribute
     -> TypeCheck Untyped [Attributed]
 attribute ts cs = forM cs $ \c ->
     sequence $ extend (memoizedTC generateConstraints) c
-
 
 -- | Generate the constraints for the type inference algorithm
 generateConstraints :: Untyped -> TypeCheck Untyped (Type, TypeResult)
@@ -221,18 +245,11 @@ generateConstraints (() :< IfC c t e) = do
 generateConstraints (() :< DefC sym expr) = do
     var <- freshVarId
     (t, tr) <- memoizedTC generateConstraints expr
+    let s = ftv t -- FIXME this is not the correct construction of this set
     return (var, tr <> TypeResult {
-                   constraints = [ EqualityConstraint var t ],
+                   constraints = [ ImplicitConstraint s var t ],
                    assumptions = mempty
                    })
-
-type Frame = M.Map Int Type
-
--- | Get the concrete 'Type' value for any non-constants from a mapping
-substitute :: Frame -> Type -> Type
-substitute subs v@(TVar i) = maybe v (substitute subs) $ M.lookup i subs
-substitute subs (TList ts) = TList $ map (substitute subs) ts
-substitute _ t = t
 
 instantiate :: Scheme -> TypeCheck Untyped Type
 instantiate (Scheme vars t) = do
@@ -240,21 +257,39 @@ instantiate (Scheme vars t) = do
     let s = M.fromList (zip vars nvars)
     return $ substitute s t
 
+generalize :: S.Set Int -> Type -> Scheme
+generalize vars t = Scheme vars' t
+    where vars' = S.toList $ (ftv t) `S.difference` vars
+
+activeVars :: Constraint -> S.Set Int
+activeVars (EqualityConstraint t1 t2) = (ftv t1) `S.union` (ftv t2)
+activeVars (ExplicitConstraint t s) = (ftv t) `S.union` (ftv s)
+activeVars (ImplicitConstraint m t1 t2) = (ftv t1) `S.union` (m `S.intersection` (ftv t2))
+
 -- | Attempt a mapping from type variables to types given a list of constraints
+
 solveConstraints :: [Constraint] -> TypeCheck Untyped (Maybe Frame)
-solveConstraints cs = foldM
-    (\b a -> do
-            ba <- solve b a
-            return $ liftM2 mappend ba b)
-    (Just M.empty) cs
-    where solve (Just subs) (EqualityConstraint a b) = do
-              return $ unify (substitute subs a) (substitute subs b) $ Just subs
+solveConstraints cs = go (Just mempty) cs where
+    go result [] = return result
+    go Nothing _ = return Nothing
+    go (Just subs) ((EqualityConstraint a b) : cs) = do
+        let subs' = unify (substitute subs a) (substitute subs b) $ Just subs
+        go subs' cs
 
-          solve (Just subs) (ImplicitConstraint a b) = do
-              c <- instantiate b
-              return $ unify (substitute subs a) (substitute subs c) $ Just subs
+    go (Just subs) ((ExplicitConstraint a b) : cs) = do
+        c <- instantiate b
+        let subs' = unify (substitute subs a) (substitute subs c) $ Just subs
+        go subs' cs
 
-          solve Nothing _ = return Nothing
+    go (Just subs) ((ImplicitConstraint vars a b) : cs) = do
+        let avs = foldl S.union S.empty $ map activeVars cs
+        if (((ftv b) `S.difference` vars) `S.intersection` avs) == S.empty
+           then do
+             c <- instantiate $ generalize vars b
+             let subs' = unify (substitute subs a) (substitute subs c) $
+                         Just subs
+             go subs' cs
+           else return $ Just subs
 
 -- | Simple unification for 'Type' values
 unify :: Type -> Type -> Maybe Frame -> Maybe Frame
@@ -300,7 +335,7 @@ occurs_check var@(TVar x) val frame = go (substitute frame val) where
 int_type = TVar 0
 float_type = TSym "Float"
 mul_type = TList [ TSym "->", int_type, int_type, int_type ]
-mul_res = TypeResult [ ImplicitConstraint (TVar 0) $
+mul_res = TypeResult [ ExplicitConstraint (TVar 0) $
                        Scheme [0] (TList [ TSym "Num", TVar 0 ] ) ]
           mempty
 
@@ -309,18 +344,20 @@ infer attr = solveConstraints $ constraints $ snd $ extract attr
 
 test :: IO ()
 test = do
-    defns <- parse_multi "(defun id (y) y) (defun square (x) (* x x)) (def four (square 2))"
+    defns <- parse_multi "(defun square (x) (* x x)) (def four (square 2))"
     --defns <- parse_multi "(defun wut (x) (if x 3 2))"
     putStrLn . show $ defns
     putStrLn "***"
     let tyState = defaultTypeState {
             builtins = M.fromList [("*", (mul_type, mul_res))],
+            definitions = M.fromList (
+                fmap (\(Free (DefC sym expr)) -> (sym, co expr)) defns),
             varId = 1 }
 
     let (defns', tyState') = runState (attribute tyState $ fmap co defns) tyState
     forM_ defns' $ putStrLn . show
     putStrLn "***"
-    let inferred = evalState (fmap (foldl (<>) mempty) $
+    let (inferred, ts) = runState (fmap (foldl (<>) mempty) $
                    sequence $
                    fmap infer defns') tyState'
     forM_ inferred $ putStrLn . show
@@ -329,3 +366,7 @@ test = do
         putStrLn . show $ fmap
             (\subs -> fmap (substitute subs . fst) d)
             inferred
+    putStrLn "***"
+    putStrLn . show . memo $ ts
+    putStrLn "***"
+    putStrLn . show . builtins $ ts
