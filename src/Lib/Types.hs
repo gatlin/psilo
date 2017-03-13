@@ -13,6 +13,9 @@ where
 -- Inspiration for this code came from
 --   https://brianmckenna.org/blog/type_annotation_cofree
 --
+-- I also liberally plagiarized this page:
+--   http://dev.stephendiehl.com/fun/006_hindley_milner.html#generalization-and-instantiation
+--
 -- It has been modified for a slightly different type and more flexible type
 -- grammar.
 
@@ -116,7 +119,7 @@ instance Typing a => Typing [a] where
 data Constraint
     = Type := Type -- ^ equality constraint
     | Type :~ Scheme -- ^ instance constraint
-    deriving (Show, Eq)
+    deriving (Show, Eq, Ord)
 
 data TypeResult = TypeResult
     { constraints :: [ Constraint ]
@@ -187,24 +190,6 @@ memoizedTC f c = gets memo >>= maybe memoize return . M.lookup c where
         modify $ \s -> s { memo = M.insert c r $ memo s }
         return r
 
--- | A program expression that is attributed with types.
-type Attributed = Cofree CoreAst (Type, TypeResult)
-
--- | Convert a list of 'Untyped' expressions to 'Attributed' expressions.
-attribute
-    :: [Untyped]
-    -> TypeCheck [Attributed]
-attribute cs = forM cs $ sequence . extend (memoizedTC generateConstraints)
-
-lookupType :: Symbol -> TypeCheck Type
-lookupType sym = do
-    (TypeEnv te) <- gets typeEnv
-    case M.lookup sym te of
-        Nothing -> freshVarId
-        Just s -> do
-            t <- instantiate s
-            return t
-
 -- | Generate type constraints based on Damas-Hindley-Milner type rules to be
 -- solved later.
 generateConstraints :: Untyped -> TypeCheck (Type, TypeResult)
@@ -214,8 +199,15 @@ generateConstraints (() :< DoubleC _) = return (TSym "Float", mempty)
 generateConstraints (() :< BoolC _) = return (TSym "Boolean", mempty)
 
 generateConstraints (() :< IdC sym) = do
-    var <- lookupType sym
-    return (var, TypeResult [] (M.singleton sym [var]))
+    (TypeEnv te) <- gets typeEnv
+    var <- freshVarId
+    case M.lookup sym te of
+        Nothing -> return (var, TypeResult [] (M.singleton sym [var]))
+        Just sc -> do
+            return (var, TypeResult {
+                           constraints = [ var :~ sc ],
+                           assumptions = M.singleton sym [var]
+                           })
 
 generateConstraints (() :< ClosC argSyms body) = do
     br <- memoizedTC generateConstraints body
@@ -239,10 +231,10 @@ generateConstraints (() :< ClosC argSyms body) = do
 generateConstraints (() :< AppC op erands) = do
     var <- freshVarId
     op' <- memoizedTC generateConstraints op
-    (tys, results) <- mapAndUnzipM (memoizedTC generateConstraints) erands
-    let results' = foldl (<>) mempty results
-    let cs = [ ( (fst op') := (lambdaType (tys <> [var]))) ]
-    return (var, snd op' <> results' <> TypeResult {
+    (tys, erands') <- mapAndUnzipM (memoizedTC generateConstraints) erands
+    let results = foldl (<>) mempty erands'
+    let cs = [ (fst op') := (lambdaType (tys <> [var])) ]
+    return (var, snd op' <> results <> TypeResult {
                    constraints = cs,
                    assumptions = mempty
                    })
@@ -342,19 +334,19 @@ occurs_check var@(TVar x) val frame = go (substitute frame val)
 
 -- | The set of constraints is unified one by one until failure or a 'Frame' has
 -- been constructed.
-solveConstraints :: [Constraint] -> Maybe Frame
+solveConstraints :: [Constraint] -> TypeCheck (Maybe Frame)
 solveConstraints cs = go (Just mempty) cs where
-    go result [] = result
-    go Nothing _ = Nothing
+    go result [] = return result
+    go Nothing _ = return Nothing
 
     go f@(Just frame) ((a := b) : cs) = do
         let fr = unify (substitute frame a) (substitute frame b) $ Just frame
         go (fr <> f) cs
 
-{-
-infer :: Attributed -> TypeCheck (Maybe Frame)
-infer = solveConstraints . constraints . snd . extract
--}
+    go f@(Just frame) ((a :~ b) : cs) = do
+        b' <- instantiate (substitute frame b)
+        let fr = unify (substitute frame a) (substitute frame b') $ Just frame
+        go (fr <> f) cs
 
 inferTop :: TypeEnv -> [(Symbol, CoreExpr ())] -> IO (Maybe TypeEnv)
 inferTop te [] = return $ Just te
@@ -372,27 +364,29 @@ inferExpr te expr = do
         Just frame -> return $ Just $ closeOver $ substitute frame ty
 
 runInfer :: TypeEnv -> TypeCheck (Type, TypeResult) -> IO (Type, Maybe Frame)
-runInfer te m = evalState go (newTypeState { typeEnv = te })
+runInfer te m = evalStateT go (newTypeState { typeEnv = te })
     where go = do
               (ty, tr) <- m
-              let mFrame = solveConstraints (constraints tr)
+              let cs = constraints tr
+              liftIO . putStrLn $ "Constraints = " ++ show cs
+              mFrame <- solveConstraints cs
               case mFrame of
                   Nothing -> return (ty, Nothing)
                   Just fr -> return (ty, Just fr)
-{-
-runInfer :: TypeEnv -> TypeCheck (Type, TypeResult) -> IO (Type, [Constraint])
-runInfer te m = do
-    (ty, tr) <- evalStateT m (newTypeState { typeEnv = te })
-    return (ty, constraints tr)
--}
 
-num_type = TList [ TSym "Num", TVar 0 ]
+num_type = TSym "Int"
 mul_type = generalize mempty $ lambdaType [num_type, num_type, num_type]
-te = TypeEnv $ M.fromList [("*", mul_type)]
+add_type = generalize mempty $ lambdaType [num_type, num_type, num_type]
+te = TypeEnv $ M.fromList [("*", mul_type), ("+", add_type)]
 test :: IO ()
 test = do
---    defns <- parse_multi "(defun id (x) x)"
-    defns <- parse_multi "(defun fact (n prod) (if (= n 2) prod (fact (- n 1) (* prod n))))"
+    defns <- parse_multi $ T.concat
+        [ "(defun times-1 (x) (* 1 x))"
+        , "(def nine (square 3))"
+        , "(defun square (x) (* x x))"
+        , "(def four (square 2))"
+        , "(defun box (x) (\\ (f) (f x)))"
+        ]
     let defns' = map (\d@(Free (DefC sym expr)) -> (sym, expr)) defns
     putStrLn . show $ defns'
     putStrLn "***"
