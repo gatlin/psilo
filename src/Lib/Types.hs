@@ -366,15 +366,25 @@ inferTop te ((name, expr) : exprs) = do
 
 inferExpr :: TypeEnv -> CoreExpr () -> IO (Maybe Scheme)
 inferExpr te expr = do
-    (ty, cs) <- runInfer te (memoizedTC generateConstraints $ untyped expr)
-    case solveConstraints cs of
+    (ty, mFrame) <- runInfer te (memoizedTC generateConstraints $ untyped expr)
+    case mFrame of
         Nothing -> return Nothing
         Just frame -> return $ Just $ closeOver $ substitute frame ty
 
+runInfer :: TypeEnv -> TypeCheck (Type, TypeResult) -> IO (Type, Maybe Frame)
+runInfer te m = evalState go (newTypeState { typeEnv = te })
+    where go = do
+              (ty, tr) <- m
+              let mFrame = solveConstraints (constraints tr)
+              case mFrame of
+                  Nothing -> return (ty, Nothing)
+                  Just fr -> return (ty, Just fr)
+{-
 runInfer :: TypeEnv -> TypeCheck (Type, TypeResult) -> IO (Type, [Constraint])
 runInfer te m = do
     (ty, tr) <- evalStateT m (newTypeState { typeEnv = te })
     return (ty, constraints tr)
+-}
 
 num_type = TList [ TSym "Num", TVar 0 ]
 mul_type = generalize mempty $ lambdaType [num_type, num_type, num_type]
