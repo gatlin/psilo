@@ -106,7 +106,6 @@ instance HasKind Type where
 args |-> body = TFun $ args ++ [body]
 infix |->
 
-
 -- | A mapping from type variables to concrete types. The goal of type inference
 -- is to construct a frame for a given program that is consistent and sound.
 newtype Frame = Frame {
@@ -265,8 +264,8 @@ addInst ps p@(IsIn i _) ce
 overlap :: Pred -> Pred -> Bool
 overlap p q = defined (unify_pred p q $ Just mempty)
 
-exampleInsts :: EnvTransformer
-exampleInsts = addPreludeClasses
+initialInstances :: EnvTransformer
+initialInstances = addPreludeClasses
            <:> addInst [] (IsIn "Show" int_t)
            <:> addInst [] (IsIn "Eq" int_t)
            <:> addInst [] (IsIn "Ord" int_t)
@@ -277,6 +276,9 @@ exampleInsts = addPreludeClasses
            <:> addInst [] (IsIn "Num" float_t)
            <:> addInst [] (IsIn "Show" bool_t)
            <:> addInst [] (IsIn "Eq" bool_t)
+
+baseClassEnv :: Maybe ClassEnv
+baseClassEnv = initialInstances initialClassEnv
 
 bySuper :: ClassEnv -> Pred -> [Pred]
 bySuper ce p@(IsIn i t) =
@@ -323,6 +325,7 @@ reduce ce ps = do
     qs <- toHnfs ce ps
     return $ simplify ce qs
 
+-- * Type schemes
 
 -- | A type scheme is a polymorphic type with quantified type variables. They
 -- allow polymorphic types to instantiated in different ways depending on
@@ -335,9 +338,6 @@ instance Show Scheme where
         where vars' = intercalate " " $ map show vars
               prefix = if (length vars) > 0 then "∀ " ++ vars' ++ ". "
                                             else ""
-
-instance HasKind Scheme where
-    kind (Forall _ t) = kind t -- TODO ensure this is correct
 
 instance Typing Scheme where
     ftv (Forall vars t) = (ftv t) `S.difference` (S.fromList vars)
@@ -411,11 +411,11 @@ newTypeState = TypeState 0 mempty mempty mempty
 type TypeCheck = StateT TypeState IO
 
 -- | You get a globally unique type variable each time you call this function.
-freshVarId :: TypeCheck Type
-freshVarId = do
+freshVarId :: Kind -> TypeCheck (Qual Type)
+freshVarId k = do
     v <- gets varId
     modify $ \s -> s { varId = succ v }
-    return $ TVar (TyVar v Star)
+    return $ [] :=> (TVar (TyVar v k))
 
 -- | The actual memoization function for the 'TypeCheck' monad.
 memoizedTC
@@ -456,17 +456,17 @@ generateConstraints (() :< IdC sym) = do
                            assumptions = mempty })
         Nothing -> case M.lookup sym te of
             Just sc -> do
-                var <- freshVarId
+                (ps :=> var) <- freshVarId Star
                 return (var, TypeResult [ var :~ sc ] mempty)
             Nothing -> do
-                var <- freshVarId
+                (ps :=> var) <- freshVarId Star
                 return (var, TypeResult [] (M.singleton sym [var]))
 
 generateConstraints (() :< FunC argSyms body) = do
     br <- memoizedTC generateConstraints body
     (vars, tr) <- foldM
         (\(vars, TypeResult cs as) arg -> do
-                var@(TVar (TyVar n k)) <- freshVarId
+                (ps :=> var@(TVar (TyVar n k))) <- freshVarId Star
                 let cs' = maybe [] (map (var :=))
                           (M.lookup arg as)
                     as' = M.delete arg as
@@ -482,7 +482,7 @@ generateConstraints (() :< FunC argSyms body) = do
                    })
 
 generateConstraints (() :< AppC op erands) = do
-    var <- freshVarId
+    (ps :=> var) <- freshVarId Star
     op' <- memoizedTC generateConstraints op
     (tys, erands') <- mapAndUnzipM (memoizedTC generateConstraints) erands
     let results = foldl (<>) mempty erands'
@@ -493,7 +493,7 @@ generateConstraints (() :< AppC op erands) = do
                    })
 
 generateConstraints (() :< IfC c t e) = do
-    var <- freshVarId
+    (ps :=> var) <- freshVarId Star
     cr <- memoizedTC generateConstraints c
     tr <- memoizedTC generateConstraints t
     er <- memoizedTC generateConstraints e
@@ -505,14 +505,34 @@ generateConstraints (() :< IfC c t e) = do
                    assumptions = mempty
                    })
 
--- | Instantiating a type scheme replaces all of its type variables with new
--- unique variables. Each time a polymorphic definition is used it is
--- instantiated differently.
-instantiate :: Scheme -> TypeCheck Type
+-- | Instantiation is the process of replacing type variables with a set of new
+-- variables which allows a polymorphic value to be correctly inferred depending
+-- on context.
+class Instantiate t where
+    inst :: [Type] -> t -> t
+
+instance Instantiate Type where
+    inst is (TFun ts) = TFun $ inst is ts
+    inst is (TVar (TyVar n _)) = is !! n
+    inst [] t = t
+    inst is t = t
+
+instance Instantiate t => Instantiate [t] where
+    inst ts = map (inst ts)
+
+instance Instantiate t => Instantiate (Qual t) where
+    inst ts (ps :=> t) = inst ts ps :=> inst ts t
+
+instance Instantiate Pred where
+    inst ts (IsIn c t) = IsIn c (inst ts t)
+
+instantiate :: Scheme -> TypeCheck (Qual Type)
 instantiate (Forall vars (ps :=> t)) = do
-    nvars <- mapM (\_ -> freshVarId) vars
+    qs <- mapM (\(TyVar _ k) -> freshVarId k) vars
+    let nvars = map (\(_ :=> var) -> var) qs
     let f = Frame $ M.fromList (zip vars nvars)
-    return $ substitute f t
+    let (ps' :=> t') = inst (substitute f nvars) $ ps :=> t
+    return $ (substitute f ps' :=> substitute f t')
 
 -- | When a top level definition is inferred, its type is generalized into a
 -- type scheme so that it may be instantiated multiple times later depending on
@@ -525,7 +545,7 @@ generalize te t = Forall as ([] :=> t)
 normalize :: Scheme -> Scheme
 normalize (Forall _ (ps :=> t)) = Forall (map snd ord) (ps' :=> (normtype t))
     where
-        ord = zip (nub $ fv t) (map (\n -> TyVar n Star) [1..])
+        ord = zip (nub $ fv t) (map (\n -> TyVar n Star) [0..])
         ps' = map (\(IsIn sym (TVar t)) -> maybe
                                     (error "fuck")
                                     (\x -> (IsIn sym (TVar x)))
@@ -619,7 +639,7 @@ solveConstraints cs = go (Just mempty) cs where
         go (fr <> f) cs
 
     go f@(Just frame) ((a :~ b) : cs) = do
-        b' <- instantiate (substitute frame b)
+        (ps :=> b') <- instantiate (substitute frame b)
         let fr = unify (substitute frame a) (substitute frame b') $ Just frame
         go (fr <> f) cs
 
