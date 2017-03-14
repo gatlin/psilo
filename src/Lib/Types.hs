@@ -207,23 +207,10 @@ generateConstraints (() :< IdC sym) = do
     var <- freshVarId
     let as = M.singleton sym [var]
     case (S.member sym defns) || (M.member sym te) of
-        False -> (liftIO . putStrLn $ "FUCK YOU " ++ sym) >> return (var, TypeResult [] as)
-        True -> do
-            liftIO . putStrLn $ "YAY " ++ sym
-            return (var, TypeResult {
+        False -> return (var, TypeResult [] as)
+        True -> return (var, TypeResult {
                                constraints = [ var :~ sym ],
                                assumptions = as })
-    {-
-    (TypeEnv te) <- gets typeEnv
-    var <- freshVarId
-    case M.lookup sym te of
-        Nothing -> return (var, TypeResult [] (M.singleton sym [var]))
-        Just sc -> do
-            return (var, TypeResult {
-                           constraints = [ var :~ sc ],
-                           assumptions = M.singleton sym [var]
-                           })
--}
 
 generateConstraints (() :< ClosC argSyms body) = do
     br <- memoizedTC generateConstraints body
@@ -379,11 +366,6 @@ inferTop te exprs = (flip evalStateT) ts $ do
         return $ constraints tr
 
     let cs = concat ccs
-    liftIO . putStrLn $ "***"
-    liftIO . putStrLn . show $ cs
-    liftIO . putStrLn $ "***"
-    gets typeEnv >>= liftIO . putStrLn . show
-    liftIO . putStrLn $ "***"
     mFrame <- solveConstraints cs
     case mFrame of
         Nothing -> return Nothing
@@ -395,34 +377,6 @@ inferTop te exprs = (flip evalStateT) ts $ do
               typeEnv = te,
               definitions = S.fromList $ map fst exprs }
 
-{-
-inferTop :: TypeEnv -> [(Symbol, CoreExpr ())] -> IO (Maybe (Map Symbol Scheme))
-inferTop (TypeEnv te) [] = return $ Just te
-inferTop te ((name, expr) : exprs) = do
-    inferred <- inferExpr te expr
-    case inferred of
-        Nothing -> return Nothing
-        Just ty -> inferTop (envInsert te name ty) exprs
-
-inferExpr :: TypeEnv -> CoreExpr () -> IO (Maybe Scheme)
-inferExpr te expr = do
-    (ty, mFrame) <- runInfer te (memoizedTC generateConstraints $ untyped expr)
-    case mFrame of
-        Nothing -> return Nothing
-        Just frame -> return $ Just $ closeOver $ substitute frame ty
-
-runInfer :: TypeEnv -> TypeCheck (Type, TypeResult) -> IO (Type, Maybe Frame)
-runInfer te m = evalStateT go (newTypeState { typeEnv = te })
-    where go = do
-              (ty, tr) <- m
-              let cs = constraints tr
-              liftIO . putStrLn $ "Constraints = " ++ show cs
-              mFrame <- solveConstraints cs
-              case mFrame of
-                  Nothing -> return (ty, Nothing)
-                  Just fr -> return (ty, Just fr)
--}
-
 num_type = TSym "Int"
 mul_type = generalize mempty $ lambdaType [num_type, num_type, num_type]
 add_type = generalize mempty $ lambdaType [num_type, num_type, num_type]
@@ -431,9 +385,9 @@ test :: IO ()
 test = do
     defns <- parse_multi $ T.concat
         [ "(defun times-1 (x) (* 1 x))"
+        , "(def nine (square 3))"
         , "(defun square (y) (* y y))"
         , "(def four (square 2))"
-        , "(def nine (square 3))"
         , "(defun box (b) (\\ (f) (f b)))"
         ]
     let defns' = map (\(Free (DefC sym expr)) -> (sym, expr)) defns
