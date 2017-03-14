@@ -46,19 +46,19 @@ import qualified Data.Text as T
 data Type
     = TVar Int
     | TSym Symbol
-    | TList [Type]
+    | TFun [Type]
     deriving (Ord, Eq)
 
 instance Show Type where
     show (TVar n) = "t" ++ (show n)
     show (TSym sym) = sym
-    show (TList ts) = parens ts' where
-        parens inside = "(" ++ inside ++ ")"
+    show (TFun ts) = parens ts' where
+        parens inside = "(-> " ++ inside ++ ")"
         ts' = intercalate " " $
               map show ts
 
 (|->) :: [ Type ] -> Type -> Type
-args |-> body = TList $ (TSym "->") : args ++ [body]
+args |-> body = TFun $ args ++ [body]
 infix |->
 
 -- | A type scheme is a polymorphic type with quantified type variables. They
@@ -99,12 +99,12 @@ class Typing t where
 instance Typing Type where
     ftv (TVar n) = I.singleton n
     ftv (TSym s) = mempty
-    ftv (TList ts) = foldl (<>) mempty $ fmap ftv ts
+    ftv (TFun ts) = foldl (<>) mempty $ fmap ftv ts
 
     substitute frame v@(TVar n) = maybe v (substitute frame) $
         frameLookup frame n
 
-    substitute frame (TList ts) = TList $ map (substitute frame) ts
+    substitute frame (TFun ts) = TFun $ map (substitute frame) ts
     substitute _ t = t
 
 instance Typing Scheme where
@@ -288,7 +288,7 @@ normalize (Forall _ t) = Forall (map snd ord) (normtype t)
         ord = zip (nub $ fv t) [1..]
         fv = reverse . I.toList . ftv
 
-        normtype (TList ts) = TList $ map normtype ts
+        normtype (TFun ts) = TFun $ map normtype ts
         normtype (TSym sym) = TSym sym
         normtype (TVar n) = case Prelude.lookup n ord of
             Just x -> TVar x
@@ -308,8 +308,8 @@ unify t1 t2 (Just frame)
           go (TVar _) t2 = unify_var t1 t2 frame
           go t1 (TVar _) = unify_var t2 t1 frame
 
-          go (TList (a:as)) (TList (b:bs)) =
-              unify (TList as) (TList bs) $
+          go (TFun (a:as)) (TFun (b:bs)) =
+              unify (TFun as) (TFun bs) $
               unify (substitute frame a) (substitute frame b) $
               Just frame
 
@@ -342,8 +342,8 @@ occurs_check var@(TVar x) val frame = go (substitute frame val)
                                 Nothing -> True
                                 Just v' -> go v'
 
-          go (TList (x:xs)) = and [ go x, go (TList xs) ]
-          go (TList []) = True
+          go (TFun (x:xs)) = and [ go x, go (TFun xs) ]
+          go (TFun []) = True
 
 -- | The set of constraints is unified one by one until failure or a 'Frame' has
 -- been constructed.
