@@ -44,6 +44,9 @@ import Lib.Syntax
 import Lib.Parser (parse_expr, parse_multi)
 import qualified Data.Text as T
 
+-- * Fundamental type system building blocks
+
+-- | Kinds are like type level type signatures.
 data Kind
     = Star
     | Kind :-> Kind
@@ -53,9 +56,11 @@ instance Show Kind where
     show (Star) = "*"
     show (a :-> b) = (show a) ++ " -> " ++ (show b)
 
+-- | Things that have 'Kind' values.
 class HasKind t where
     kind :: t -> Kind
 
+-- | A type variable will have some distinguishing ID along with 'Kind'.
 data TyVar = TyVar Int Kind
     deriving (Eq, Ord)
 
@@ -65,6 +70,7 @@ instance Show TyVar where
 instance HasKind TyVar where
     kind (TyVar n k) = k
 
+-- | A type constant is a unique symbol along with an associated 'Kind'.
 data TyCon = TyCon Symbol Kind
     deriving (Eq, Ord)
 
@@ -75,7 +81,7 @@ instance HasKind TyCon where
     kind (TyCon _ k) = k
 
 -- | The type language. Perhaps this will change but for flexibility types are
--- composed of variables, constant symbols, or sequences of the two.
+-- composed of variables, constant symbols, or function arrows.
 data Type
     = TVar TyVar
     | TSym TyCon
@@ -95,24 +101,11 @@ instance HasKind Type where
     kind (TVar tv) = kind tv
     kind (TFun (t:ts)) = Star -- not that important right now but FIXME anyway
 
+-- | This function mainly exists for readability.
 (|->) :: [ Type ] -> Type -> Type
 args |-> body = TFun $ args ++ [body]
 infix |->
 
--- | A type scheme is a polymorphic type with quantified type variables. They
--- allow polymorphic types to instantiated in different ways depending on
--- context.
-data Scheme = Forall [TyVar] Type
-    deriving (Eq, Ord)
-
-instance Show Scheme where
-    show (Forall vars t) = prefix ++ (show t)
-        where vars' = intercalate " " $ map show vars
-              prefix = if (length vars) > 0 then "∀ " ++ vars' ++ ". "
-                                            else ""
-
-instance HasKind Scheme where
-    kind (Forall _ t) = kind t
 
 -- | A mapping from type variables to concrete types. The goal of type inference
 -- is to construct a frame for a given program that is consistent and sound.
@@ -154,15 +147,202 @@ instance Typing Type where
     substitute frame (TFun ts) = TFun $ map (substitute frame) ts
     substitute _ t = t
 
+instance Typing a => Typing [a] where
+    ftv = foldr (S.union . ftv) S.empty
+    substitute = map . substitute
+
+-- ** Typeclass machinery
+
+data Qual t = [Pred] :=> t
+    deriving (Eq, Ord)
+
+instance Show t => Show (Qual t) where
+    show ([] :=> t) = show t
+    show (ps :=> t) = ps' ++ " => " ++ show t
+        where ps' = intercalate " " $ map show ps
+
+instance HasKind t => HasKind (Qual t) where
+    kind (_ :=> t) = kind t
+
+data Pred = IsIn Symbol Type
+    deriving (Eq, Ord, Show)
+
+instance Typing Pred where
+    substitute frame (IsIn i t) = IsIn i (substitute frame t)
+    ftv (IsIn i t) = ftv t
+
+instance Typing t => Typing (Qual t) where
+    substitute frame (ps :=> t) = substitute frame ps :=> substitute frame t
+    ftv (ps :=> t) = ftv ps `S.union` ftv t
+
+liftUnifier
+    :: (Type -> Type -> Maybe Frame -> Maybe Frame)
+    -> Pred
+    -> Pred
+    -> Maybe Frame
+    -> Maybe Frame
+liftUnifier m (IsIn i t) (IsIn i' t') frame
+    | i == i' = m t t' frame
+    | otherwise = fail "Classes differ"
+
+unify_pred :: Pred -> Pred -> Maybe Frame -> Maybe Frame
+unify_pred = liftUnifier unify
+
+match_pred :: Pred -> Pred -> Maybe Frame -> Maybe Frame
+match_pred = liftUnifier match
+
+type Class = ([Symbol], [Inst])
+type Inst = Qual Pred
+
+data ClassEnv = ClassEnv
+    { classes :: Symbol -> Maybe Class
+    , defaults :: [Type]
+    }
+
+super :: ClassEnv -> Symbol -> [Symbol]
+super ce i = case classes ce i of
+    Just (is, its) -> is
+    Nothing -> []
+
+insts :: ClassEnv -> Symbol -> [Inst]
+insts ce i = case classes ce i of
+    Just (is, its) -> its
+    Nothing -> []
+
+defined :: Maybe a -> Bool
+defined = isJust
+
+modifyClassEnv :: ClassEnv -> Symbol -> Class -> ClassEnv
+modifyClassEnv ce i c = ce {
+    classes = \j -> if i == j then Just c else classes ce j }
+
+initialClassEnv :: ClassEnv
+initialClassEnv = ClassEnv {
+    classes = \i -> fail "class not defined",
+    defaults = [int_t, float_t] }
+
+type EnvTransformer = ClassEnv -> Maybe ClassEnv
+
+(<:>) :: EnvTransformer -> EnvTransformer -> EnvTransformer
+(f <:> g) ce = do ce' <- f ce
+                  g ce'
+infixr 5 <:>
+
+addClass :: Symbol -> [Symbol] -> EnvTransformer
+addClass i is ce
+    | defined (classes ce i) = fail "class already defined"
+    | any (not . defined . classes ce) is = fail "superclass not defined"
+    | otherwise = return (modifyClassEnv ce i (is, []))
+
+addPreludeClasses :: EnvTransformer
+addPreludeClasses = addCoreClasses <:> addNumClasses
+
+addCoreClasses :: EnvTransformer
+addCoreClasses = addClass "Eq" []
+             <:> addClass "Ord" ["Eq"]
+             <:> addClass "Show" []
+             <:> addClass "Enum" []
+
+addNumClasses :: EnvTransformer
+addNumClasses = addClass "Num" ["Eq", "Show"]
+            <:> addClass "Real" ["Num", "Ord"]
+            <:> addClass "Fractional" ["Num"]
+            <:> addClass "Integral" ["Real", "Enum"]
+            <:> addClass "Floating" ["Fractional"]
+
+addInst :: [Pred] -> Pred -> EnvTransformer
+addInst ps p@(IsIn i _) ce
+    | not (defined (classes ce i)) = fail "no class for instance"
+    | any (overlap p) qs = fail "overlapping instance"
+    | otherwise = return (modifyClassEnv ce i c)
+    where its = insts ce i
+          qs = [q | (_ :=> q) <- its ]
+          c = (super ce i, (ps :=> p) : its)
+
+overlap :: Pred -> Pred -> Bool
+overlap p q = defined (unify_pred p q $ Just mempty)
+
+exampleInsts :: EnvTransformer
+exampleInsts = addPreludeClasses
+           <:> addInst [] (IsIn "Show" int_t)
+           <:> addInst [] (IsIn "Eq" int_t)
+           <:> addInst [] (IsIn "Ord" int_t)
+           <:> addInst [] (IsIn "Num" int_t)
+           <:> addInst [] (IsIn "Show" float_t)
+           <:> addInst [] (IsIn "Eq" float_t)
+           <:> addInst [] (IsIn "Ord" float_t)
+           <:> addInst [] (IsIn "Num" float_t)
+           <:> addInst [] (IsIn "Show" bool_t)
+           <:> addInst [] (IsIn "Eq" bool_t)
+
+bySuper :: ClassEnv -> Pred -> [Pred]
+bySuper ce p@(IsIn i t) =
+    p : concat [ bySuper ce (IsIn i' t) | i' <- super ce i ]
+
+byInst :: ClassEnv -> Pred -> Maybe [Pred]
+byInst ce p@(IsIn i t) = msum [tryInst it | it <- insts ce i]
+    where tryInst (ps :=> h) = do
+              u <- match_pred h p (Just mempty)
+              return $ map (substitute u) ps
+
+entail :: ClassEnv -> [Pred] -> Pred -> Bool
+entail ce ps p = any (p `elem`) (map (bySuper ce) ps) ||
+                 case byInst ce p of
+                     Nothing -> False
+                     Just qs -> all (entail ce ps) qs
+
+inHnf :: Pred -> Bool
+inHnf (IsIn c t) = hnf t
+    where hnf (TVar v) = True
+          hnf (TSym s) = False
+          hnf (TFun ts) = all hnf $ take ((length ts)-1) ts
+
+toHnfs :: Monad m => ClassEnv -> [Pred] -> m [Pred]
+toHnfs ce ps = do
+    pss <- mapM (toHnf ce) ps
+    return (concat pss)
+
+toHnf :: Monad m => ClassEnv -> Pred -> m [Pred]
+toHnf ce p
+    | inHnf p = return [p]
+    | otherwise = case byInst ce p of
+                      Nothing -> fail "context reduction"
+                      Just ps -> toHnfs ce ps
+
+simplify :: ClassEnv -> [Pred] -> [Pred]
+simplify ce = loop []
+    where loop rs [] = rs
+          loop rs (p:ps) | entail ce (rs ++ ps) p = loop rs ps
+                         | otherwise = loop (p : rs) ps
+
+reduce :: Monad m => ClassEnv -> [Pred] -> m [Pred]
+reduce ce ps = do
+    qs <- toHnfs ce ps
+    return $ simplify ce qs
+
+
+-- | A type scheme is a polymorphic type with quantified type variables. They
+-- allow polymorphic types to instantiated in different ways depending on
+-- context.
+data Scheme = Forall [TyVar] (Qual Type)
+    deriving (Eq, Ord)
+
+instance Show Scheme where
+    show (Forall vars t) = prefix ++ (show t)
+        where vars' = intercalate " " $ map show vars
+              prefix = if (length vars) > 0 then "∀ " ++ vars' ++ ". "
+                                            else ""
+
+instance HasKind Scheme where
+    kind (Forall _ t) = kind t
+
 instance Typing Scheme where
     ftv (Forall vars t) = (ftv t) `S.difference` (S.fromList vars)
 
     substitute (Frame frame) (Forall vars t) = Forall vars $
         substitute (Frame $ foldr M.delete frame vars) t
 
-instance Typing a => Typing [a] where
-    ftv = foldr (S.union . ftv) S.empty
-    substitute = map . substitute
+-- * Constraint generation
 
 -- | If two types are constrained then there must be a valid unification for
 -- them. Inference fails unless all constraints are satisfied.
@@ -171,6 +351,9 @@ data Constraint
     | Type :~ Scheme -- ^ instance constraint
     deriving (Show, Eq, Ord)
 
+-- | At each step of inference we will have generated constraints along with
+-- assumptions about symbols we have seen. The assumptions are used when typing
+-- functions.
 data TypeResult = TypeResult
     { constraints :: [ Constraint ]
     , assumptions :: Map String [ Type ]
@@ -220,10 +403,11 @@ data TypeState = TypeState
 newTypeState :: TypeState
 newTypeState = TypeState 0 mempty mempty mempty
 
--- | A simple type checking monad.
+-- | A simple type checking monad. It doesn't need to be based on IO but is for
+-- lazy debugging purposes right now.
 type TypeCheck = StateT TypeState IO
 
--- | This function returns a fresh supply of type variables.
+-- | You get a globally unique type variable each time you call this function.
 freshVarId :: TypeCheck Type
 freshVarId = do
     v <- gets varId
@@ -243,6 +427,8 @@ memoizedTC f c@(() :< c') = gets memo >>= maybe memoize return . M.lookup c wher
             modify $ \s -> s { memo = M.insert c r $ memo s }
             return r
 
+-- | Some basic helper types, which should probably be treated a little more
+-- formally.
 int_t = TSym (TyCon "Int" Star)
 float_t = TSym (TyCon "Float" Star)
 bool_t = TSym (TyCon "Boolean" Star)
@@ -320,7 +506,7 @@ generateConstraints (() :< IfC c t e) = do
 -- unique variables. Each time a polymorphic definition is used it is
 -- instantiated differently.
 instantiate :: Scheme -> TypeCheck Type
-instantiate (Forall vars t) = do
+instantiate (Forall vars (ps :=> t)) = do
     nvars <- mapM (\_ -> freshVarId) vars
     let f = Frame $ M.fromList (zip vars nvars)
     return $ substitute f t
@@ -329,12 +515,12 @@ instantiate (Forall vars t) = do
 -- type scheme so that it may be instantiated multiple times later depending on
 -- usage.
 generalize :: TypeEnv -> Type -> Scheme
-generalize te t = Forall as t
+generalize te t = Forall as ([] :=> t)
     where as = S.toList $ ftv t `S.difference` ftv te
 
 -- | Type schemes don't need to have globally unique type variables.
 normalize :: Scheme -> Scheme
-normalize (Forall _ t) = Forall (map snd ord) (normtype t)
+normalize (Forall _ (ps :=> t)) = Forall (map snd ord) (ps :=> (normtype t))
     where
         ord = zip (nub $ fv t) (map (\n -> TyVar n Star) [1..])
         fv = reverse . S.toList . ftv
@@ -349,7 +535,7 @@ normalize (Forall _ t) = Forall (map snd ord) (normtype t)
 closeOver :: Type -> Scheme
 closeOver = normalize . generalize mempty
 
--- * Unification!
+-- * Unification and constraint solving
 
 unify :: Type -> Type -> Maybe Frame -> Maybe Frame
 unify t1 t2 (Just frame)
@@ -384,6 +570,8 @@ unify_var var@(TVar tv) val frame
 
 unify_var _ _ _ = Nothing
 
+-- | Returns true if the first type is not used to define the second
+-- type.
 occurs_check :: Type -> Type -> Frame -> Bool
 occurs_check var@(TVar x) val frame = go (substitute frame val)
     where go (TSym _) = True
@@ -395,6 +583,21 @@ occurs_check var@(TVar x) val frame = go (substitute frame val)
 
           go (TFun (x:xs)) = and [ go x, go (TFun xs) ]
           go (TFun []) = True
+
+match :: Type -> Type -> Maybe Frame -> Maybe Frame
+match _ _ Nothing = Nothing
+match (TFun (t1:ts1)) (TFun (t2:ts2)) (Just frame) = do
+    sl <- match t1 t2 (Just frame)
+    sr <- match (TFun ts1) (TFun ts2) (Just frame)
+    return $ sl <> sr
+
+match (TVar u) t (Just frame)
+    | kind u == kind t = return (frameInsert frame u t)
+
+match (TSym c1) (TSym c2) (Just frame)
+    | c1 == c2 = return mempty
+
+match t1 t2 (Just frame) = fail "types do not match"
 
 -- | The set of constraints is unified one by one until failure or a 'Frame' has
 -- been constructed.
@@ -421,7 +624,7 @@ inferTop te exprs = (flip evalStateT) ts $ do
 
     ccs <- forM exprs $ \(name, expr) -> do
         (ty, tr) <- memoizedTC generateConstraints expr
-        modifyTypeEnv $ \te -> envInsert te name $ Forall [] ty
+        modifyTypeEnv $ \te -> envInsert te name $ Forall [] ([] :=> ty)
         return $ constraints tr
 
     let cs = concat ccs
@@ -436,6 +639,8 @@ inferTop te exprs = (flip evalStateT) ts $ do
     where ts = newTypeState {
               typeEnv = te,
               definitions = M.fromList exprs }
+
+-- * Informal hobby-project-chic testing routines.
 
 mul_type = generalize mempty $ [int_t, int_t] |-> int_t
 add_type = generalize mempty $ [int_t, int_t] |-> int_t
