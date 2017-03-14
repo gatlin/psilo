@@ -58,7 +58,8 @@ instance Show Type where
               map show ts
 
 (|->) :: [ Type ] -> Type -> Type
-args |-> body = TList $ (TSym "->") ++ args ++ [body]
+args |-> body = TList $ (TSym "->") : args ++ [body]
+infix |->
 
 -- | A type scheme is a polymorphic type with quantified type variables. They
 -- allow polymorphic types to instantiated in different ways depending on
