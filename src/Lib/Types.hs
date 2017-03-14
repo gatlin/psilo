@@ -57,8 +57,8 @@ instance Show Type where
         ts' = intercalate " " $
               map show ts
 
-lambdaType :: [ Type ] -> Type
-lambdaType tys = TList $ (TSym "->") : tys
+(|->) :: [ Type ] -> Type -> Type
+args |-> body = TList $ (TSym "->") ++ args ++ [body]
 
 -- | A type scheme is a polymorphic type with quantified type variables. They
 -- allow polymorphic types to instantiated in different ways depending on
@@ -235,7 +235,7 @@ generateConstraints (() :< FunC argSyms body) = do
                                }))
         ([], TypeResult [] (assumptions $ snd br))
         argSyms
-    return (lambdaType (vars <> [fst br]), TypeResult {
+    return ((vars |-> (fst br)), TypeResult {
                    constraints = constraints (snd br) <> constraints tr,
                    assumptions = assumptions tr
                    })
@@ -245,7 +245,7 @@ generateConstraints (() :< AppC op erands) = do
     op' <- memoizedTC generateConstraints op
     (tys, erands') <- mapAndUnzipM (memoizedTC generateConstraints) erands
     let results = foldl (<>) mempty erands'
-    let cs = [ (fst op') := (lambdaType (tys <> [var])) ]
+    let cs = [ (fst op') := (tys |-> var) ]
     return (var, snd op' <> results <> TypeResult {
                    constraints = cs,
                    assumptions = mempty
@@ -386,8 +386,8 @@ inferTop te exprs = (flip evalStateT) ts $ do
               definitions = M.fromList exprs }
 
 num_type = TSym "Int"
-mul_type = generalize mempty $ lambdaType [num_type, num_type, num_type]
-add_type = generalize mempty $ lambdaType [num_type, num_type, num_type]
+mul_type = generalize mempty $ [num_type, num_type] |-> num_type
+add_type = generalize mempty $ [num_type, num_type] |-> num_type
 te = TypeEnv $ M.fromList [("*", mul_type), ("+", add_type)]
 test :: IO ()
 test = do
