@@ -221,7 +221,7 @@ generateConstraints (() :< IdC sym) = do
                 var <- freshVarId
                 return (var, TypeResult [] (M.singleton sym [var]))
 
-generateConstraints (() :< ClosC argSyms body) = do
+generateConstraints (() :< FunC argSyms body) = do
     br <- memoizedTC generateConstraints body
     (vars, tr) <- foldM
         (\(vars, TypeResult cs as) arg -> do
@@ -407,4 +407,5 @@ test = do
     case results of
         Nothing -> putStrLn "Typecheck failed!"
         Just (TypeEnv te) -> do
-            forM_ (M.toList te) $ putStrLn . show
+            forM_ (M.toList te) $ \(name, ty) ->
+                putStrLn $ name ++ " : " ++ (show ty)

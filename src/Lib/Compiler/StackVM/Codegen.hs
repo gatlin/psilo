@@ -114,7 +114,7 @@ codegen expr = go (tailRec expr) where
             Nothing -> error $ "Cannot make tail-recursive call"
             Just tld -> return $ operands' ++ [ Jump tld ]
 
-    go (Free (ClosC args body)) = do
+    go (Free (FunC args body)) = do
         let numbered_args = zip args [0..]
         body' <- local (store_args numbered_args) $ do
             b <- go body

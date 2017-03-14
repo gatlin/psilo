@@ -40,7 +40,7 @@ data CoreAst a
 --    | StringC { stringC :: Text }
     | IdC { idC :: Symbol }
     | AppC { appFun :: a, appArgs :: [a] }
-    | ClosC { closCArgs :: [Symbol], closCBody :: a }
+    | FunC { funCArgs :: [Symbol], funCBody :: a }
     | IfC { ifCond :: a, ifThen :: a, ifElse :: a }
     | DefC { defSym :: Symbol, defValue :: a }
     | TailRecC { tailRecArgs :: [a] }
@@ -68,8 +68,8 @@ aId s = liftF $ IdC s
 aApp :: (MonadFree CoreAst m) => a -> [a] -> m a
 aApp f a = liftF $ AppC f a
 
-aClos :: (MonadFree CoreAst m) => [Symbol] -> a -> m a
-aClos a b = liftF $ ClosC a b
+aFun :: (MonadFree CoreAst m) => [Symbol] -> a -> m a
+aFun a b = liftF $ FunC a b
 
 aIf :: (MonadFree CoreAst m) => a -> a -> a -> m a
 aIf c t e = liftF $ IfC c t e

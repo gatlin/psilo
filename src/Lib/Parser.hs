@@ -67,8 +67,8 @@ app_parser = do
 lam_parser :: Parser Text
 lam_parser =  (string "\\")
 
-clos_parser :: Parser (CoreExpr a)
-clos_parser = do
+fun_parser :: Parser (CoreExpr a)
+fun_parser = do
     char '\\'
     skipSpace
     char '('
@@ -78,7 +78,7 @@ clos_parser = do
     char ')'
     skipSpace
     body <- expr_parser
-    return . join $ aClos args body
+    return . join $ aFun args body
 
 if_parser :: Parser (CoreExpr a)
 if_parser = do
@@ -112,7 +112,7 @@ defun_parser = do
     char ')'
     skipSpace
     body <- expr_parser
-    return . join $ aDef name (join $ aClos args body)
+    return . join $ aDef name (join $ aFun args body)
 
 parens :: Parser a -> Parser a
 parens p = do
@@ -124,7 +124,7 @@ parens p = do
     return thing
 
 expr_parser :: Parser (CoreExpr a)
-expr_parser = (parens clos_parser)
+expr_parser = (parens fun_parser)
           <|> (parens if_parser)
           <|> bool_parser
           <|> id_parser

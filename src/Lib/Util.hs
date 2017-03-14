@@ -17,7 +17,7 @@ tailRec :: CoreExpr () -> CoreExpr ()
 tailRec (Free (DefC sym val)) = Free (DefC sym (go sym val)) where
     go :: Symbol -> CoreExpr () -> CoreExpr ()
 
-    go sym expr@(Free (ClosC args body)) = Free (ClosC args (go' sym body))
+    go sym expr@(Free (FunC args body)) = Free (FunC args (go' sym body))
     go _ other = other
 
     go' sym expr@(Free (IfC c t e)) = Free (IfC c (go' sym t) (go' sym e))
@@ -54,7 +54,7 @@ free_variables expr tlds = (flip runReader) tlds $ go expr S.empty where
             go arg fvs
         let arg_freeVars = foldl S.union S.empty args'
         return $ S.union fun_freeVars arg_freeVars
-    go (Free (ClosC args body)) fvs =
+    go (Free (FunC args body)) fvs =
         local (\boundVars ->
                    foldl (\bvs arg -> S.insert arg bvs) boundVars args) $
           go body fvs
