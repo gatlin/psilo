@@ -158,14 +158,17 @@ data Qual t = [Pred] :=> t
 
 instance Show t => Show (Qual t) where
     show ([] :=> t) = show t
-    show (ps :=> t) = ps' ++ " => " ++ show t
-        where ps' = intercalate " " $ map show ps
+    show (ps :=> t) = "(" ++ ps' ++ ")" ++ " => " ++ show t
+        where ps' = intercalate ", " $ map show ps
 
 instance HasKind t => HasKind (Qual t) where
     kind (_ :=> t) = kind t
 
 data Pred = IsIn Symbol Type
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Ord)
+
+instance Show Pred where
+    show (IsIn c t) = c ++ " " ++ (show t)
 
 instance Typing Pred where
     substitute frame (IsIn i t) = IsIn i (substitute frame t)
@@ -334,7 +337,7 @@ instance Show Scheme where
                                             else ""
 
 instance HasKind Scheme where
-    kind (Forall _ t) = kind t
+    kind (Forall _ t) = kind t -- TODO ensure this is correct
 
 instance Typing Scheme where
     ftv (Forall vars t) = (ftv t) `S.difference` (S.fromList vars)
@@ -520,9 +523,14 @@ generalize te t = Forall as ([] :=> t)
 
 -- | Type schemes don't need to have globally unique type variables.
 normalize :: Scheme -> Scheme
-normalize (Forall _ (ps :=> t)) = Forall (map snd ord) (ps :=> (normtype t))
+normalize (Forall _ (ps :=> t)) = Forall (map snd ord) (ps' :=> (normtype t))
     where
         ord = zip (nub $ fv t) (map (\n -> TyVar n Star) [1..])
+        ps' = map (\(IsIn sym (TVar t)) -> maybe
+                                    (error "fuck")
+                                    (\x -> (IsIn sym (TVar x)))
+                                    (Prelude.lookup t ord))
+              ps
         fv = reverse . S.toList . ftv
 
         normtype (TFun ts) = TFun $ map normtype ts
@@ -641,24 +649,23 @@ inferTop te exprs = (flip evalStateT) ts $ do
               definitions = M.fromList exprs }
 
 -- * Informal hobby-project-chic testing routines.
-
-mul_type = generalize mempty $ [int_t, int_t] |-> int_t
-add_type = generalize mempty $ [int_t, int_t] |-> int_t
+num_pred = (IsIn "Num" (TVar (TyVar 0 Star)))
+num_type = TVar (TyVar 0 Star)
+mul_type = Forall [TyVar 0 Star] ([num_pred] :=> ([num_type, num_type] |-> num_type))
+add_type = mul_type
 te = TypeEnv $ M.fromList [("*", mul_type), ("+", add_type)]
 test :: IO ()
 test = do
     defns <- parse_multi $ T.concat
         [ "(defun times-1 (x) (* 1 x))"
-        , "(def nine (square 3))"
+--        , "(def nine (square 3))"
         , "(defun id (z) z)"
         , "(defun square (y) (* y y))"
-        , "(def four (id (square 2)))"
+--        , "(def four (id (square 2)))"
         , "(defun box (b) (\\ (f) (id (f b))))" -- sanity check
         , "(defun pair (x y) (\\ (f) (f x y)))"
         ]
     let defns' = map (\(Free (DefC sym expr)) -> (sym, untyped expr)) defns
-    putStrLn . show $ defns'
-    putStrLn "***"
     results <- inferTop te defns'
     case results of
         Nothing -> putStrLn "Typecheck failed!"
