@@ -16,6 +16,9 @@ where
 -- I also liberally plagiarized this page:
 --   http://dev.stephendiehl.com/fun/006_hindley_milner.html#generalization-and-instantiation
 --
+-- Finally, the paper "Typing Haskell in Haskell" was plagiarized once I
+-- realized it's where the others were plagiarizing from.
+--
 -- It has been modified for a slightly different type and more flexible type
 -- grammar.
 
@@ -41,21 +44,56 @@ import Lib.Syntax
 import Lib.Parser (parse_expr, parse_multi)
 import qualified Data.Text as T
 
+data Kind
+    = Star
+    | Kind :-> Kind
+    deriving (Eq, Ord)
+
+instance Show Kind where
+    show (Star) = "*"
+    show (a :-> b) = (show a) ++ " -> " ++ (show b)
+
+class HasKind t where
+    kind :: t -> Kind
+
+data TyVar = TyVar Int Kind
+    deriving (Eq, Ord)
+
+instance Show TyVar where
+    show (TyVar n k) = "t"++(show n)
+
+instance HasKind TyVar where
+    kind (TyVar n k) = k
+
+data TyCon = TyCon Symbol Kind
+    deriving (Eq, Ord)
+
+instance Show TyCon where
+    show (TyCon sym k) = sym
+
+instance HasKind TyCon where
+    kind (TyCon _ k) = k
+
 -- | The type language. Perhaps this will change but for flexibility types are
 -- composed of variables, constant symbols, or sequences of the two.
 data Type
-    = TVar Int
-    | TSym Symbol
+    = TVar TyVar
+    | TSym TyCon
     | TFun [Type]
     deriving (Ord, Eq)
 
 instance Show Type where
-    show (TVar n) = "t" ++ (show n)
-    show (TSym sym) = sym
+    show (TVar n) = show n
+    show (TSym sym) = show sym
     show (TFun ts) = parens ts' where
-        parens inside = "(-> " ++ inside ++ ")"
-        ts' = intercalate " " $
+        parens inside = "(" ++ inside ++ ")"
+        ts' = intercalate " -> " $
               map show ts
+
+instance HasKind Type where
+    kind (TSym tc) = kind tc
+    kind (TVar tv) = kind tv
+    kind (TFun (t:ts)) = Star -- not that important right now but FIXME anyway
 
 (|->) :: [ Type ] -> Type -> Type
 args |-> body = TFun $ args ++ [body]
@@ -64,13 +102,22 @@ infix |->
 -- | A type scheme is a polymorphic type with quantified type variables. They
 -- allow polymorphic types to instantiated in different ways depending on
 -- context.
-data Scheme = Forall [Int] Type
-    deriving (Eq, Ord, Show)
+data Scheme = Forall [TyVar] Type
+    deriving (Eq, Ord)
+
+instance Show Scheme where
+    show (Forall vars t) = prefix ++ (show t)
+        where vars' = intercalate " " $ map show vars
+              prefix = if (length vars) > 0 then "∀ " ++ vars' ++ ". "
+                                            else ""
+
+instance HasKind Scheme where
+    kind (Forall _ t) = kind t
 
 -- | A mapping from type variables to concrete types. The goal of type inference
 -- is to construct a frame for a given program that is consistent and sound.
 newtype Frame = Frame {
-    bindings :: Map Int Type
+    bindings :: Map TyVar Type
     } deriving (Eq, Show)
 
 instance Monoid Frame where
@@ -78,26 +125,26 @@ instance Monoid Frame where
     (Frame f1) `mappend` (Frame f2) = Frame $
         M.map (substitute (Frame f1)) f2 `M.union` f1
 
-frameLookup :: Frame -> Int -> Maybe Type
+frameLookup :: Frame -> TyVar -> Maybe Type
 frameLookup (Frame frame) i = M.lookup i frame
 
-frameInsert :: Frame -> Int -> Type -> Frame
+frameInsert :: Frame -> TyVar -> Type -> Frame
 frameInsert (Frame frame) i ty = Frame $ M.insert i ty frame
 
-frameDelete :: Frame -> Int -> Frame
+frameDelete :: Frame -> TyVar -> Frame
 frameDelete (Frame frame) i = Frame $ M.delete i frame
 
 -- | A class for things which may contain type variables or be substituted for
 -- types given a 'Frame'.
 class Typing t where
     -- | free type variables
-    ftv :: t -> IntSet
+    ftv :: t -> Set TyVar
 
     -- | perform a substitution
     substitute :: Frame -> t -> t
 
 instance Typing Type where
-    ftv (TVar n) = I.singleton n
+    ftv (TVar n) = S.singleton n
     ftv (TSym s) = mempty
     ftv (TFun ts) = foldl (<>) mempty $ fmap ftv ts
 
@@ -108,13 +155,13 @@ instance Typing Type where
     substitute _ t = t
 
 instance Typing Scheme where
-    ftv (Forall vars t) = (ftv t) `I.difference` (I.fromList vars)
+    ftv (Forall vars t) = (ftv t) `S.difference` (S.fromList vars)
 
     substitute (Frame frame) (Forall vars t) = Forall vars $
         substitute (Frame $ foldr M.delete frame vars) t
 
 instance Typing a => Typing [a] where
-    ftv = foldr (I.union . ftv) I.empty
+    ftv = foldr (S.union . ftv) S.empty
     substitute = map . substitute
 
 -- | If two types are constrained then there must be a valid unification for
@@ -181,7 +228,7 @@ freshVarId :: TypeCheck Type
 freshVarId = do
     v <- gets varId
     modify $ \s -> s { varId = succ v }
-    return $ TVar v
+    return $ TVar (TyVar v Star)
 
 -- | The actual memoization function for the 'TypeCheck' monad.
 memoizedTC
@@ -196,13 +243,17 @@ memoizedTC f c@(() :< c') = gets memo >>= maybe memoize return . M.lookup c wher
             modify $ \s -> s { memo = M.insert c r $ memo s }
             return r
 
+int_t = TSym (TyCon "Int" Star)
+float_t = TSym (TyCon "Float" Star)
+bool_t = TSym (TyCon "Boolean" Star)
+
 -- | Generate type constraints based on Damas-Hindley-Milner type rules to be
 -- solved later.
 generateConstraints :: Untyped -> TypeCheck (Type, TypeResult)
 
-generateConstraints (() :< IntC _) = return (TSym "Int", mempty)
-generateConstraints (() :< DoubleC _) = return (TSym "Float", mempty)
-generateConstraints (() :< BoolC _) = return (TSym "Boolean", mempty)
+generateConstraints (() :< IntC _) = return (int_t, mempty)
+generateConstraints (() :< DoubleC _) = return (float_t, mempty)
+generateConstraints (() :< BoolC _) = return (bool_t, mempty)
 
 generateConstraints (() :< IdC sym) = do
     defns <- gets definitions
@@ -226,7 +277,7 @@ generateConstraints (() :< FunC argSyms body) = do
     br <- memoizedTC generateConstraints body
     (vars, tr) <- foldM
         (\(vars, TypeResult cs as) arg -> do
-                var@(TVar n) <- freshVarId
+                var@(TVar (TyVar n k)) <- freshVarId
                 let cs' = maybe [] (map (var :=))
                           (M.lookup arg as)
                     as' = M.delete arg as
@@ -260,7 +311,7 @@ generateConstraints (() :< IfC c t e) = do
     return (var, snd cr <> snd tr <> snd er <> TypeResult {
                    constraints = [ (fst tr) := (fst er)
                                  , var := (fst tr)
-                                 , (fst cr) := (TSym "Boolean")
+                                 , (fst cr) := bool_t
                                  ],
                    assumptions = mempty
                    })
@@ -279,18 +330,18 @@ instantiate (Forall vars t) = do
 -- usage.
 generalize :: TypeEnv -> Type -> Scheme
 generalize te t = Forall as t
-    where as = I.toList $ ftv t `I.difference` ftv te
+    where as = S.toList $ ftv t `S.difference` ftv te
 
 -- | Type schemes don't need to have globally unique type variables.
 normalize :: Scheme -> Scheme
 normalize (Forall _ t) = Forall (map snd ord) (normtype t)
     where
-        ord = zip (nub $ fv t) [1..]
-        fv = reverse . I.toList . ftv
+        ord = zip (nub $ fv t) (map (\n -> TyVar n Star) [1..])
+        fv = reverse . S.toList . ftv
 
         normtype (TFun ts) = TFun $ map normtype ts
         normtype (TSym sym) = TSym sym
-        normtype (TVar n) = case Prelude.lookup n ord of
+        normtype (TVar tv) = case Prelude.lookup tv ord of
             Just x -> TVar x
             Nothing -> error "type variable not in signature"
 
@@ -322,11 +373,11 @@ unify t1 t2 (Just frame)
 unify _ _ Nothing = Nothing
 
 unify_var :: Type -> Type -> Frame -> Maybe Frame
-unify_var var@(TVar n) val frame
+unify_var var@(TVar tv) val frame
     | var == val = Just frame
-    | otherwise = case frameLookup frame n of
+    | otherwise = case frameLookup frame tv of
                       Nothing -> if occurs_check var val frame
-                                    then Just $ frameInsert frame n val
+                                    then Just $ frameInsert frame tv val
                                     else Nothing
 
                       Just val' -> unify val' val $ Just frame
@@ -386,9 +437,8 @@ inferTop te exprs = (flip evalStateT) ts $ do
               typeEnv = te,
               definitions = M.fromList exprs }
 
-num_type = TSym "Int"
-mul_type = generalize mempty $ [num_type, num_type] |-> num_type
-add_type = generalize mempty $ [num_type, num_type] |-> num_type
+mul_type = generalize mempty $ [int_t, int_t] |-> int_t
+add_type = generalize mempty $ [int_t, int_t] |-> int_t
 te = TypeEnv $ M.fromList [("*", mul_type), ("+", add_type)]
 test :: IO ()
 test = do
