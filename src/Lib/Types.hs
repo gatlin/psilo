@@ -120,7 +120,7 @@ instance Typing a => Typing [a] where
 -- them. Inference fails unless all constraints are satisfied.
 data Constraint
     = Type := Type -- ^ equality constraint
-    | Type :~ Symbol -- ^ instance constraint
+    | Type :~ Scheme -- ^ instance constraint
     deriving (Show, Eq, Ord)
 
 data TypeResult = TypeResult
@@ -166,7 +166,7 @@ data TypeState = TypeState
     { varId :: Int
     , memo :: Map Untyped (Type, TypeResult)
     , typeEnv :: TypeEnv
-    , definitions :: Set Symbol
+    , definitions :: Map Symbol Untyped
     }
 
 newTypeState :: TypeState
@@ -187,11 +187,13 @@ memoizedTC
     :: (Untyped -> TypeCheck (Type, TypeResult))
     -> Untyped
     -> TypeCheck (Type, TypeResult)
-memoizedTC f c = gets memo >>= maybe memoize return . M.lookup c where
-    memoize = do
-        r <- f c
-        modify $ \s -> s { memo = M.insert c r $ memo s }
-        return r
+memoizedTC f c@(() :< c') = gets memo >>= maybe memoize return . M.lookup c where
+    memoize = case c' of
+        IdC _ -> f c
+        _ -> do
+            r <- f c
+            modify $ \s -> s { memo = M.insert c r $ memo s }
+            return r
 
 -- | Generate type constraints based on Damas-Hindley-Milner type rules to be
 -- solved later.
@@ -204,13 +206,20 @@ generateConstraints (() :< BoolC _) = return (TSym "Boolean", mempty)
 generateConstraints (() :< IdC sym) = do
     defns <- gets definitions
     (TypeEnv te) <- gets typeEnv
-    var <- freshVarId
-    let as = M.singleton sym [var]
-    case (S.member sym defns) || (M.member sym te) of
-        False -> return (var, TypeResult [] as)
-        True -> return (var, TypeResult {
-                               constraints = [ var :~ sym ],
-                               assumptions = as })
+    case M.lookup sym defns of
+        Just u -> do
+            (ty, tr) <- generateConstraints u
+            let sc = closeOver ty
+            return (ty, tr <> TypeResult {
+                           constraints = [ ty :~ sc ],
+                           assumptions = mempty })
+        Nothing -> case M.lookup sym te of
+            Just sc -> do
+                var <- freshVarId
+                return (var, TypeResult [ var :~ sc ] mempty)
+            Nothing -> do
+                var <- freshVarId
+                return (var, TypeResult [] (M.singleton sym [var]))
 
 generateConstraints (() :< ClosC argSyms body) = do
     br <- memoizedTC generateConstraints body
@@ -346,9 +355,7 @@ solveConstraints cs = go (Just mempty) cs where
         let fr = unify (substitute frame a) (substitute frame b) $ Just frame
         go (fr <> f) cs
 
-    go f@(Just frame) ((a :~ sym) : cs) = do
-        (TypeEnv te) <- gets typeEnv >>= return . substitute frame
-        let Just b = M.lookup sym te
+    go f@(Just frame) ((a :~ b) : cs) = do
         b' <- instantiate (substitute frame b)
         let fr = unify (substitute frame a) (substitute frame b') $ Just frame
         go (fr <> f) cs
@@ -356,12 +363,12 @@ solveConstraints cs = go (Just mempty) cs where
 modifyTypeEnv :: (TypeEnv -> TypeEnv) -> TypeCheck ()
 modifyTypeEnv f = gets typeEnv >>= \te -> modify $ \st -> st { typeEnv = f te }
 
-inferTop :: TypeEnv -> [(Symbol, CoreExpr ())] -> IO (Maybe TypeEnv)
+inferTop :: TypeEnv -> [(Symbol, Untyped)] -> IO (Maybe TypeEnv)
 inferTop te [] = return $ Just te
 inferTop te exprs = (flip evalStateT) ts $ do
 
     ccs <- forM exprs $ \(name, expr) -> do
-        (ty, tr) <- memoizedTC generateConstraints $ untyped expr
+        (ty, tr) <- memoizedTC generateConstraints expr
         modifyTypeEnv $ \te -> envInsert te name $ Forall [] ty
         return $ constraints tr
 
@@ -375,7 +382,7 @@ inferTop te exprs = (flip evalStateT) ts $ do
 
     where ts = newTypeState {
               typeEnv = te,
-              definitions = S.fromList $ map fst exprs }
+              definitions = M.fromList exprs }
 
 num_type = TSym "Int"
 mul_type = generalize mempty $ lambdaType [num_type, num_type, num_type]
@@ -386,11 +393,12 @@ test = do
     defns <- parse_multi $ T.concat
         [ "(defun times-1 (x) (* 1 x))"
         , "(def nine (square 3))"
-        , "(defun square (y) (* y y))"
+        , "(defun id (z) z)"
+        , "(defun square (y) (id (* y y)))"
         , "(def four (square 2))"
         , "(defun box (b) (\\ (f) (f b)))"
         ]
-    let defns' = map (\(Free (DefC sym expr)) -> (sym, expr)) defns
+    let defns' = map (\(Free (DefC sym expr)) -> (sym, untyped expr)) defns
     putStrLn . show $ defns'
     putStrLn "***"
     results <- inferTop te defns'
