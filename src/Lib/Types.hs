@@ -34,6 +34,8 @@ import Data.Map.Lazy (Map)
 import qualified Data.Map.Lazy as M
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as I
+import Data.Set (Set)
+import qualified Data.Set as S
 
 import Lib.Syntax
 import Lib.Parser (parse_expr, parse_multi)
@@ -118,7 +120,7 @@ instance Typing a => Typing [a] where
 -- them. Inference fails unless all constraints are satisfied.
 data Constraint
     = Type := Type -- ^ equality constraint
-    | Type :~ Scheme -- ^ instance constraint
+    | Type :~ Symbol -- ^ instance constraint
     deriving (Show, Eq, Ord)
 
 data TypeResult = TypeResult
@@ -164,10 +166,11 @@ data TypeState = TypeState
     { varId :: Int
     , memo :: Map Untyped (Type, TypeResult)
     , typeEnv :: TypeEnv
+    , definitions :: Set Symbol
     }
 
 newTypeState :: TypeState
-newTypeState = TypeState 0 mempty mempty
+newTypeState = TypeState 0 mempty mempty mempty
 
 -- | A simple type checking monad.
 type TypeCheck = StateT TypeState IO
@@ -199,6 +202,18 @@ generateConstraints (() :< DoubleC _) = return (TSym "Float", mempty)
 generateConstraints (() :< BoolC _) = return (TSym "Boolean", mempty)
 
 generateConstraints (() :< IdC sym) = do
+    defns <- gets definitions
+    (TypeEnv te) <- gets typeEnv
+    var <- freshVarId
+    let as = M.singleton sym [var]
+    case (S.member sym defns) || (M.member sym te) of
+        False -> (liftIO . putStrLn $ "FUCK YOU " ++ sym) >> return (var, TypeResult [] as)
+        True -> do
+            liftIO . putStrLn $ "YAY " ++ sym
+            return (var, TypeResult {
+                               constraints = [ var :~ sym ],
+                               assumptions = as })
+    {-
     (TypeEnv te) <- gets typeEnv
     var <- freshVarId
     case M.lookup sym te of
@@ -208,6 +223,7 @@ generateConstraints (() :< IdC sym) = do
                            constraints = [ var :~ sc ],
                            assumptions = M.singleton sym [var]
                            })
+-}
 
 generateConstraints (() :< ClosC argSyms body) = do
     br <- memoizedTC generateConstraints body
@@ -343,13 +359,45 @@ solveConstraints cs = go (Just mempty) cs where
         let fr = unify (substitute frame a) (substitute frame b) $ Just frame
         go (fr <> f) cs
 
-    go f@(Just frame) ((a :~ b) : cs) = do
+    go f@(Just frame) ((a :~ sym) : cs) = do
+        (TypeEnv te) <- gets typeEnv >>= return . substitute frame
+        let Just b = M.lookup sym te
         b' <- instantiate (substitute frame b)
         let fr = unify (substitute frame a) (substitute frame b') $ Just frame
         go (fr <> f) cs
 
+modifyTypeEnv :: (TypeEnv -> TypeEnv) -> TypeCheck ()
+modifyTypeEnv f = gets typeEnv >>= \te -> modify $ \st -> st { typeEnv = f te }
+
 inferTop :: TypeEnv -> [(Symbol, CoreExpr ())] -> IO (Maybe TypeEnv)
 inferTop te [] = return $ Just te
+inferTop te exprs = (flip evalStateT) ts $ do
+
+    ccs <- forM exprs $ \(name, expr) -> do
+        (ty, tr) <- memoizedTC generateConstraints $ untyped expr
+        modifyTypeEnv $ \te -> envInsert te name $ Forall [] ty
+        return $ constraints tr
+
+    let cs = concat ccs
+    liftIO . putStrLn $ "***"
+    liftIO . putStrLn . show $ cs
+    liftIO . putStrLn $ "***"
+    gets typeEnv >>= liftIO . putStrLn . show
+    liftIO . putStrLn $ "***"
+    mFrame <- solveConstraints cs
+    case mFrame of
+        Nothing -> return Nothing
+        Just frame -> do
+            te <- gets typeEnv
+            return . Just $ substitute frame te
+
+    where ts = newTypeState {
+              typeEnv = te,
+              definitions = S.fromList $ map fst exprs }
+
+{-
+inferTop :: TypeEnv -> [(Symbol, CoreExpr ())] -> IO (Maybe (Map Symbol Scheme))
+inferTop (TypeEnv te) [] = return $ Just te
 inferTop te ((name, expr) : exprs) = do
     inferred <- inferExpr te expr
     case inferred of
@@ -373,6 +421,7 @@ runInfer te m = evalStateT go (newTypeState { typeEnv = te })
               case mFrame of
                   Nothing -> return (ty, Nothing)
                   Just fr -> return (ty, Just fr)
+-}
 
 num_type = TSym "Int"
 mul_type = generalize mempty $ lambdaType [num_type, num_type, num_type]
@@ -382,12 +431,12 @@ test :: IO ()
 test = do
     defns <- parse_multi $ T.concat
         [ "(defun times-1 (x) (* 1 x))"
-        , "(def nine (square 3))"
-        , "(defun square (x) (* x x))"
+        , "(defun square (y) (* y y))"
         , "(def four (square 2))"
-        , "(defun box (x) (\\ (f) (f x)))"
+        , "(def nine (square 3))"
+        , "(defun box (b) (\\ (f) (f b)))"
         ]
-    let defns' = map (\d@(Free (DefC sym expr)) -> (sym, expr)) defns
+    let defns' = map (\(Free (DefC sym expr)) -> (sym, expr)) defns
     putStrLn . show $ defns'
     putStrLn "***"
     results <- inferTop te defns'

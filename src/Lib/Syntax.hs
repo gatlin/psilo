@@ -9,6 +9,7 @@ module Lib.Syntax where
 import Control.Monad.Free
 import Data.Text (Text)
 import qualified Data.Text as T
+import Control.Comonad
 
 -- * TODO
 -- Different phases of compilation really need different syntax trees. For now
