@@ -377,8 +377,9 @@ inferTop te exprs = (flip evalStateT) ts $ do
     case mFrame of
         Nothing -> return Nothing
         Just frame -> do
-            te <- gets typeEnv
-            return . Just $ substitute frame te
+            (TypeEnv te) <- gets typeEnv
+            let (TypeEnv te') = substitute frame (TypeEnv te)
+            return . Just . TypeEnv . M.map normalize $ te'
 
     where ts = newTypeState {
               typeEnv = te,
@@ -394,12 +395,15 @@ test = do
         [ "(defun times-1 (x) (* 1 x))"
         , "(def nine (square 3))"
         , "(defun id (z) z)"
-        , "(defun square (y) (id (* y y)))"
-        , "(def four (square 2))"
-        , "(defun box (b) (\\ (f) (f b)))"
+        , "(defun square (y) (* y y))"
+        , "(def four (id (square 2)))"
+        , "(defun box (b) (\\ (f) (id (f b))))" -- sanity check
         ]
     let defns' = map (\(Free (DefC sym expr)) -> (sym, untyped expr)) defns
     putStrLn . show $ defns'
     putStrLn "***"
     results <- inferTop te defns'
-    putStrLn . show $ results
+    case results of
+        Nothing -> putStrLn "Typecheck failed!"
+        Just (TypeEnv te) -> do
+            forM_ (M.toList te) $ putStrLn . show
