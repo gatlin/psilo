@@ -285,7 +285,7 @@ normalize :: Scheme -> Scheme
 normalize (Forall _ t) = Forall (map snd ord) (normtype t)
     where
         ord = zip (nub $ fv t) [1..]
-        fv = I.toList . ftv
+        fv = reverse . I.toList . ftv
 
         normtype (TList ts) = TList $ map normtype ts
         normtype (TSym sym) = TSym sym
@@ -398,6 +398,7 @@ test = do
         , "(defun square (y) (* y y))"
         , "(def four (id (square 2)))"
         , "(defun box (b) (\\ (f) (id (f b))))" -- sanity check
+        , "(defun pair (x y) (\\ (f) (f x y)))"
         ]
     let defns' = map (\(Free (DefC sym expr)) -> (sym, untyped expr)) defns
     putStrLn . show $ defns'
