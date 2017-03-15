@@ -102,9 +102,10 @@ instance HasKind Type where
     kind (TFun (t:ts)) = Star -- not that important right now but FIXME anyway
 
 -- | This function mainly exists for readability.
-(|->) :: [ Type ] -> Type -> Type
-args |-> body = TFun $ args ++ [body]
-infix |->
+(|->) :: [ Qual Type ] -> Qual Type -> Qual Type
+args |-> (psb :=> body) = ps :=> (TFun $ args' ++ [body])
+    where (psa, args') = unzip $ map (\(pa :=> arg) -> (pa, arg)) args
+          ps = sort $ (concat psa) ++ psb
 
 -- | A mapping from type variables to concrete types. The goal of type inference
 -- is to construct a frame for a given program that is consistent and sound.
@@ -350,8 +351,8 @@ instance Typing Scheme where
 -- | If two types are constrained then there must be a valid unification for
 -- them. Inference fails unless all constraints are satisfied.
 data Constraint
-    = Type := Type -- ^ equality constraint
-    | Type :~ Scheme -- ^ instance constraint
+    = Qual Type := Qual Type -- ^ equality constraint
+    | Qual Type :~ Scheme -- ^ instance constraint
     deriving (Show, Eq, Ord)
 
 -- | At each step of inference we will have generated constraints along with
@@ -359,7 +360,7 @@ data Constraint
 -- functions.
 data TypeResult = TypeResult
     { constraints :: [ Constraint ]
-    , assumptions :: Map String [ Type ]
+    , assumptions :: Map String [ Qual Type ]
     } deriving (Show)
 
 instance Monoid TypeResult where
@@ -398,7 +399,7 @@ instance Typing TypeEnv where
 -- instantiated.
 data TypeState = TypeState
     { varId :: Int
-    , memo :: Map Untyped (Type, TypeResult)
+    , memo :: Map Untyped (Qual Type, TypeResult)
     , typeEnv :: TypeEnv
     , definitions :: Map Symbol Untyped
     }
@@ -419,9 +420,9 @@ freshVarId k = do
 
 -- | The actual memoization function for the 'TypeCheck' monad.
 memoizedTC
-    :: (Untyped -> TypeCheck (Type, TypeResult))
+    :: (Untyped -> TypeCheck (Qual Type, TypeResult))
     -> Untyped
-    -> TypeCheck (Type, TypeResult)
+    -> TypeCheck (Qual Type, TypeResult)
 memoizedTC f c@(() :< c') = gets memo >>= maybe memoize return . M.lookup c where
     memoize = case c' of
         IdC _ -> f c
@@ -435,38 +436,46 @@ memoizedTC f c@(() :< c') = gets memo >>= maybe memoize return . M.lookup c wher
 int_t = TSym (TyCon "Int" Star)
 float_t = TSym (TyCon "Float" Star)
 bool_t = TSym (TyCon "Boolean" Star)
+num_p = [IsIn "Num" $ TVar $ TyVar 1000 Star] :=> (TVar (TyVar 1000 Star))
 
 -- | Generate type constraints based on Damas-Hindley-Milner type rules to be
 -- solved later.
-generateConstraints :: Untyped -> TypeCheck (Type, TypeResult)
+generateConstraints :: Untyped -> TypeCheck (Qual Type, TypeResult)
 
-generateConstraints (() :< IntC _) = return (int_t, mempty)
-generateConstraints (() :< DoubleC _) = return (float_t, mempty)
-generateConstraints (() :< BoolC _) = return (bool_t, mempty)
+generateConstraints (() :< IntC _) = return (num_p, mempty)
+generateConstraints (() :< DoubleC _) = return (num_p, mempty)
+generateConstraints (() :< BoolC _) = return ([] :=> bool_t, mempty)
 
 generateConstraints (() :< IdC sym) = do
     defns <- gets definitions
     (TypeEnv te) <- gets typeEnv
     case M.lookup sym defns of
         Just u -> do
-            (ty, tr) <- generateConstraints u
+            liftIO . putStrLn $ "[" ++ sym ++ "] found in definitions"
+            (ty, tr) <- memoizedTC generateConstraints u
+            liftIO . putStrLn $ "[" ++ sym ++ "] type = " ++ show ty
             let sc = closeOver ty
+            liftIO . putStrLn $ "[" ++ sym ++ "] scheme = " ++ show sc
+            liftIO . putStrLn $ "***"
             return (ty, tr <> TypeResult {
                            constraints = [ ty :~ sc ],
                            assumptions = mempty })
         Nothing -> case M.lookup sym te of
             Just sc -> do
-                (ps :=> var) <- freshVarId Star
+                liftIO . putStrLn $ "[" ++ sym ++ "] found in type env"
+                liftIO . putStrLn $ "[" ++ sym ++ "] scheme = " ++ show sc
+                liftIO . putStrLn $ "***"
+                var <- freshVarId Star
                 return (var, TypeResult [ var :~ sc ] mempty)
             Nothing -> do
-                (ps :=> var) <- freshVarId Star
+                var <- freshVarId Star
                 return (var, TypeResult [] (M.singleton sym [var]))
 
 generateConstraints (() :< FunC argSyms body) = do
     br <- memoizedTC generateConstraints body
     (vars, tr) <- foldM
         (\(vars, TypeResult cs as) arg -> do
-                (ps :=> var@(TVar (TyVar n k))) <- freshVarId Star
+                var <- freshVarId Star
                 let cs' = maybe [] (map (var :=))
                           (M.lookup arg as)
                     as' = M.delete arg as
@@ -476,31 +485,36 @@ generateConstraints (() :< FunC argSyms body) = do
                                }))
         ([], TypeResult [] (assumptions $ snd br))
         argSyms
-    return ((vars |-> (fst br)), TypeResult {
+
+    let (ps :=> fun_t) = vars |-> (fst br)
+    ps' <- reduce (fromJust baseClassEnv) ps
+    return (ps' :=> fun_t , TypeResult {
                    constraints = constraints (snd br) <> constraints tr,
                    assumptions = assumptions tr
                    })
 
 generateConstraints (() :< AppC op erands) = do
-    (ps :=> var) <- freshVarId Star
+    var <- freshVarId Star
     op' <- memoizedTC generateConstraints op
     (tys, erands') <- mapAndUnzipM (memoizedTC generateConstraints) erands
     let results = foldl (<>) mempty erands'
-    let cs = [ (fst op') := (tys |-> var) ]
+    let (ps :=> fun_t) = tys |-> var
+    ps' <- reduce (fromJust baseClassEnv) ps
+    let cs = [ (fst op') := (ps' :=> fun_t) ]
     return (var, snd op' <> results <> TypeResult {
                    constraints = cs,
                    assumptions = mempty
                    })
 
 generateConstraints (() :< IfC c t e) = do
-    (ps :=> var) <- freshVarId Star
+    var <- freshVarId Star
     cr <- memoizedTC generateConstraints c
     tr <- memoizedTC generateConstraints t
     er <- memoizedTC generateConstraints e
     return (var, snd cr <> snd tr <> snd er <> TypeResult {
                    constraints = [ (fst tr) := (fst er)
                                  , var := (fst tr)
-                                 , (fst cr) := bool_t
+                                 , (fst cr) := ([] :=> bool_t)
                                  ],
                    assumptions = mempty
                    })
@@ -528,17 +542,21 @@ instance Instantiate Pred where
 
 instantiate :: Scheme -> TypeCheck (Qual Type)
 instantiate (Forall vars (ps :=> t)) = do
+    ps' <- reduce (fromJust baseClassEnv) ps
     qs <- mapM (\(TyVar _ k) -> freshVarId k) vars
     let nvars = map (\(_ :=> var) -> var) qs
     let f = Frame $ M.fromList (zip vars nvars)
-    let (ps' :=> t') = inst (substitute f nvars) $ ps :=> t
-    return $ (substitute f ps' :=> substitute f t')
+    let (ps'' :=> t') = inst (substitute f nvars) $ ps' :=> t
+    return $ (substitute f ps'' :=> substitute f t')
 
 -- | When a top level definition is inferred, its type is generalized into a
 -- type scheme so that it may be instantiated multiple times later depending on
 -- usage.
-generalize :: TypeEnv -> Type -> Scheme
-generalize te t = Forall as ([] :=> t)
+-- FIXME HEY HERE LOOK HERE
+-- IF SHIT ISN'T WORKING RIGHT CONSIDER THE IMPLICATIONS OF ftv ON THE WHOLE
+-- QUALIFIED TYPE VERSUS JUST THE BARE TYPE
+generalize :: TypeEnv -> Qual Type -> Scheme
+generalize te t = Forall as t
     where as = S.toList $ ftv t `S.difference` ftv te
 
 -- | Type schemes don't need to have globally unique type variables.
@@ -560,7 +578,7 @@ normalize (Forall _ (ps :=> t)) = Forall (map snd ord) (ps' :=> (normtype t))
             Nothing -> error "type variable not in signature"
 
 -- | Generalize and normalize a type into a type scheme in one smooth motion.
-closeOver :: Type -> Scheme
+closeOver :: Qual Type -> Scheme
 closeOver = normalize . generalize mempty
 
 -- * Unification and constraint solving
@@ -634,14 +652,20 @@ solveConstraints cs = go (Just mempty) cs where
     go result [] = return result
     go Nothing _ = return Nothing
 
-    go f@(Just frame) ((a := b) : cs) = do
-        let fr = unify (substitute frame a) (substitute frame b) $ Just frame
-        go (fr <> f) cs
+    go f@(Just frame) (((psa :=> a) := (psb :=> b)) : cs) = do
+        liftIO . putStrLn $ (show (psa :=> a)) ++ " = " ++ (show (psb :=> b))
+        let fr = unify (substitute frame a) (substitute frame b) f
+        let fr' = foldl (\frame' (a, b) -> unify_pred a b frame') fr $
+                  zip (substitute frame psa) (substitute frame psb)
+        go (fr' <> f) cs
 
-    go f@(Just frame) ((a :~ b) : cs) = do
-        (ps :=> b') <- instantiate (substitute frame b)
-        let fr = unify (substitute frame a) (substitute frame b') $ Just frame
-        go (fr <> f) cs
+    go f@(Just frame) (((psa :=> a) :~ b) : cs) = do
+        (psb :=> b') <- instantiate (substitute frame b)
+        liftIO . putStrLn $ (show (psa :=> a)) ++ " ~ " ++ (show b)
+        let fr = unify (substitute frame a) (substitute frame b') f
+        let fr' = foldl (\frame' (a, b) -> unify_pred a b frame') fr $
+                  zip (substitute frame psa) (substitute frame psb)
+        go (fr' <> f) cs
 
 modifyTypeEnv :: (TypeEnv -> TypeEnv) -> TypeCheck ()
 modifyTypeEnv f = gets typeEnv >>= \te -> modify $ \st -> st { typeEnv = f te }
@@ -652,7 +676,7 @@ inferTop te exprs = (flip evalStateT) ts $ do
 
     ccs <- forM exprs $ \(name, expr) -> do
         (ty, tr) <- memoizedTC generateConstraints expr
-        modifyTypeEnv $ \te -> envInsert te name $ Forall [] ([] :=> ty)
+        modifyTypeEnv $ \te -> envInsert te name $ Forall [] ty -- !!!!!
         return $ constraints tr
 
     let cs = concat ccs
@@ -660,7 +684,10 @@ inferTop te exprs = (flip evalStateT) ts $ do
     case mFrame of
         Nothing -> return Nothing
         Just frame -> do
+            liftIO . putStrLn $ "-----"
+            liftIO . putStrLn $ "Final frame: " ++ (show frame)
             (TypeEnv te) <- gets typeEnv
+            liftIO . putStrLn $ "Penultimate type env: " ++ (show te)
             let (TypeEnv te') = substitute frame (TypeEnv te)
             return . Just . TypeEnv . M.map normalize $ te'
 
@@ -670,23 +697,27 @@ inferTop te exprs = (flip evalStateT) ts $ do
 
 -- * Informal hobby-project-chic testing routines.
 num_pred = (IsIn "Num" (TVar (TyVar 0 Star)))
-num_type = TVar (TyVar 0 Star)
-mul_type = Forall [TyVar 0 Star] ([num_pred] :=> ([num_type, num_type] |-> num_type))
-add_type = mul_type
-te = TypeEnv $ M.fromList [("*", mul_type), ("+", add_type)]
+num_type = [num_pred] :=> (TVar (TyVar 0 Star))
+
 test :: IO ()
 test = do
+    let (ps :=> mult_t) = [num_type, num_type] |-> num_type
+    ps' <- reduce (fromJust baseClassEnv) ps
+    let mul_type = Forall [TyVar 0 Star] (ps' :=> mult_t)
+    let add_type = mul_type
+    let te = TypeEnv $ M.fromList [("*", mul_type), ("+", add_type)]
     defns <- parse_multi $ T.concat
         [ "(defun times-1 (x) (* 1 x))"
---        , "(def nine (square 3))"
+        , "(def nine (square 3))"
         , "(defun id (z) z)"
         , "(defun square (y) (* y y))"
---        , "(def four (id (square 2)))"
-        , "(defun box (b) (\\ (f) (id (f b))))" -- sanity check
-        , "(defun pair (x y) (\\ (f) (f x y)))"
+        , "(def two 2)"
+--        , "(defun box (b) (\\ (f) (id (f b))))" -- sanity check
+--        , "(defun pair (x y) (\\ (f) (f x y)))"
         ]
     let defns' = map (\(Free (DefC sym expr)) -> (sym, untyped expr)) defns
     results <- inferTop te defns'
+    putStrLn "-----"
     case results of
         Nothing -> putStrLn "Typecheck failed!"
         Just (TypeEnv te) -> do
