@@ -227,8 +227,7 @@ initialClassEnv = ClassEnv {
 type EnvTransformer = ClassEnv -> Maybe ClassEnv
 
 (<:>) :: EnvTransformer -> EnvTransformer -> EnvTransformer
-(f <:> g) ce = do ce' <- f ce
-                  g ce'
+(f <:> g) ce = f ce >>= g
 infixr 5 <:>
 
 addClass :: Symbol -> [Symbol] -> EnvTransformer
@@ -271,10 +270,12 @@ initialInstances = addPreludeClasses
            <:> addInst [] (IsIn "Eq" int_t)
            <:> addInst [] (IsIn "Ord" int_t)
            <:> addInst [] (IsIn "Num" int_t)
+           <:> addInst [] (IsIn "Integral" int_t)
            <:> addInst [] (IsIn "Show" float_t)
            <:> addInst [] (IsIn "Eq" float_t)
            <:> addInst [] (IsIn "Ord" float_t)
            <:> addInst [] (IsIn "Num" float_t)
+           <:> addInst [] (IsIn "Fractional" float_t)
            <:> addInst [] (IsIn "Show" bool_t)
            <:> addInst [] (IsIn "Eq" bool_t)
 
@@ -436,14 +437,15 @@ memoizedTC f c@(() :< c') = gets memo >>= maybe memoize return . M.lookup c wher
 int_t = TSym (TyCon "Int" Star)
 float_t = TSym (TyCon "Float" Star)
 bool_t = TSym (TyCon "Boolean" Star)
-num_p = [IsIn "Num" $ TVar $ TyVar 1000 Star] :=> (TVar (TyVar 1000 Star))
+int_p = [IsIn "Integral" $ TVar $ TyVar 1000 Star] :=> (TVar (TyVar 1000 Star))
+float_p = [IsIn "Fractional" $ TVar $ TyVar 1001 Star] :=> (TVar (TyVar 1001 Star))
 
 -- | Generate type constraints based on Damas-Hindley-Milner type rules to be
 -- solved later.
 generateConstraints :: Untyped -> TypeCheck (Qual Type, TypeResult)
 
-generateConstraints (() :< IntC _) = return (num_p, mempty)
-generateConstraints (() :< DoubleC _) = return (num_p, mempty)
+generateConstraints (() :< IntC _) = return (int_p, mempty)
+generateConstraints (() :< DoubleC _) = return (float_p, mempty)
 generateConstraints (() :< BoolC _) = return ([] :=> bool_t, mempty)
 
 generateConstraints (() :< IdC sym) = do
@@ -552,9 +554,7 @@ instantiate (Forall vars (ps :=> t)) = do
 -- | When a top level definition is inferred, its type is generalized into a
 -- type scheme so that it may be instantiated multiple times later depending on
 -- usage.
--- FIXME HEY HERE LOOK HERE
--- IF SHIT ISN'T WORKING RIGHT CONSIDER THE IMPLICATIONS OF ftv ON THE WHOLE
--- QUALIFIED TYPE VERSUS JUST THE BARE TYPE
+-- NB keep an eye out for this one
 generalize :: TypeEnv -> Qual Type -> Scheme
 generalize te t = Forall as t
     where as = S.toList $ ftv t `S.difference` ftv te
@@ -565,7 +565,7 @@ normalize (Forall _ (ps :=> t)) = Forall (map snd ord) (ps' :=> (normtype t))
     where
         ord = zip (nub $ fv t) (map (\n -> TyVar n Star) [0..])
         ps' = map (\(IsIn sym (TVar t)) -> maybe
-                                    (error "fuck")
+                                    (error "non-existent type variable")
                                     (\x -> (IsIn sym (TVar x)))
                                     (Prelude.lookup t ord))
               ps
@@ -660,8 +660,11 @@ solveConstraints cs = go (Just mempty) cs where
         go (fr' <> f) cs
 
     go f@(Just frame) (((psa :=> a) :~ b) : cs) = do
-        (psb :=> b') <- instantiate (substitute frame b)
+        liftIO . putStrLn $ "+++++"
         liftIO . putStrLn $ (show (psa :=> a)) ++ " ~ " ++ (show b)
+        (psb :=> b') <- instantiate (substitute frame b)
+        liftIO . putStrLn . show $ psb :=> b'
+        liftIO . putStrLn $ "~~~~~"
         let fr = unify (substitute frame a) (substitute frame b') f
         let fr' = foldl (\frame' (a, b) -> unify_pred a b frame') fr $
                   zip (substitute frame psa) (substitute frame psb)
@@ -676,7 +679,7 @@ inferTop te exprs = (flip evalStateT) ts $ do
 
     ccs <- forM exprs $ \(name, expr) -> do
         (ty, tr) <- memoizedTC generateConstraints expr
-        modifyTypeEnv $ \te -> envInsert te name $ Forall [] ty -- !!!!!
+        modifyTypeEnv $ \te -> envInsert te name $ Forall [] ty -- [1]
         return $ constraints tr
 
     let cs = concat ccs
@@ -712,6 +715,8 @@ test = do
         , "(defun id (z) z)"
         , "(defun square (y) (* y y))"
         , "(def two 2)"
+        , "(def three-and-a-half 3.5)"
+        , "(def seven (* three-and-a-half 2.0))"
 --        , "(defun box (b) (\\ (f) (id (f b))))" -- sanity check
 --        , "(defun pair (x y) (\\ (f) (f x y)))"
         ]
@@ -723,3 +728,8 @@ test = do
         Just (TypeEnv te) -> do
             forM_ (M.toList te) $ \(name, ty) ->
                 putStrLn $ name ++ " : " ++ (show ty)
+
+{-
+[1]: When you use `closeOver` here you end up with, eg, id having two distinct
+type variables
+-}
