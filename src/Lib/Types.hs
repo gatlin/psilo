@@ -110,7 +110,7 @@ args |-> (psb :=> body) = ps :=> (TFun $ args' ++ [body])
 -- | A mapping from type variables to concrete types. The goal of type inference
 -- is to construct a frame for a given program that is consistent and sound.
 newtype Frame = Frame {
-    bindings :: Map TyVar Type
+    bindings :: Map TyVar (Qual Type)
     } deriving (Eq, Show)
 
 instance Monoid Frame where
@@ -118,10 +118,10 @@ instance Monoid Frame where
     (Frame f1) `mappend` (Frame f2) = Frame $
         M.map (substitute (Frame f1)) f2 `M.union` f1
 
-frameLookup :: Frame -> TyVar -> Maybe Type
+frameLookup :: Frame -> TyVar -> Maybe (Qual Type)
 frameLookup (Frame frame) i = M.lookup i frame
 
-frameInsert :: Frame -> TyVar -> Type -> Frame
+frameInsert :: Frame -> TyVar -> (Qual Type) -> Frame
 frameInsert (Frame frame) i ty = Frame $ M.insert i ty frame
 
 frameDelete :: Frame -> TyVar -> Frame
@@ -141,7 +141,8 @@ instance Typing Type where
     ftv (TSym s) = mempty
     ftv (TFun ts) = foldl (<>) mempty $ fmap ftv ts
 
-    substitute frame v@(TVar n) = maybe v (substitute frame) $
+    substitute frame v@(TVar n) =
+        maybe v (\(_ :=> t) -> substitute frame t) $
         frameLookup frame n
 
     substitute frame (TFun ts) = TFun $ map (substitute frame) ts
@@ -547,7 +548,7 @@ instantiate (Forall vars (ps :=> t)) = do
     ps' <- reduce (fromJust baseClassEnv) ps
     qs <- mapM (\(TyVar _ k) -> freshVarId k) vars
     let nvars = map (\(_ :=> var) -> var) qs
-    let f = Frame $ M.fromList (zip vars nvars)
+    let f = Frame $ M.fromList (zip vars {- nvars -} qs)
     let (ps'' :=> t') = inst (substitute f nvars) $ ps' :=> t
     return $ (substitute f ps'' :=> substitute f t')
 
@@ -609,10 +610,11 @@ unify_var var@(TVar tv) val frame
     | var == val = Just frame
     | otherwise = case frameLookup frame tv of
                       Nothing -> if occurs_check var val frame
-                                    then Just $ frameInsert frame tv val
+                                    then Just $ frameInsert frame tv
+                                         ([] :=> val)
                                     else Nothing
 
-                      Just val' -> unify val' val $ Just frame
+                      Just (_ :=> val') -> unify val' val $ Just frame
 
 unify_var _ _ _ = Nothing
 
@@ -625,7 +627,7 @@ occurs_check var@(TVar x) val frame = go (substitute frame val)
               | var == val = True
               | otherwise = case frameLookup frame y of
                                 Nothing -> True
-                                Just v' -> go v'
+                                Just (_ :=> v') -> go v'
 
           go (TFun (x:xs)) = and [ go x, go (TFun xs) ]
           go (TFun []) = True
@@ -638,7 +640,7 @@ match (TFun (t1:ts1)) (TFun (t2:ts2)) (Just frame) = do
     return $ sl <> sr
 
 match (TVar u) t (Just frame)
-    | kind u == kind t = return (frameInsert frame u t)
+    | kind u == kind t = return (frameInsert frame u ([] :=> t))
 
 match (TSym c1) (TSym c2) (Just frame)
     | c1 == c2 = return mempty
