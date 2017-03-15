@@ -108,6 +108,7 @@ args |-> (pbs :=> body) = ps' :=> (TFun $ args' ++ [body])
           ps' = sort . nub $ (concat pas) ++ pbs
 infix |->
 
+
 -- | A mapping from type variables to concrete types. The goal of type inference
 -- is to construct a frame for a given program that is consistent and sound.
 newtype Frame = Frame {
@@ -266,8 +267,8 @@ addInst ps p@(IsIn i _) ce
 overlap :: Pred -> Pred -> Bool
 overlap p q = defined (unify_pred p q $ Just mempty)
 
-initialInstances :: EnvTransformer
-initialInstances = addPreludeClasses
+exampleInsts :: EnvTransformer
+exampleInsts = addPreludeClasses
            <:> addInst [] (IsIn "Show" int_t)
            <:> addInst [] (IsIn "Eq" int_t)
            <:> addInst [] (IsIn "Ord" int_t)
@@ -278,9 +279,6 @@ initialInstances = addPreludeClasses
            <:> addInst [] (IsIn "Num" float_t)
            <:> addInst [] (IsIn "Show" bool_t)
            <:> addInst [] (IsIn "Eq" bool_t)
-
-baseClassEnv :: Maybe ClassEnv
-baseClassEnv = initialInstances initialClassEnv
 
 bySuper :: ClassEnv -> Pred -> [Pred]
 bySuper ce p@(IsIn i t) =
@@ -327,7 +325,6 @@ reduce ce ps = do
     qs <- toHnfs ce ps
     return $ simplify ce qs
 
--- * Type schemes
 
 -- | A type scheme is a polymorphic type with quantified type variables. They
 -- allow polymorphic types to instantiated in different ways depending on
@@ -340,6 +337,9 @@ instance Show Scheme where
         where vars' = intercalate " " $ map show vars
               prefix = if (length vars) > 0 then "∀ " ++ vars' ++ ". "
                                             else ""
+
+instance HasKind Scheme where
+    kind (Forall _ t) = kind t -- TODO ensure this is correct
 
 instance Typing Scheme where
     ftv (Forall vars t) = (ftv t) `S.difference` (S.fromList vars)
@@ -413,11 +413,11 @@ newTypeState = TypeState 0 mempty mempty mempty
 type TypeCheck = StateT TypeState IO
 
 -- | You get a globally unique type variable each time you call this function.
-freshVarId :: Kind -> TypeCheck (Qual Type)
-freshVarId k = do
+freshVarId :: TypeCheck Type
+freshVarId = do
     v <- gets varId
     modify $ \s -> s { varId = succ v }
-    return $ [] :=> (TVar (TyVar v k))
+    return $ TVar (TyVar v Star)
 
 -- | The actual memoization function for the 'TypeCheck' monad.
 memoizedTC
@@ -460,19 +460,30 @@ generateConstraints (() :< IdC sym) = do
                            assumptions = mempty })
         Nothing -> case M.lookup sym te of
             Just sc -> do
+<<<<<<< HEAD
                 liftIO . putStrLn $ sym ++ " found in type env"
                 liftIO . putStrLn $ "[" ++ sym ++ "] sc = " ++ (show sc)
                 var <- freshVarId Star
                 return (var, TypeResult [ var :~ sc ] mempty)
             Nothing -> do
                 var <- freshVarId Star
+=======
+                var <- freshVarId
+                return (var, TypeResult [ var :~ sc ] mempty)
+            Nothing -> do
+                var <- freshVarId
+>>>>>>> parent of 2f6202e... commit checkpoint for sanity
                 return (var, TypeResult [] (M.singleton sym [var]))
 
 generateConstraints (() :< FunC argSyms body) = do
     br <- memoizedTC generateConstraints body
     (vars, tr) <- foldM
         (\(vars, TypeResult cs as) arg -> do
+<<<<<<< HEAD
                 var@(ps :=> (TVar (TyVar n k))) <- freshVarId Star
+=======
+                var@(TVar (TyVar n k)) <- freshVarId
+>>>>>>> parent of 2f6202e... commit checkpoint for sanity
                 let cs' = maybe [] (map (var :=))
                           (M.lookup arg as)
                     as' = M.delete arg as
@@ -488,7 +499,11 @@ generateConstraints (() :< FunC argSyms body) = do
                    })
 
 generateConstraints (() :< AppC op erands) = do
+<<<<<<< HEAD
     var <- freshVarId Star
+=======
+    var <- freshVarId
+>>>>>>> parent of 2f6202e... commit checkpoint for sanity
     op' <- memoizedTC generateConstraints op
     (tys, erands') <- mapAndUnzipM (memoizedTC generateConstraints) erands
     let results = foldl (<>) mempty erands'
@@ -499,7 +514,11 @@ generateConstraints (() :< AppC op erands) = do
                    })
 
 generateConstraints (() :< IfC c t e) = do
+<<<<<<< HEAD
     var <- freshVarId Star
+=======
+    var <- freshVarId
+>>>>>>> parent of 2f6202e... commit checkpoint for sanity
     cr <- memoizedTC generateConstraints c
     tr <- memoizedTC generateConstraints t
     er <- memoizedTC generateConstraints e
@@ -511,35 +530,20 @@ generateConstraints (() :< IfC c t e) = do
                    assumptions = mempty
                    })
 
--- | Instantiation is the process of replacing type variables with a set of new
--- variables which allows a polymorphic value to be correctly inferred depending
--- on context.
-class Instantiate t where
-    inst :: [Type] -> t -> t
-
-instance Instantiate Type where
-    inst is (TFun ts) = TFun $ inst is ts
-    inst is (TVar (TyVar n _)) = is !! n
-    inst [] t = t
-    inst is t = t
-
-instance Instantiate t => Instantiate [t] where
-    inst ts = map (inst ts)
-
-instance Instantiate t => Instantiate (Qual t) where
-    inst ts (ps :=> t) = inst ts ps :=> inst ts t
-
-instance Instantiate Pred where
-    inst ts (IsIn c t) = IsIn c (inst ts t)
-
-instantiate :: Scheme -> TypeCheck (Qual Type)
+-- | Instantiating a type scheme replaces all of its type variables with new
+-- unique variables. Each time a polymorphic definition is used it is
+-- instantiated differently.
+instantiate :: Scheme -> TypeCheck Type
 instantiate (Forall vars (ps :=> t)) = do
-    qs <- mapM (\(TyVar _ k) -> freshVarId k) vars
-    let nvars = map (\(_ :=> var) -> var) qs
+    nvars <- mapM (\_ -> freshVarId) vars
     let f = Frame $ M.fromList (zip vars nvars)
+<<<<<<< HEAD
     return . substitute f $  ps :=> t
 {-    let (ps' :=> t') = inst (substitute f nvars) $ ps :=> t
     return $ (substitute f ps' :=> substitute f t') -}
+=======
+    return $ substitute f t
+>>>>>>> parent of 2f6202e... commit checkpoint for sanity
 
 -- | When a top level definition is inferred, its type is generalized into a
 -- type scheme so that it may be instantiated multiple times later depending on
@@ -552,7 +556,11 @@ generalize te t = Forall as t
 normalize :: Scheme -> Scheme
 normalize (Forall vars q@(ps :=> t)) = Forall (map snd ord) (ps' :=> (normtype t))
     where
+<<<<<<< HEAD
         ord = zip (nub $ fv q) (map (\n -> TyVar n Star) [0..])
+=======
+        ord = zip (nub $ fv t) (map (\n -> TyVar n Star) [1..])
+>>>>>>> parent of 2f6202e... commit checkpoint for sanity
         ps' = map (\(IsIn sym (TVar t)) -> maybe
                                     (error "fuck")
                                     (\x -> (IsIn sym (TVar x)))
@@ -646,9 +654,14 @@ solveConstraints cs = go (Just mempty) cs where
         let fr = unify (substitute frame a) (substitute frame b) $ Just frame
         go (fr <> f) cs
 
+<<<<<<< HEAD
     go f@(Just frame) (((psa :=> a) :~ b) : cs) = do
         liftIO . putStrLn $ (show (psa :=> a)) ++ " ~ " ++ (show b)
         (ps :=> b') <- instantiate $ normalize (substitute frame b)
+=======
+    go f@(Just frame) ((a :~ b) : cs) = do
+        b' <- instantiate (substitute frame b)
+>>>>>>> parent of 2f6202e... commit checkpoint for sanity
         let fr = unify (substitute frame a) (substitute frame b') $ Just frame
         go (fr <> f) cs
 
