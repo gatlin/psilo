@@ -649,28 +649,27 @@ match t1 t2 (Just frame) = fail "types do not match"
 
 -- | The set of constraints is unified one by one until failure or a 'Frame' has
 -- been constructed.
-solveConstraints :: [Constraint] -> TypeCheck (Maybe Frame)
-solveConstraints cs = go (Just mempty) cs where
+solveConstraints :: Maybe ClassEnv -> [Constraint] -> TypeCheck (Maybe Frame)
+solveConstraints Nothing _ = return Nothing
+solveConstraints (Just ce) cs = go (Just mempty) cs where
     go result [] = return result
     go Nothing _ = return Nothing
 
     go f@(Just frame) (((psa :=> a) := (psb :=> b)) : cs) = do
         liftIO . putStrLn $ (show (psa :=> a)) ++ " = " ++ (show (psb :=> b))
         let fr = unify (substitute frame a) (substitute frame b) f
-        let fr' = foldl (\frame' (a, b) -> unify_pred a b frame') fr $
-                  zip (substitute frame psa) (substitute frame psb)
-        go (fr' <> f) cs
+        liftIO . putStrLn $ "frame = " ++ show fr
+        go (fr <> f) cs
 
     go f@(Just frame) (((psa :=> a) :~ b) : cs) = do
         liftIO . putStrLn $ "+++++"
         liftIO . putStrLn $ (show (psa :=> a)) ++ " ~ " ++ (show b)
         (psb :=> b') <- instantiate (substitute frame b)
         liftIO . putStrLn . show $ psb :=> b'
-        liftIO . putStrLn $ "~~~~~"
         let fr = unify (substitute frame a) (substitute frame b') f
-        let fr' = foldl (\frame' (a, b) -> unify_pred a b frame') fr $
-                  zip (substitute frame psa) (substitute frame psb)
-        go (fr' <> f) cs
+        liftIO . putStrLn $ "frame = " ++ show fr
+        liftIO . putStrLn $ "~~~~~"
+        go (fr <> f) cs
 
 modifyTypeEnv :: (TypeEnv -> TypeEnv) -> TypeCheck ()
 modifyTypeEnv f = gets typeEnv >>= \te -> modify $ \st -> st { typeEnv = f te }
@@ -685,7 +684,7 @@ inferTop te exprs = (flip evalStateT) ts $ do
         return $ constraints tr
 
     let cs = concat ccs
-    mFrame <- solveConstraints cs
+    mFrame <- solveConstraints baseClassEnv $ sort cs
     case mFrame of
         Nothing -> return Nothing
         Just frame -> do
