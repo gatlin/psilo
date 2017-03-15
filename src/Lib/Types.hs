@@ -145,7 +145,7 @@ instance Typing Type where
     substitute frame v@(TVar n) = maybe v (substitute frame) $
         frameLookup frame n
 
-    substitute frame (TFun ts) = TFun $ map (substitute frame) ts
+    substitute frame (TFun ts) = TFun $ substitute frame ts
     substitute _ t = t
 
 instance Typing a => Typing [a] where
@@ -425,12 +425,10 @@ memoizedTC
     -> Untyped
     -> TypeCheck (Qual Type, TypeResult)
 memoizedTC f c@(() :< c') = gets memo >>= maybe memoize return . M.lookup c where
-    memoize = case c' of
-        IdC _ -> f c
-        _ -> do
-            r <- f c
-            modify $ \s -> s { memo = M.insert c r $ memo s }
-            return r
+    memoize = do
+        r <- f c
+        modify $ \s -> s { memo = M.insert c r $ memo s }
+        return r
 
 -- | Some basic helper types, which should probably be treated a little more
 -- formally.
@@ -453,12 +451,17 @@ generateConstraints (() :< IdC sym) = do
     case M.lookup sym defns of
         Just u -> do
             (ty, tr) <- generateConstraints u
-            let sc = closeOver ty
+            liftIO . putStrLn $ sym ++ " found in definitions"
+            liftIO . putStrLn $ "[" ++ sym ++ "] ty = " ++ (show ty)
+            let sc = {- closeOver ty -} generalize mempty ty
+            liftIO . putStrLn $ "[" ++ sym ++ "] sc = " ++ (show sc)
             return (ty, tr <> TypeResult {
                            constraints = [ ty :~ sc ],
                            assumptions = mempty })
         Nothing -> case M.lookup sym te of
             Just sc -> do
+                liftIO . putStrLn $ sym ++ " found in type env"
+                liftIO . putStrLn $ "[" ++ sym ++ "] sc = " ++ (show sc)
                 var <- freshVarId Star
                 return (var, TypeResult [ var :~ sc ] mempty)
             Nothing -> do
@@ -534,21 +537,22 @@ instantiate (Forall vars (ps :=> t)) = do
     qs <- mapM (\(TyVar _ k) -> freshVarId k) vars
     let nvars = map (\(_ :=> var) -> var) qs
     let f = Frame $ M.fromList (zip vars nvars)
-    let (ps' :=> t') = inst (substitute f nvars) $ ps :=> t
-    return $ (substitute f ps' :=> substitute f t')
+    return . substitute f $  ps :=> t
+{-    let (ps' :=> t') = inst (substitute f nvars) $ ps :=> t
+    return $ (substitute f ps' :=> substitute f t') -}
 
 -- | When a top level definition is inferred, its type is generalized into a
 -- type scheme so that it may be instantiated multiple times later depending on
 -- usage.
 generalize :: TypeEnv -> Qual Type -> Scheme
-generalize te (ps :=> t) = Forall as (ps :=> t)
+generalize te t = Forall as t
     where as = S.toList $ ftv t `S.difference` ftv te
 
 -- | Type schemes don't need to have globally unique type variables.
 normalize :: Scheme -> Scheme
-normalize (Forall _ (ps :=> t)) = Forall (map snd ord) (ps' :=> (normtype t))
+normalize (Forall vars q@(ps :=> t)) = Forall (map snd ord) (ps' :=> (normtype t))
     where
-        ord = zip (nub $ fv t) (map (\n -> TyVar n Star) [0..])
+        ord = zip (nub $ fv q) (map (\n -> TyVar n Star) [0..])
         ps' = map (\(IsIn sym (TVar t)) -> maybe
                                     (error "fuck")
                                     (\x -> (IsIn sym (TVar x)))
@@ -638,11 +642,13 @@ solveConstraints cs = go (Just mempty) cs where
     go Nothing _ = return Nothing
 
     go f@(Just frame) (((psa :=> a) := (psb :=> b)) : cs) = do
+        liftIO . putStrLn $ (show (psa :=> a)) ++ " = " ++ (show (psb :=> b))
         let fr = unify (substitute frame a) (substitute frame b) $ Just frame
         go (fr <> f) cs
 
     go f@(Just frame) (((psa :=> a) :~ b) : cs) = do
-        (ps :=> b') <- instantiate (substitute frame b)
+        liftIO . putStrLn $ (show (psa :=> a)) ++ " ~ " ++ (show b)
+        (ps :=> b') <- instantiate $ normalize (substitute frame b)
         let fr = unify (substitute frame a) (substitute frame b') $ Just frame
         go (fr <> f) cs
 
@@ -655,17 +661,20 @@ inferTop te exprs = (flip evalStateT) ts $ do
 
     ccs <- forM exprs $ \(name, expr) -> do
         (ty, tr) <- memoizedTC generateConstraints expr
-        modifyTypeEnv $ \te -> envInsert te name $ Forall [] ty
+        modifyTypeEnv $ \te -> envInsert te name $ Forall (S.toList $ ftv ty) ty
         return $ constraints tr
 
     let cs = concat ccs
-    mFrame <- solveConstraints cs
+    mFrame <- solveConstraints $ sort cs
     case mFrame of
         Nothing -> return Nothing
         Just frame -> do
             (TypeEnv te) <- gets typeEnv
+            liftIO . putStrLn $ "---"
+            liftIO . putStrLn $ "final frame = " ++ show frame
+            liftIO . putStrLn $ "---"
             let (TypeEnv te') = substitute frame (TypeEnv te)
-            return . Just . TypeEnv . M.map normalize $ te'
+            return . Just . TypeEnv {- . M.map normalize -} $ te'
 
     where ts = newTypeState {
               typeEnv = te,
@@ -684,9 +693,10 @@ test = do
 --        , "(def nine (square 3))"
         , "(defun id (z) z)"
         , "(defun square (y) (* y y))"
---        , "(def four (id (square 2)))"
-        , "(defun box (b) (\\ (f) (id (f b))))" -- sanity check
-        , "(defun pair (x y) (\\ (f) (f x y)))"
+        , "(def two 2)"
+        , "(def four (id (square two)))"
+--        , "(defun box (b) (\\ (f) (id (f b))))" -- sanity check
+--        , "(defun pair (x y) (\\ (f) (f x y)))"
         ]
     let defns' = map (\(Free (DefC sym expr)) -> (sym, untyped expr)) defns
     results <- inferTop te defns'
