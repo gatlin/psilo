@@ -657,19 +657,19 @@ solveConstraints (Just ce) cs = go (Just mempty) cs where
 
     go f@(Just frame) (((psa :=> a) := (psb :=> b)) : cs) = do
         liftIO . putStrLn $ (show (psa :=> a)) ++ " = " ++ (show (psb :=> b))
-        let fr = unify (substitute frame a) (substitute frame b) f
-        liftIO . putStrLn $ "frame = " ++ show fr
-        go (fr <> f) cs
+        let f' = unify (substitute frame a) (substitute frame b) f
+        liftIO . putStrLn $ "frame = " ++ show f'
+        go f' cs
 
     go f@(Just frame) (((psa :=> a) :~ b) : cs) = do
         liftIO . putStrLn $ "+++++"
         liftIO . putStrLn $ (show (psa :=> a)) ++ " ~ " ++ (show b)
         (psb :=> b') <- instantiate (substitute frame b)
         liftIO . putStrLn . show $ psb :=> b'
-        let fr = unify (substitute frame a) (substitute frame b') f
-        liftIO . putStrLn $ "frame = " ++ show fr
+        let f' = unify (substitute frame a) (substitute frame b') f
+        liftIO . putStrLn $ "frame = " ++ show f'
         liftIO . putStrLn $ "~~~~~"
-        go (fr <> f) cs
+        go f' cs
 
 modifyTypeEnv :: (TypeEnv -> TypeEnv) -> TypeCheck ()
 modifyTypeEnv f = gets typeEnv >>= \te -> modify $ \st -> st { typeEnv = f te }
