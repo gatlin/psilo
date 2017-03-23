@@ -465,8 +465,9 @@ generateConstraints (() :< IdC sym) = do
                            assumptions = mempty })
         Nothing -> case M.lookup sym te of
             Just sc -> do
-                var <- freshVarId Star
-                return (var, TypeResult [ var :~ sc ] mempty)
+--                var <- freshVarId Star
+                ty <- instantiate sc
+                return (ty, TypeResult [ ty :~ sc ] mempty)
             Nothing -> do
                 var <- freshVarId Star
                 return (var, TypeResult [] (M.singleton sym [var]))
@@ -488,6 +489,7 @@ generateConstraints (() :< FunC argSyms body) = do
 
     let (ps :=> fun_t) = vars |-> (fst br)
     ps' <- reduce (fromJust baseClassEnv) ps
+    liftIO . putStrLn $ "[Fun] cs = " ++ show (constraints tr)
     return (ps' :=> fun_t , TypeResult {
                    constraints = constraints (snd br) <> constraints tr,
                    assumptions = assumptions tr
@@ -499,8 +501,9 @@ generateConstraints (() :< AppC op erands) = do
     (tys, erands') <- mapAndUnzipM (memoizedTC generateConstraints) erands
     let results = foldl (<>) mempty erands'
     let (ps :=> fun_t) = tys |-> var
-    ps' <- reduce (fromJust baseClassEnv) ps
-    let cs = [ (fst op') := (ps' :=> fun_t) ]
+--    ps' <- reduce (fromJust baseClassEnv) ps
+    let cs = [ (fst op') := (ps :=> fun_t) ]
+    liftIO . putStrLn $ "[App] cs = " ++ show cs
     return (var, snd op' <> results <> TypeResult {
                    constraints = cs,
                    assumptions = mempty
@@ -657,44 +660,21 @@ solveConstraints (Just ce) cs = go (Just mempty) cs where
 
     go f@(Just frame) ((a@(psa :=> ta) := b@(psb :=> tb)) : cs) = do
         liftIO . putStrLn $ show a ++ " = " ++ show b
-        let tyvars = S.toList $ ftv ta
-        liftIO . putStrLn $ "tyvars = " ++ show tyvars
-        let (psa' :=> ta') = substitute frame a
-        let (psb' :=> tb') = substitute frame b
+        let a'@(psa' :=> ta') = substitute frame a
+        let b'@(psb' :=> tb') = substitute frame b
         let f' = unify ta' tb' f
-        liftIO . putStrLn $ "f' = " ++ show f'
-        liftIO . putStrLn $ "psb' = " ++ show psb'
-        let pred_map = M.fromList $ map (\p@(IsIn _ ty) -> (ty, p)) psb'
-        liftIO . putStrLn $ "pred_map = " ++ show pred_map
-        forM_ tyvars $ \tyvar -> case frameLookup (fromJust f') tyvar of
-                                     Nothing -> liftIO . putStrLn $ "FUCK"
-                                     Just (ps :=> ty) ->
-                                         case M.lookup ty pred_map of
-                                             Nothing -> liftIO . putStrLn $ "FUCK " ++ show ty
-                                             Just p -> liftIO . putStrLn $ "p = " ++ show p
-        let frame' = f' >>= restore_preds psb' tyvars
-        liftIO . putStrLn $ "frame = " ++ show frame'
-        go frame' cs
+--        liftIO . putStrLn $ "frame = " ++ show f'
+        go (f' <> f) cs
 
-{-
     go f@(Just frame) (((psa :=> a) :~ b) : cs) = do
         liftIO . putStrLn $ show a ++ " ~ " ++ show b
         (psb :=> b') <- instantiate (substitute frame b)
         let f' = unify (substitute frame a) (substitute frame b') f
 --        liftIO . putStrLn $ "psb = " ++ show psb
 --        liftIO . putStrLn $ "frame = " ++ show f'
-        go f' cs
--}
-    go f _ = return f
+        go (f' <> f) cs
 
-restore_preds :: [Pred] -> [TyVar] -> Frame -> Maybe Frame
-restore_preds ps tvs frame = foldM go frame tvs
-    where pred_map = M.fromList $ map (\p@(IsIn _ ty) -> (ty, p)) ps
-          go f tyvar = do
-              (ps :=> ty) <- frameLookup f tyvar
-              case M.lookup ty pred_map of
-                  Nothing -> return f
-                  Just p -> return $ frameInsert f tyvar ((p:ps) :=> ty)
+    go f _ = return f
 
 modifyTypeEnv :: (TypeEnv -> TypeEnv) -> TypeCheck ()
 modifyTypeEnv f = gets typeEnv >>= \te -> modify $ \st -> st { typeEnv = f te }
@@ -739,9 +719,10 @@ test = do
     defns <- parse_multi $ T.concat
         [ "(defun square (y) (* y y))"
 --        , "(def nine (square 3))"
+        , "(def two 2)"
         , "(def four (square two))"
 --        , "(defun id (z) z)"
-        , "(def two 2)"
+        , "(def ocho (* two 4))"
         , "(def three-and-a-half 3.5)"
         , "(def seven (* three-and-a-half 2.0))"
         , "(def wut (square three-and-a-half))"
