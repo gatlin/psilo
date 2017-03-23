@@ -445,8 +445,12 @@ float_p = [IsIn "Fractional" $ TVar $ TyVar 1001 Star] :=> (TVar (TyVar 1001 Sta
 -- solved later.
 generateConstraints :: Untyped -> TypeCheck (Qual Type, TypeResult)
 
-generateConstraints (() :< IntC _) = return (int_p, mempty)
-generateConstraints (() :< DoubleC _) = return (float_p, mempty)
+generateConstraints (() :< IntC _) = do
+    (_ :=> t) <- freshVarId Star
+    return ([IsIn "Integral" t] :=> t, mempty)
+generateConstraints (() :< DoubleC _) = do
+    (_ :=> t) <- freshVarId Star
+    return ([IsIn "Fractional" t] :=> t, mempty)
 generateConstraints (() :< BoolC _) = return ([] :=> bool_t, mempty)
 
 generateConstraints (() :< IdC sym) = do
@@ -454,20 +458,13 @@ generateConstraints (() :< IdC sym) = do
     (TypeEnv te) <- gets typeEnv
     case M.lookup sym defns of
         Just u -> do
-            liftIO . putStrLn $ "[" ++ sym ++ "] found in definitions"
             (ty, tr) <- memoizedTC generateConstraints u
-            liftIO . putStrLn $ "[" ++ sym ++ "] type = " ++ show ty
             let sc = closeOver ty
-            liftIO . putStrLn $ "[" ++ sym ++ "] scheme = " ++ show sc
-            liftIO . putStrLn $ "***"
             return (ty, tr <> TypeResult {
                            constraints = [ ty :~ sc ],
                            assumptions = mempty })
         Nothing -> case M.lookup sym te of
             Just sc -> do
-                liftIO . putStrLn $ "[" ++ sym ++ "] found in type env"
-                liftIO . putStrLn $ "[" ++ sym ++ "] scheme = " ++ show sc
-                liftIO . putStrLn $ "***"
                 var <- freshVarId Star
                 return (var, TypeResult [ var :~ sc ] mempty)
             Nothing -> do
@@ -656,20 +653,18 @@ solveConstraints (Just ce) cs = go (Just mempty) cs where
     go Nothing _ = return Nothing
 
     go f@(Just frame) (((psa :=> a) := (psb :=> b)) : cs) = do
-        liftIO . putStrLn $ (show (psa :=> a)) ++ " = " ++ (show (psb :=> b))
+        liftIO . putStrLn $ show a ++ " = " ++ show b
         let f' = unify (substitute frame a) (substitute frame b) f
         liftIO . putStrLn $ "frame = " ++ show f'
-        go f' cs
+        go (f' <> f) cs
 
     go f@(Just frame) (((psa :=> a) :~ b) : cs) = do
-        liftIO . putStrLn $ "+++++"
-        liftIO . putStrLn $ (show (psa :=> a)) ++ " ~ " ++ (show b)
+        liftIO . putStrLn $ show a ++ " ~ " ++ show b
         (psb :=> b') <- instantiate (substitute frame b)
-        liftIO . putStrLn . show $ psb :=> b'
         let f' = unify (substitute frame a) (substitute frame b') f
+        liftIO . putStrLn $ "psb = " ++ show psb
         liftIO . putStrLn $ "frame = " ++ show f'
-        liftIO . putStrLn $ "~~~~~"
-        go f' cs
+        go (f' <> f) cs
 
 modifyTypeEnv :: (TypeEnv -> TypeEnv) -> TypeCheck ()
 modifyTypeEnv f = gets typeEnv >>= \te -> modify $ \st -> st { typeEnv = f te }
@@ -683,8 +678,8 @@ inferTop te exprs = (flip evalStateT) ts $ do
         modifyTypeEnv $ \te -> envInsert te name $ Forall [] ty -- [1]
         return $ constraints tr
 
-    let cs = concat ccs
-    mFrame <- solveConstraints baseClassEnv $ sort cs
+    let cs = sort $ nub $ concat ccs
+    mFrame <- solveConstraints baseClassEnv cs
     case mFrame of
         Nothing -> return Nothing
         Just frame -> do
@@ -693,9 +688,10 @@ inferTop te exprs = (flip evalStateT) ts $ do
             (TypeEnv te) <- gets typeEnv
             liftIO . putStrLn $ "Penultimate type env: " ++ (show te)
             let (TypeEnv te') = substitute frame (TypeEnv te)
-            return . Just . TypeEnv . M.map normalize $ te'
+            return . Just . TypeEnv {- . M.map normalize -} $ te'
 
     where ts = newTypeState {
+              varId = 1,
               typeEnv = te,
               definitions = M.fromList exprs }
 
@@ -709,15 +705,16 @@ test = do
     ps' <- reduce (fromJust baseClassEnv) ps
     let mul_type = Forall [TyVar 0 Star] (ps' :=> mult_t)
     let add_type = mul_type
-    let te = TypeEnv $ M.fromList [("*", mul_type), ("+", add_type)]
+    let te = TypeEnv $ M.fromList [("*", mul_type) {-, ("+", add_type) -} ]
     defns <- parse_multi $ T.concat
-        [ "(defun times-1 (x) (* 1 x))"
-        , "(def nine (square 3))"
-        , "(defun id (z) z)"
-        , "(defun square (y) (* y y))"
+        [ "(defun square (y) (* y y))"
+--        , "(def nine (square 3))"
+        , "(def four (square two))"
+--        , "(defun id (z) z)"
         , "(def two 2)"
         , "(def three-and-a-half 3.5)"
         , "(def seven (* three-and-a-half 2.0))"
+        , "(def wut (square three-and-a-half))"
 --        , "(defun box (b) (\\ (f) (id (f b))))" -- sanity check
 --        , "(defun pair (x y) (\\ (f) (f x y)))"
         ]
