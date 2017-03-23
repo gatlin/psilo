@@ -581,6 +581,9 @@ closeOver = normalize . generalize mempty
 
 -- * Unification and constraint solving
 
+mgu :: Type -> Type -> Maybe Frame
+mgu t1 t2 = unify t1 t2 $ Just mempty
+
 unify :: Type -> Type -> Maybe Frame -> Maybe Frame
 unify t1 t2 (Just frame)
     | t1 == t2 = Just frame
@@ -652,19 +655,46 @@ solveConstraints (Just ce) cs = go (Just mempty) cs where
     go result [] = return result
     go Nothing _ = return Nothing
 
-    go f@(Just frame) (((psa :=> a) := (psb :=> b)) : cs) = do
+    go f@(Just frame) ((a@(psa :=> ta) := b@(psb :=> tb)) : cs) = do
         liftIO . putStrLn $ show a ++ " = " ++ show b
-        let f' = unify (substitute frame a) (substitute frame b) f
-        liftIO . putStrLn $ "frame = " ++ show f'
-        go (f' <> f) cs
+        let tyvars = S.toList $ ftv ta
+        liftIO . putStrLn $ "tyvars = " ++ show tyvars
+        let (psa' :=> ta') = substitute frame a
+        let (psb' :=> tb') = substitute frame b
+        let f' = unify ta' tb' f
+        liftIO . putStrLn $ "f' = " ++ show f'
+        liftIO . putStrLn $ "psb' = " ++ show psb'
+        let pred_map = M.fromList $ map (\p@(IsIn _ ty) -> (ty, p)) psb'
+        liftIO . putStrLn $ "pred_map = " ++ show pred_map
+        forM_ tyvars $ \tyvar -> case frameLookup (fromJust f') tyvar of
+                                     Nothing -> liftIO . putStrLn $ "FUCK"
+                                     Just (ps :=> ty) ->
+                                         case M.lookup ty pred_map of
+                                             Nothing -> liftIO . putStrLn $ "FUCK " ++ show ty
+                                             Just p -> liftIO . putStrLn $ "p = " ++ show p
+        let frame' = f' >>= restore_preds psb' tyvars
+        liftIO . putStrLn $ "frame = " ++ show frame'
+        go frame' cs
 
+{-
     go f@(Just frame) (((psa :=> a) :~ b) : cs) = do
         liftIO . putStrLn $ show a ++ " ~ " ++ show b
         (psb :=> b') <- instantiate (substitute frame b)
         let f' = unify (substitute frame a) (substitute frame b') f
-        liftIO . putStrLn $ "psb = " ++ show psb
-        liftIO . putStrLn $ "frame = " ++ show f'
-        go (f' <> f) cs
+--        liftIO . putStrLn $ "psb = " ++ show psb
+--        liftIO . putStrLn $ "frame = " ++ show f'
+        go f' cs
+-}
+    go f _ = return f
+
+restore_preds :: [Pred] -> [TyVar] -> Frame -> Maybe Frame
+restore_preds ps tvs frame = foldM go frame tvs
+    where pred_map = M.fromList $ map (\p@(IsIn _ ty) -> (ty, p)) ps
+          go f tyvar = do
+              (ps :=> ty) <- frameLookup f tyvar
+              case M.lookup ty pred_map of
+                  Nothing -> return f
+                  Just p -> return $ frameInsert f tyvar ((p:ps) :=> ty)
 
 modifyTypeEnv :: (TypeEnv -> TypeEnv) -> TypeCheck ()
 modifyTypeEnv f = gets typeEnv >>= \te -> modify $ \st -> st { typeEnv = f te }
