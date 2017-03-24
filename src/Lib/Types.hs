@@ -39,10 +39,13 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as I
 import Data.Set (Set)
 import qualified Data.Set as S
+import qualified Data.Text as T
 
 import Lib.Syntax
 import Lib.Parser (parse_expr, parse_multi)
-import qualified Data.Text as T
+import Lib.Util
+
+
 
 -- * Fundamental type system building blocks
 
@@ -425,13 +428,19 @@ memoizedTC
     :: (Untyped -> TypeCheck (Qual Type, TypeResult))
     -> Untyped
     -> TypeCheck (Qual Type, TypeResult)
-memoizedTC f c@(() :< c') = gets memo >>= maybe memoize return . M.lookup c where
-    memoize = case c' of
-        IdC _ -> f c
-        _ -> do
-            r <- f c
-            modify $ \s -> s { memo = M.insert c r $ memo s }
-            return r
+memoizedTC f c@(() :< c') = gets memo >>= maybe memoize return . M.lookup c
+    where memoize = do
+              r <- f c
+              modify $ \s -> s { memo = M.insert c r $ memo s }
+              return r
+{-
+    where memoize = case c' of
+                        IdC _ -> f c
+                        _ -> do
+                            r <- f c
+                            modify $ \s -> s { memo = M.insert c r $ memo s }
+                            return r
+-}
 
 -- | Some basic helper types, which should probably be treated a little more
 -- formally.
@@ -456,18 +465,18 @@ generateConstraints (() :< BoolC _) = return ([] :=> bool_t, mempty)
 generateConstraints (() :< IdC sym) = do
     defns <- gets definitions
     (TypeEnv te) <- gets typeEnv
+    var <- freshVarId Star
     case M.lookup sym defns of
         Just u -> do
             (ty, tr) <- memoizedTC generateConstraints u
             let sc = closeOver ty
-            return (ty, tr <> TypeResult {
-                           constraints = [ ty :~ sc ],
+            return (var, tr <> TypeResult {
+                           constraints = [ var := ty, ty :~ sc ],
                            assumptions = mempty })
         Nothing -> case M.lookup sym te of
             Just sc -> do
---                var <- freshVarId Star
                 ty <- instantiate sc
-                return (ty, TypeResult [ ty :~ sc ] mempty)
+                return (var, TypeResult [ var := ty, ty :~ sc ] mempty)
             Nothing -> do
                 var <- freshVarId Star
                 return (var, TypeResult [] (M.singleton sym [var]))
@@ -489,7 +498,6 @@ generateConstraints (() :< FunC argSyms body) = do
 
     let (ps :=> fun_t) = vars |-> (fst br)
     ps' <- reduce (fromJust baseClassEnv) ps
-    liftIO . putStrLn $ "[Fun] cs = " ++ show (constraints tr)
     return (ps' :=> fun_t , TypeResult {
                    constraints = constraints (snd br) <> constraints tr,
                    assumptions = assumptions tr
@@ -501,9 +509,8 @@ generateConstraints (() :< AppC op erands) = do
     (tys, erands') <- mapAndUnzipM (memoizedTC generateConstraints) erands
     let results = foldl (<>) mempty erands'
     let (ps :=> fun_t) = tys |-> var
---    ps' <- reduce (fromJust baseClassEnv) ps
-    let cs = [ (fst op') := (ps :=> fun_t) ]
-    liftIO . putStrLn $ "[App] cs = " ++ show cs
+    ps' <- reduce (fromJust baseClassEnv) ps
+    let cs = [ (fst op') := (ps' :=> fun_t) ]
     return (var, snd op' <> results <> TypeResult {
                    constraints = cs,
                    assumptions = mempty
@@ -659,51 +666,85 @@ solveConstraints (Just ce) cs = go (Just mempty) cs where
     go Nothing _ = return Nothing
 
     go f@(Just frame) ((a@(psa :=> ta) := b@(psb :=> tb)) : cs) = do
-        liftIO . putStrLn $ show a ++ " = " ++ show b
+--        liftIO . putStrLn $ show a ++ " = " ++ show b
         let a'@(psa' :=> ta') = substitute frame a
         let b'@(psb' :=> tb') = substitute frame b
-        let f' = unify ta' tb' f
---        liftIO . putStrLn $ "frame = " ++ show f'
+        let frame' = unify ta' tb' f
+        let tyvars = S.toList $ ftv ta'
+        let f' = frame' >>= restore_preds psb' tyvars
+
         go (f' <> f) cs
 
     go f@(Just frame) (((psa :=> a) :~ b) : cs) = do
-        liftIO . putStrLn $ show a ++ " ~ " ++ show b
+--        liftIO . putStrLn $ show a ++ " ~ " ++ show b
         (psb :=> b') <- instantiate (substitute frame b)
-        let f' = unify (substitute frame a) (substitute frame b') f
---        liftIO . putStrLn $ "psb = " ++ show psb
---        liftIO . putStrLn $ "frame = " ++ show f'
+        let frame' = unify (substitute frame a) (substitute frame b') f
+        let tyvars = S.toList $ ftv $ psa :=> a
+        let f' = frame' >>= restore_preds psb tyvars
         go (f' <> f) cs
 
     go f _ = return f
 
+restore_preds :: [Pred] -> [TyVar] -> Frame -> Maybe Frame
+restore_preds ps tvs frame = foldM go frame tvs
+    where pred_map = M.fromList $ map (\p@(IsIn _ ty) -> (ty, p)) ps
+          go fr tyvar = do
+              (ps :=> bound_ty) <- frameLookup fr tyvar
+              case M.lookup bound_ty pred_map of
+                  Nothing -> return fr
+                  Just p -> return $ frameInsert fr tyvar ((p:ps) :=> bound_ty)
+
 modifyTypeEnv :: (TypeEnv -> TypeEnv) -> TypeCheck ()
 modifyTypeEnv f = gets typeEnv >>= \te -> modify $ \st -> st { typeEnv = f te }
+
+invert :: Frame -> Map TyVar [Pred]
+invert (Frame f) = foldl go M.empty $ map snd $ M.toList f
+    where go m (ps :=> ty)
+              | is_var ty = let (TVar tv) = ty
+                            in  case M.lookup tv m of
+                                    Nothing -> M.insert tv ps m
+                                    Just _ -> M.adjust (++ ps) tv m
+              | otherwise = m
 
 inferTop :: TypeEnv -> [(Symbol, Untyped)] -> IO (Maybe TypeEnv)
 inferTop te [] = return $ Just te
 inferTop te exprs = (flip evalStateT) ts $ do
 
-    ccs <- forM exprs $ \(name, expr) -> do
-        (ty, tr) <- memoizedTC generateConstraints expr
-        modifyTypeEnv $ \te -> envInsert te name $ Forall [] ty -- [1]
-        return $ constraints tr
+    results <- forM (map snd exprs) $
+        sequence . extend (memoizedTC generateConstraints)
 
-    let cs = sort $ nub $ concat ccs
-    mFrame <- solveConstraints baseClassEnv cs
-    case mFrame of
-        Nothing -> return Nothing
-        Just frame -> do
-            liftIO . putStrLn $ "-----"
-            liftIO . putStrLn $ "Final frame: " ++ (show frame)
-            (TypeEnv te) <- gets typeEnv
-            liftIO . putStrLn $ "Penultimate type env: " ++ (show te)
-            let (TypeEnv te') = substitute frame (TypeEnv te)
-            return . Just . TypeEnv {- . M.map normalize -} $ te'
+    constrained <- forM (zip (fst <$> exprs) results) $ \(sym, result) -> do
+        let (ty, tr) = extract result
+        return $ (sym, ty, sort $ nub $ constraints tr)
+
+    liftIO . putStrLn $ "---"
+
+    forM_ constrained $ \(sym, ty, cs) -> do
+        mFrame <- solveConstraints baseClassEnv cs
+        case mFrame of
+            Nothing -> liftIO . putStrLn $ sym ++ " failed"
+            Just frame -> do
+                let (ps :=> ty') = substitute frame ty
+                let inverted = invert frame
+                let fvs = S.toList $ ftv ty'
+                let ps' = concat $ map (\fv -> maybe [] id (M.lookup fv inverted)) fvs
+                preds <- reduce (fromJust baseClassEnv) (ps ++ ps')
+                let sc = closeOver $ preds :=> ty'
+                liftIO . putStrLn $ sym ++ " : " ++ show sc
+
+--        forM_ cs $ liftIO . putStrLn . show
+        liftIO . putStrLn $ "---"
+
+    return Nothing
 
     where ts = newTypeState {
-              varId = 1,
-              typeEnv = te,
-              definitions = M.fromList exprs }
+                   varId = 1,
+                   typeEnv = te,
+                   definitions = M.fromList exprs }
+
+is_var :: Type -> Bool
+is_var (TVar _) = True
+is_var _ = False
 
 -- * Informal hobby-project-chic testing routines.
 num_pred = (IsIn "Num" (TVar (TyVar 0 Star)))
@@ -716,19 +757,18 @@ test = do
     let mul_type = Forall [TyVar 0 Star] (ps' :=> mult_t)
     let add_type = mul_type
     let te = TypeEnv $ M.fromList [("*", mul_type) {-, ("+", add_type) -} ]
+
     defns <- parse_multi $ T.concat
         [ "(defun square (y) (* y y))"
---        , "(def nine (square 3))"
         , "(def two 2)"
         , "(def four (square two))"
---        , "(defun id (z) z)"
         , "(def ocho (* two 4))"
         , "(def three-and-a-half 3.5)"
         , "(def seven (* three-and-a-half 2.0))"
         , "(def wut (square three-and-a-half))"
---        , "(defun box (b) (\\ (f) (id (f b))))" -- sanity check
---        , "(defun pair (x y) (\\ (f) (f x y)))"
+        , "(defun compose (f g) (\\ (x) (f (g x))))"
         ]
+
     let defns' = map (\(Free (DefC sym expr)) -> (sym, untyped expr)) defns
     results <- inferTop te defns'
     putStrLn "-----"
