@@ -715,6 +715,9 @@ invert (Frame f) = foldl go M.empty $ map snd $ M.toList f
                                     Just _ -> M.adjust (++ ps) tv m
               | otherwise = m
 
+          is_var (TVar _) = True
+          is_var _ = False
+
 inferTop :: TypeEnv -> [(Symbol, Untyped)] -> IO (Maybe TypeEnv)
 inferTop te [] = return $ Just te
 inferTop te exprs = (flip evalStateT) ts $ do
@@ -734,7 +737,8 @@ inferTop te exprs = (flip evalStateT) ts $ do
                 let (ps :=> ty') = substitute frame ty
                 let inverted = invert frame
                 let fvs = S.toList $ ftv ty'
-                let ps' = concat $ map (\fv -> maybe [] id (M.lookup fv inverted)) fvs
+                let ps' = concat $
+                          map (\fv -> maybe [] id (M.lookup fv inverted)) fvs
                 preds <- reduce (fromJust baseClassEnv) (ps ++ ps')
                 let sc = closeOver $ preds :=> ty'
                 modifyTypeEnv $ \te -> envInsert te sym sc
@@ -744,10 +748,6 @@ inferTop te exprs = (flip evalStateT) ts $ do
                    varId = 1,
                    typeEnv = te,
                    definitions = M.fromList exprs }
-
-is_var :: Type -> Bool
-is_var (TVar _) = True
-is_var _ = False
 
 -- * Informal hobby-project-chic testing routines.
 num_pred = (IsIn "Num" (TVar (TyVar 0 Star)))
@@ -759,17 +759,19 @@ test = do
     ps' <- reduce (fromJust baseClassEnv) ps
     let mul_type = Forall [TyVar 0 Star] (ps' :=> mult_t)
     let add_type = mul_type
-    let te = TypeEnv $ M.fromList [("*", mul_type) {-, ("+", add_type) -} ]
+    let te = TypeEnv $ M.fromList [("*", mul_type) , ("+", add_type) ]
 
     defns <- parse_multi $ T.concat
         [ "(defun square (y) (* y y))"
         , "(def two 2)"
         , "(def four (square two))"
         , "(def ocho (* two 4))"
-        , "(def three-and-a-half 3.5)"
-        , "(def seven (* three-and-a-half 2.0))"
-        , "(def wut (square three-and-a-half))"
+        , "(def three-half 3.5)"
+        , "(def seven (* three-half 2.0))"
+        , "(def twelve-quarter (square three-and-a-half))"
         , "(defun compose (f g) (\\ (x) (f (g x))))"
+        , "(defun id (x) x)"
+        , "(defun pair (x y) (\\ (f) (f x y)))"
         ]
 
     let defns' = map (\(Free (DefC sym expr)) -> (sym, untyped expr)) defns
