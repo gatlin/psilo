@@ -67,8 +67,17 @@ class HasKind t where
 data TyVar = TyVar Int Kind
     deriving (Eq, Ord)
 
+nsym :: Int -> Symbol
+nsym n = l ++ suffix
+    where letters = ['a' .. 'z']
+          idx = n `mod` (length letters)
+          l = [letters !! idx]
+          suff 0 = ""
+          suff s = show s
+          suffix = suff $ n `div` (length letters)
+
 instance Show TyVar where
-    show (TyVar n k) = "t"++(show n)
+    show (TyVar n k) = nsym n
 
 instance HasKind TyVar where
     kind (TyVar n k) = k
@@ -717,8 +726,6 @@ inferTop te exprs = (flip evalStateT) ts $ do
         let (ty, tr) = extract result
         return $ (sym, ty, sort $ nub $ constraints tr)
 
-    liftIO . putStrLn $ "---"
-
     forM_ constrained $ \(sym, ty, cs) -> do
         mFrame <- solveConstraints baseClassEnv cs
         case mFrame of
@@ -730,12 +737,8 @@ inferTop te exprs = (flip evalStateT) ts $ do
                 let ps' = concat $ map (\fv -> maybe [] id (M.lookup fv inverted)) fvs
                 preds <- reduce (fromJust baseClassEnv) (ps ++ ps')
                 let sc = closeOver $ preds :=> ty'
-                liftIO . putStrLn $ sym ++ " : " ++ show sc
-
---        forM_ cs $ liftIO . putStrLn . show
-        liftIO . putStrLn $ "---"
-
-    return Nothing
+                modifyTypeEnv $ \te -> envInsert te sym sc
+    gets typeEnv >>= return . Just
 
     where ts = newTypeState {
                    varId = 1,
@@ -771,7 +774,6 @@ test = do
 
     let defns' = map (\(Free (DefC sym expr)) -> (sym, untyped expr)) defns
     results <- inferTop te defns'
-    putStrLn "-----"
     case results of
         Nothing -> putStrLn "Typecheck failed!"
         Just (TypeEnv te) -> do
