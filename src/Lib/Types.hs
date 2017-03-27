@@ -672,19 +672,31 @@ solveConstraints (Just ce) cs = go (Just mempty) cs where
     go Nothing _ = return Nothing
 
     go f@(Just frame) ((a@(psa :=> ta) := b@(psb :=> tb)) : cs) = do
+        liftIO . putStrLn $ show a ++ " = " ++ show b
         let tyvars = S.toList $ ftv a
         let a'@(psa' :=> ta') = substitute frame a
         let b'@(psb' :=> tb') = substitute frame b
-        let frame' = unify ta' tb' f
+        liftIO . putStrLn $ "psb' = " ++ show psb'
+        let frame' = (unify ta' tb' f) <> f
+        liftIO . putStrLn $ "frame' = " ++ show frame'
         let f' = frame' >>= restore_preds ce psb' tyvars
-        go (f' <> f) cs
+        forM_ (filter (\(IsIn _ ty) -> is_var ty) psb') $ \p@(IsIn c ty) -> do
+            liftIO . putStrLn $ "p = " ++ show p
+        liftIO . putStrLn $ "*****"
+        go f' cs
 
     go f@(Just frame) (((psa :=> a) :~ b) : cs) = do
+        liftIO . putStrLn $ show a ++ " ~ " ++ show b
         (psb :=> b') <- instantiate (substitute frame b)
-        let frame' = unify (substitute frame a) (substitute frame b') f
+        let frame' =
+                (unify (substitute frame a) (substitute frame b') f) <> f
+        liftIO . putStrLn $ "frame' = " ++ show frame'
         let tyvars = S.toList $ ftv $ psa :=> a
+        forM_ (filter (\(IsIn _ ty) -> is_var ty) psb) $ \p@(IsIn c ty) -> do
+            liftIO . putStrLn $ "p = " ++ show p
         let f' = frame' >>= restore_preds ce psb tyvars
-        go (f' <> f) cs
+        liftIO . putStrLn $ "*****"
+        go f' cs
 
     go f _ = return f
 
@@ -692,13 +704,23 @@ is_var (TVar _) = True
 is_var _ = False
 
 restore_preds :: ClassEnv -> [Pred] -> [TyVar] -> Frame -> Maybe Frame
-restore_preds ce ps tvs frame = foldM go frame tvs
+restore_preds ce ps tvs frame = foldM go frame tvs >>= \f' -> foldM check f' ps
     where pred_map = M.fromList $ map (\p@(IsIn _ ty) -> (ty, p)) ps
           go fr tyvar = do
               (ps :=> bound_ty) <- frameLookup fr tyvar
               case M.lookup bound_ty pred_map of
                   Nothing -> return fr
                   Just p -> return $ frameInsert fr tyvar ((p:ps) :=> bound_ty)
+
+          check fr p@(IsIn c ty) = if not (is_var ty) then return fr else do
+              let TVar tv = ty
+              case frameLookup fr tv of
+                  Nothing -> Just fr
+                  Just (ps :=> bound_ty) ->
+                      case entail ce ps (IsIn c bound_ty) of
+                          False -> Nothing
+                          True -> return $ frameInsert fr tv $
+                              ((IsIn c bound_ty):ps) :=> bound_ty
 
 modifyTypeEnv :: (TypeEnv -> TypeEnv) -> TypeCheck ()
 modifyTypeEnv f = gets typeEnv >>= \te -> modify $ \st -> st { typeEnv = f te }
@@ -724,20 +746,21 @@ inferTop te exprs = (flip evalStateT) ts $ do
         return $ (sym, ty, sort $ nub $ constraints tr)
 
     forM_ constrained $ \(sym, ty, cs) -> do
+        liftIO . putStrLn $ sym
+        liftIO . putStrLn $ "====="
         mFrame <- solveConstraints baseClassEnv cs
         case mFrame of
             Nothing -> liftIO . putStrLn $ sym ++ " failed"
             Just frame -> do
-                liftIO . putStrLn $ "final frame = " ++ show frame
                 let (ps :=> ty') = substitute frame ty
                 let inverted = invert frame
-                liftIO . putStrLn $ "inverted = " ++ show inverted
                 let fvs = S.toList $ ftv ty'
                 let ps' = concat $
                           map (\fv -> maybe [] id (M.lookup fv inverted)) fvs
                 preds <- reduce (fromJust baseClassEnv) (ps ++ ps')
                 let sc = closeOver $ preds :=> ty'
                 modifyTypeEnv $ \te -> envInsert te sym sc
+
     gets typeEnv >>= return . Just
 
     where ts = newTypeState {
@@ -767,19 +790,19 @@ test = do
     defns <- parse_multi $ T.concat
         [
 
---          "(defun square (y) (* y y))"
+          "(defun square (y) (* y y))"
 --        , "(def two 2)"
 --        , "(def four (square two))"
 --        , "(def ocho (* two 4))"
---        , "(def three-half 3.5)"
+        , "(def three-half 3.5)"
 --        , "(def seven (* three-half 2.0))"
---        , "(def twelve-quarter (square three-and-a-half))"
+        , "(def twelve-quarter (square three-half))"
 --        , "(defun compose (f g) (\\ (x) (f (g x))))"
 --        , "(defun id (x) x)"
 --        , "(defun pair (x y) (\\ (f) (f x y)))"
-         "(def if-test (if (< 0 #f) 0.5 2.5))"
+--        ,"(def if-test (if (< 0 5) 0.5 2.5))"
 
---        {- , -}"(def wut (* #t 5))"
+        ,"(def wut (* #t 5))"
 --        , "(defun fact (n prod) (if (< n 2) prod (fact (- n 1) (* prod n))))"
         ]
     let defns' = map (\(Free (DefC sym expr)) -> (sym, untyped expr)) defns
