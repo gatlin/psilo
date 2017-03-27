@@ -802,7 +802,7 @@ test = do
 --        , "(defun pair (x y) (\\ (f) (f x y)))"
 --        ,"(def if-test (if (< 0 5) 0.5 2.5))"
 
-        ,"(def wut (* #t 5))"
+        ,"(def wut (* 7.2 5))"
 --        , "(defun fact (n prod) (if (< n 2) prod (fact (- n 1) (* prod n))))"
         ]
     let defns' = map (\(Free (DefC sym expr)) -> (sym, untyped expr)) defns
