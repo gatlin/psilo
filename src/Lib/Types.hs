@@ -728,6 +728,7 @@ inferTop te exprs = (flip evalStateT) ts $ do
         case mFrame of
             Nothing -> liftIO . putStrLn $ sym ++ " failed"
             Just frame -> do
+                liftIO . putStrLn $ "final frame = " ++ show frame
                 let (ps :=> ty') = substitute frame ty
                 let inverted = invert frame
                 liftIO . putStrLn $ "inverted = " ++ show inverted
