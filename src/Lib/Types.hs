@@ -475,6 +475,14 @@ generateConstraints (() :< IdC sym) = do
     defns <- gets definitions
     (TypeEnv te) <- gets typeEnv
     var <- freshVarId Star
+    case M.lookup sym te of
+            Just sc -> do
+                ty <- instantiate sc
+                return (var, TypeResult [ var := ty, ty :~ sc ] mempty)
+            Nothing -> do
+                var <- freshVarId Star
+                return (var, TypeResult [] (M.singleton sym [var]))
+{-
     case M.lookup sym defns of
         Just u -> do
             (ty, tr) <- memoizedTC generateConstraints u
@@ -489,6 +497,7 @@ generateConstraints (() :< IdC sym) = do
             Nothing -> do
                 var <- freshVarId Star
                 return (var, TypeResult [] (M.singleton sym [var]))
+-}
 
 generateConstraints (() :< FunC argSyms body) = do
     br <- memoizedTC generateConstraints body
@@ -529,7 +538,7 @@ generateConstraints (() :< IfC c t e) = do
     cr <- memoizedTC generateConstraints c
     tr <- memoizedTC generateConstraints t
     er <- memoizedTC generateConstraints e
-    return ((fst tr), {- snd cr <> snd tr <> snd er <> -} TypeResult {
+    return ((fst tr), snd cr <> snd tr <> snd er <> TypeResult {
                    constraints = [ (fst cr) := ([] :=> bool_t)
                                  , (fst tr) := (fst er) ],
                    assumptions = mempty
@@ -803,7 +812,7 @@ test = do
 --        ,"(def if-test (if (< 0 5) 0.5 2.5))"
 
         ,"(def wut (* 7.2 5))"
---        , "(defun fact (n prod) (if (< n 2) prod (fact (- n 1) (* prod n))))"
+        , "(defun fact (n prod) (if (< n 2) prod (fact (- n 1) (* prod n))))"
         ]
     let defns' = map (\(Free (DefC sym expr)) -> (sym, untyped expr)) defns
     results <- inferTop te defns'
