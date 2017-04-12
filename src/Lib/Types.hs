@@ -685,13 +685,13 @@ solveConstraints (Just ce) cs = go (Just mempty) cs where
         let tyvars = S.toList $ ftv a
         let a'@(psa' :=> ta') = substitute frame a
         let b'@(psb' :=> tb') = substitute frame b
-        liftIO . putStrLn $ "psb' = " ++ show psb'
+--        liftIO . putStrLn $ "psb' = " ++ show psb'
         let frame' = (unify ta' tb' f) <> f
-        liftIO . putStrLn $ "frame' = " ++ show frame'
+--        liftIO . putStrLn $ "frame' = " ++ show frame'
         let f' = frame' >>= restore_preds ce psb' tyvars
-        forM_ (filter (\(IsIn _ ty) -> is_var ty) psb') $ \p@(IsIn c ty) -> do
-            liftIO . putStrLn $ "p = " ++ show p
-        liftIO . putStrLn $ "*****"
+{-        forM_ (filter (\(IsIn _ ty) -> is_var ty) psb') $ \p@(IsIn c ty) -> do
+            liftIO . putStrLn $ "p = " ++ show p -}
+--        liftIO . putStrLn $ "*****"
         go f' cs
 
     go f@(Just frame) (((psa :=> a) :~ b) : cs) = do
@@ -699,12 +699,12 @@ solveConstraints (Just ce) cs = go (Just mempty) cs where
         (psb :=> b') <- instantiate (substitute frame b)
         let frame' =
                 (unify (substitute frame a) (substitute frame b') f) <> f
-        liftIO . putStrLn $ "frame' = " ++ show frame'
+--        liftIO . putStrLn $ "frame' = " ++ show frame'
         let tyvars = S.toList $ ftv $ psa :=> a
-        forM_ (filter (\(IsIn _ ty) -> is_var ty) psb) $ \p@(IsIn c ty) -> do
-            liftIO . putStrLn $ "p = " ++ show p
+{-        forM_ (filter (\(IsIn _ ty) -> is_var ty) psb) $ \p@(IsIn c ty) -> do
+            liftIO . putStrLn $ "p = " ++ show p -}
         let f' = frame' >>= restore_preds ce psb tyvars
-        liftIO . putStrLn $ "*****"
+--        liftIO . putStrLn $ "*****"
         go f' cs
 
     go f _ = return f
