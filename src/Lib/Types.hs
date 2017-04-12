@@ -482,22 +482,6 @@ generateConstraints (() :< IdC sym) = do
             Nothing -> do
                 var <- freshVarId Star
                 return (var, TypeResult [] (M.singleton sym [var]))
-{-
-    case M.lookup sym defns of
-        Just u -> do
-            (ty, tr) <- memoizedTC generateConstraints u
-            let sc = closeOver ty
-            return (var, tr <> TypeResult {
-                           constraints = [ var := ty, ty :~ sc ],
-                           assumptions = mempty })
-        Nothing -> case M.lookup sym te of
-            Just sc -> do
-                ty <- instantiate sc
-                return (var, TypeResult [ var := ty, ty :~ sc ] mempty)
-            Nothing -> do
-                var <- freshVarId Star
-                return (var, TypeResult [] (M.singleton sym [var]))
--}
 
 generateConstraints (() :< FunC argSyms body) = do
     br <- memoizedTC generateConstraints body
