@@ -513,6 +513,14 @@ typecheck_defns defns te = runExcept $ do
     let scms2 = map (\ty -> closeOver frame2 ([] :=> ty)) tys_pass_2
     return (scms2, cs2)
 
+typecheck_defn
+    :: Definition
+    -> TypeEnv
+    -> Either TypeError (Scheme, [Constraint])
+typecheck_defn defn te = case typecheck_defns [defn] te of
+    Left err -> Left err
+    Right ((ty:_), cs) -> Right (ty, cs)
+
 {-
 test :: IO ()
 test = do

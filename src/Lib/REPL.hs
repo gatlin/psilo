@@ -47,14 +47,10 @@ data ReplError
 -- | A monad encapsulating a REPL session
 type Repl = StateT ReplState (ExceptT ReplError (InputT IO))
 
-data ReplExpr
-    = ReplDefn Definition
-    | ReplCore (CoreExpr ())
-    deriving (Show, Eq)
-
 runRepl :: ReplState -> Repl a -> IO (Either ReplError a)
 runRepl rs m = runInputT defaultSettings $ runExceptT $ evalStateT m rs
 
+-- | For now we just catch exceptions and print them out
 handleError :: ReplError -> Repl ()
 handleError err = do
     liftIO . putStrLn . show $ err
@@ -66,6 +62,7 @@ replMain = do
     runRepl defaultReplState $ repl `catchError` handleError
     return ()
 
+-- | Parse an input string into either a definition or a bare expression
 replParse :: String -> Repl ()
 replParse src = do
     mParsed <- parse_expr $ Text.pack src
@@ -82,20 +79,20 @@ replParse src = do
 
         Just e -> liftIO . putStrLn $ src
 
-    -- | Type checks a 'Definition' during a REPL session
+-- | Type checks a 'Definition' during a REPL session
 replTypeCheckDefn :: Definition -> Repl ()
 replTypeCheckDefn defn@(Define sym expr) = do
     te <- gets typeEnv
-    case typecheck_defns [defn] te of
+    case typecheck_defn defn te of
         Left err -> do
             throwError $ TypeCheckError err
-        Right ((ty:[]), _) -> do
+        Right (ty, _) -> do
             liftIO . putStrLn $
                 sym ++ " : " ++ (show ty)
             modify $ \st -> st {
                 typeEnv = extendEnv te (sym, ty) }
 
--- | Executes REPL commands
+-- | Executes REPL shell commands
 replCommand :: String -> Repl ()
 replCommand cmd = case break isSpace cmd of
     ("beep", _) -> do

@@ -82,6 +82,8 @@ gensym = do
     return gs
 
 codegen :: MonadIO m => CoreExpr () -> CodegenT m [Asm]
+codegen _ = return []
+{-
 codegen expr = go expr where
 
     go (Free (IntC n)) = return [ Push $ fromInteger n ]
@@ -145,3 +147,4 @@ codegen expr = go expr where
     push_on_stack exprs = do
         exprs' <- forM exprs go
         return $ concat exprs'
+-}
