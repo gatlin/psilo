@@ -2,6 +2,7 @@ module Main where
 
 import Options.Applicative
 import Options.Applicative.Common
+import Data.Monoid ((<>))
 import Lib
 
 data CmdLnOpts = CmdLnOpts
