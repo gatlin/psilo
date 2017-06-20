@@ -10,13 +10,10 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as TextIO
 
-{-
-mapM :: (a -> m b) -> t a -> m (t b)
-
-foldM :: (b -> a -> m b) -> b -> t a -> m b
--}
 
 interpret_file :: Bool -> Bool ->  FilePath -> IO ()
+interpret_file _ _ _ = putStrLn "Under construction!"
+{-
 interpret_file optDebug optAsm inFile = do
     file_contents <- TextIO.readFile inFile
     defns <- parse_multi $ removeComments file_contents
@@ -28,3 +25,4 @@ interpret_file optDebug optAsm inFile = do
     when (optDebug && (not optAsm)) $
         putStrLn . show $ stackPeek $ machineStack st
     return ()
+-}

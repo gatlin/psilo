@@ -45,11 +45,10 @@ import Lib.Syntax
 import Lib.Parser (parse_expr, parse_multi)
 import Lib.Util
 
-
-typeInt, typeBool, typeDouble :: Type
+typeInt, typeBool, typeFloat :: Type
 typeInt = TSym (TyCon "Int" Star)
 typeBool = TSym (TyCon "Boolean" Star)
-typeDouble = TSym (TyCon "Double" Star)
+typeFloat = TSym (TyCon "Float" Star)
 
 -- * Type building blocks
 
@@ -278,7 +277,7 @@ instance TypeLike Constraint where
         (t1 :~ t2) -> (ftv t1)
 
 -- | The @Infer@ monad:
--- 1. reads and locally extend a type environment;
+-- 1. reads and locally extends a type environment;
 -- 2. produces a log of inferred type constraints; and
 -- 3. references a mutable counter to generate new type variables.
 -- The result of inference is either a 'TypeError' or a 3-tuple containing
@@ -333,19 +332,13 @@ instantiate (Forall vs t) = do
     let frame = M.fromList $ zip vs vs'
     return $ substitute frame t
 
--- | Turn a 'CoreExpr' into an annotated tree.
-freeToCofree :: Functor f => Free f () -> Cofree f ()
-freeToCofree (Free m) = () :< fmap freeToCofree m
-
-type Annotated = Cofree CoreAst
-
 -- | Constraint generation and type generation
-infer :: Annotated a -> Infer Type
+infer :: AnnotatedExpr a -> Infer Type
 
 -- Constants are straightforward, except integers could be any @Num@ instance.
 infer (_ :< IntC _) = fresh Star >>= \tv -> return $ TVar tv
 infer (_ :< BoolC _) = return $ typeBool
-infer (_ :< DoubleC _) = return $ typeDouble
+infer (_ :< FloatC _) = return $ typeFloat
 
 -- Symbols are either not in the type environment, raising an exception, or they
 -- map to a 'Scheme' which may be instantiated. In this way we allow
@@ -361,7 +354,7 @@ infer (_ :< IdC sym) = do
             var @= ty
             return var
 
--- | A lambda abstraction is a list of symbols and an 'Annotated' body. Each
+-- | A lambda abstraction is a list of symbols and an 'AnnotatedExpr' body. Each
 -- argument should generate a unique 'Scheme' and the 'TypeEnv' should be
 -- temporarily extended with them to evaluate the body.
 infer (_ :< FunC args body) = do
@@ -392,12 +385,6 @@ infer (_ :< IfC c t e) = do
     cr @= typeBool
     tr @= er
     return tr
-
--- | Kind of useless for now until I reorganize my 'CoreAst'.
-infer (_ :< DefC sym expr) = do
-    var <- fresh Star
-    withEnv [(sym, Forall [] ([] :=> (TVar var)))] $
-        infer expr
 
 -- * Constraint solving
 
@@ -502,36 +489,38 @@ example_defns = [ "(def three (id 3.0))"
 -- definition. These are then inserted into the default type environment and
 -- inference and solving are re-run to produce the final type schemes.
 -- TODO: handle predicates.
+typecheck_defns
+    :: [Definition]
+    -> TypeEnv
+    -> Either TypeError ([Scheme], [Constraint])
+typecheck_defns defns te = runExcept $ do
+    let te' = defaultTypeEnv <> te
+    (syms, exprs) <- mapAndUnzipM
+                     (\(Define sym expr) -> return (sym, annotated expr))
+                     defns
+    (tys_pass_1, _, cs1) <- runInfer te' initInferState $ do
+        scms <- forM exprs $ \_ -> do
+            tv <- fresh Star
+            return $ generalize te' $ [] :=> (TVar tv)
+        inferred <- withEnv (zip syms scms) $ mapM infer exprs
+        return inferred
+
+    frame1 <- runSolve cs1
+    let scms1 = map (\ty -> closeOver frame1 ([] :=> ty)) tys_pass_1
+    let te = foldl extendEnv te' $ zip syms scms1
+    (tys_pass_2, _, cs2) <- runInfer te initInferState $ mapM infer exprs
+    frame2 <- runSolve cs2
+    let scms2 = map (\ty -> closeOver frame2 ([] :=> ty)) tys_pass_2
+    return (scms2, cs2)
+
+{-
 test :: IO ()
 test = do
-    defns <- parse_multi . T.pack . concat $ example_defns
-    (syms, exprs) <- mapAndUnzipM
-                     (\(Free (DefC sym expr)) -> do
-                             expr <- return $ freeToCofree expr
-                             return (sym, expr))
-                     defns
-    let result = do
-            (tys_pass_1, _, cs1) <- runInfer defaultTypeEnv initInferState $ do
-                scms <- forM exprs $ \_ -> do
-                    tv <- fresh Star
-                    return $ generalize defaultTypeEnv $ [] :=> (TVar tv)
-                inferred <- withEnv (zip syms scms) $
-                    mapM infer exprs
-                return inferred
-            frame1 <- runSolve cs1
-            let scms1 = map (\ty -> closeOver frame1 ([] :=> ty)) tys_pass_1
-            let te = foldl extendEnv defaultTypeEnv $ zip syms scms1
-            (tys_pass_2, _, cs2) <- runInfer te initInferState $
-                mapM infer exprs
-            frame2 <- runSolve cs2
-            let scms2 = map (\ty -> closeOver frame2 ([] :=> ty)) tys_pass_2
-            return (scms2, cs2)
+    mDefns <- parse_multi . T.pack . concat $ example_defns
+    case mDefns of
+        Nothing -> putStrLn "Parser error T_T"
+        Just defns -> case typecheck defns mempty of
+            Left err -> putStrLn . show $ err
+            Right result -> putStrLn . show $ result
 
-    case (runExcept result) of
-        Left err -> putStrLn . show $ err
-        Right (scms, cs) -> do
-            putStrLn "Constraints: "
-            forM_ cs $ putStrLn . show
-            putStrLn "---"
-            forM_ (zip syms scms) $ \(sym, scm) -> do
-                putStrLn $ sym ++ " : " ++ (show scm)
+-}

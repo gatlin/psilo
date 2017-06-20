@@ -14,7 +14,7 @@ import Control.Monad.Free
 import Lib.Syntax
 import Lib.Util
 
-num_parser :: Parser (CoreExpr a)
+num_parser :: Parser (SurfaceExpr a)
 num_parser = do
     whole_part <- many1 digit
     mDot <- peekChar
@@ -22,7 +22,7 @@ num_parser = do
         Just '.' -> do
             char '.'
             frac_part <- many1 digit
-            return $ aDouble $ read $ whole_part ++ ['.'] ++ frac_part
+            return $ aFloat $ read $ whole_part ++ ['.'] ++ frac_part
         _ -> return $ aInt (read whole_part)
 
 symchars :: String
@@ -37,7 +37,7 @@ sym = do
     otherChars <- many' $ letter <|> digit <|> symchar
     return $ firstChar:otherChars
 
-id_parser :: Parser (CoreExpr a)
+id_parser :: Parser (SurfaceExpr a)
 id_parser = do
     the_sym <- sym
     return $ aId the_sym
@@ -51,7 +51,7 @@ string_parser = do
     return $ aString $ Text.pack str
 -}
 
-bool_parser :: Parser (CoreExpr a)
+bool_parser :: Parser (SurfaceExpr a)
 bool_parser = do
     char '#'
     bv <- char 't' <|> char 'f'
@@ -59,7 +59,7 @@ bool_parser = do
         't' -> return $ aBool True
         'f' -> return $ aBool False
 
-app_parser :: Parser (CoreExpr a)
+app_parser :: Parser (SurfaceExpr a)
 app_parser = do
     (op:operands) <- expr_parser `sepBy1` (many space)
     return . join $ aApp op operands
@@ -67,7 +67,7 @@ app_parser = do
 lam_parser :: Parser Text
 lam_parser =  (string "\\")
 
-fun_parser :: Parser (CoreExpr a)
+fun_parser :: Parser (SurfaceExpr a)
 fun_parser = do
     char '\\'
     skipSpace
@@ -80,7 +80,7 @@ fun_parser = do
     body <- expr_parser
     return . join $ aFun args body
 
-if_parser :: Parser (CoreExpr a)
+if_parser :: Parser (SurfaceExpr a)
 if_parser = do
     string "if"
     skipSpace
@@ -91,7 +91,25 @@ if_parser = do
     e <- expr_parser
     return . join $ aIf c t e
 
-def_parser :: Parser (CoreExpr a)
+parens :: Parser a -> Parser a
+parens p = do
+    char '('
+    skipSpace
+    thing <- p
+    skipSpace
+    char ')'
+    return thing
+
+expr_parser :: Parser (SurfaceExpr a)
+expr_parser = (parens fun_parser)
+          <|> (parens if_parser)
+          <|> bool_parser
+          <|> id_parser
+          <|> num_parser
+--          <|> string_parser
+          <|> (parens app_parser)
+
+def_parser :: Parser (SurfaceExpr a)
 def_parser = do
     string "def"
     skipSpace
@@ -100,7 +118,7 @@ def_parser = do
     val <- expr_parser
     return . join $ aDef sym val
 
-defun_parser :: Parser (CoreExpr a)
+defun_parser :: Parser (SurfaceExpr a)
 defun_parser = do
     string "defun"
     skipSpace
@@ -114,58 +132,40 @@ defun_parser = do
     body <- expr_parser
     return . join $ aDef name (join $ aFun args body)
 
-parens :: Parser a -> Parser a
-parens p = do
-    char '('
-    skipSpace
-    thing <- p
-    skipSpace
-    char ')'
-    return thing
-
-expr_parser :: Parser (CoreExpr a)
-expr_parser = (parens fun_parser)
-          <|> (parens if_parser)
-          <|> bool_parser
-          <|> id_parser
-          <|> num_parser
---          <|> string_parser
-          <|> (parens app_parser)
-
-toplevel_parser :: Parser (CoreExpr a)
+toplevel_parser :: Parser (SurfaceExpr a)
 toplevel_parser = do
     skipSpace
     defn <- (parens defun_parser) <|> (parens def_parser)
     skipSpace
     return defn
 
-module_parser :: Parser [CoreExpr a]
+module_parser :: Parser [SurfaceExpr a]
 module_parser = toplevel_parser `sepBy` (many space)
 
 parse_expr
     :: (Monad m)
     => Text
-    -> m (Maybe (CoreExpr ()))
+    -> m (Maybe (SurfaceExpr ()))
 parse_expr input = do
     let parse_result = parseOnly ((parens def_parser)
                                   <|> (parens defun_parser)
                                   <|> expr_parser) input
     case parse_result of
         Left _ -> return Nothing
-        Right result -> return $ Just $ tailRec result
+        Right result -> return $ Just result
 
 parse_multi
     :: MonadIO m
     => Text
-    -> m [CoreExpr ()]
+    -> m (Maybe [SurfaceExpr ()])
 parse_multi inp = do
     let the_parser = module_parser
     let parse_result = parseOnly the_parser inp
     case parse_result of
         Left reason -> do
             liftIO . putStrLn $ "Parse failure: " ++ reason
-            return []
-        Right result -> return result
+            return Nothing
+        Right result -> return $ Just result
 
 -- | Remove ";" comments from source code
 removeComments :: Text -> Text

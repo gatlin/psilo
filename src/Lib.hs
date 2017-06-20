@@ -1,9 +1,9 @@
 module Lib
     ( replMain
 --    , interpret
-    , interpret_file
+--    , interpret_file
     , parse_expr
-    , parse_multi
+--    , parse_multi
     ) where
 
 import Prelude hiding (map, take, filter, sequence, mapM)

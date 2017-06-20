@@ -82,9 +82,10 @@ gensym = do
     return gs
 
 codegen :: MonadIO m => CoreExpr () -> CodegenT m [Asm]
-codegen expr = go (tailRec expr) where
+codegen expr = go expr where
 
     go (Free (IntC n)) = return [ Push $ fromInteger n ]
+    go (Free (FloatC n)) = return [ Push $ fromInteger $ round n ]
     go (Free (BoolC b)) = return [ Push $ if b then 0x1 else 0x0 ]
 
     go (Free (IdC s)) = do
@@ -94,11 +95,6 @@ codegen expr = go (tailRec expr) where
             Just loc -> return [ ReadLocal loc ]
             Nothing  -> error $ "sym = " ++ s ++ ", Env = " ++ show env ++
                 ", heap pointer = " ++ show hb
-
-    go (Free (DefC sym val)) = do
-        modify $ \st -> st { currTopLevel = Just sym }
-        body <- go val
-        return $ (Label sym) : body
 
     go (Free (AppC fun operands)) = do
         operands' <- push_on_stack (reverse operands)

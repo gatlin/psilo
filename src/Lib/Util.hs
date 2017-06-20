@@ -9,28 +9,42 @@ import qualified Data.Map as M
 import Data.Monoid
 import Control.Monad.Free
 import Control.Monad.Reader
+import Control.Comonad
+import Control.Comonad.Cofree
 
-builtin_syms :: Set Symbol
-builtin_syms = S.fromList
-    [ "+", "*", "-", "/", "=", "<", ">" ]
+surfaceToCore :: SurfaceExpr () -> Maybe (CoreExpr ())
+surfaceToCore (Free (DefS _ _)) = Nothing
+surfaceToCore other = Just $ convert other
+    where
+        convert (Free (FunS args body)) = Free (FunC args (convert body))
+        convert (Free (AppS op erands)) =
+            Free (AppC (convert op) (map convert erands))
 
--- identify tail recursive calls and replace them with a special form
-tailRec :: CoreExpr () -> CoreExpr ()
-tailRec (Free (DefC sym val)) = Free (DefC sym (go sym val)) where
-    go :: Symbol -> CoreExpr () -> CoreExpr ()
+        convert (Free (IntS n)) = Free (IntC n)
+        convert (Free (FloatS n)) = Free (FloatC n)
+        convert (Free (BoolS b)) = Free (BoolC b)
+        convert (Free (IdS s)) = Free (IdC s)
+        convert (Free (IfS c t e)) = Free $
+            IfC (convert c) (convert t) (convert e)
 
-    go sym expr@(Free (FunC args body)) = Free (FunC args (go' sym body))
-    go _ other = other
+-- | Converts a 'SurfaceExpr' to a 'Definition' or fails
+surfaceToDefinition :: SurfaceExpr () -> Maybe Definition
+surfaceToDefinition (Free (DefS sym expr)) = do
+    core <- surfaceToCore expr
+    return $ Define sym core
+{-
+        tailRec sym (Free (IfS c t e)) = Free $
+            IfC (convert c) (tailRec sym t) (tailRec sym e)
 
-    go' sym expr@(Free (IfC c t e)) = Free (IfC c (go' sym t) (go' sym e))
+        tailRec sym expr@(Free (AppS (Free (IdS fun)) ops))
+            | sym == fun = Free $ TailRecC (map convert ops)
+            | otherwise = convert expr
 
-    go' sym expr@(Free (AppC (Free (IdC fun)) ops))
-        | sym == fun = Free (TailRecC ops)
-        | otherwise = expr
+        tailRec _ other = convert other
+-}
 
-    go' _ other = other
-
-tailRec other = other
+surfaceToDefinition _ = Nothing
+{-
 
 -- | Given an expression produce a set of free variable symbols
 free_variables :: CoreExpr () -> Set Symbol -> Set Symbol
@@ -93,3 +107,4 @@ compile expr = reverse (go expr []) where
 -}
 
 -- | Interpret an 'CoreExpr ()' in a 'Runtime' to produce a result 'Value'
+-}
