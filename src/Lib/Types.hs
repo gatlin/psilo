@@ -303,7 +303,7 @@ t1 @= t2 = tell [t1 := t2]
 
 (@~) :: Type -> [Pred] -> Infer ()
 ty @~ [] = return ()
-ty @~ ps = tell [ty :~ ps]
+ty @~ ps = forM_ (ftv ps) $ \tv -> tell [TVar tv :~ ps]
 
 -- temporarily extend the type environment for lambda abstraction
 withEnv :: [(Sym, Scheme)] -> Infer a -> Infer a
@@ -397,14 +397,20 @@ newtype PredMap = PMap (Map Type [Pred])
 
 instance TypeLike PredMap where
     ftv (PMap m) = ftv (M.elems m)
-    substitute frame (PMap m) = PMap $
-        M.mapKeys (substitute frame) $
-        M.map (substitute frame) m
 
-updatePredMap :: Type -> Pred -> PredMap -> PredMap
-updatePredMap ty p (PMap m) = PMap $ case M.lookup ty m of
-    Nothing -> M.insert ty [p] m
-    Just ps -> M.insert ty (p:ps) m
+    substitute frame pmap@(PMap m) = pmap' where
+        keys = M.keys m
+        keys_subbed = substitute frame keys
+        key_fold pm (k, k') = updatePredMap
+                              k'
+                              (substitute frame (lookupPreds k pm))
+                              pm
+        pmap' = foldl key_fold pmap (zip keys keys_subbed)
+
+updatePredMap :: Type -> [Pred] -> PredMap -> PredMap
+updatePredMap ty ps (PMap m) = PMap $ case M.lookup ty m of
+    Nothing -> M.insert ty ps m
+    Just ps' -> M.insert ty (nub $ (ps ++ ps')) m
 
 lookupPreds :: Type -> PredMap -> [Pred]
 lookupPreds ty (PMap m) = concat $ fmap go tvs where
@@ -466,11 +472,8 @@ solver = do
                 put (su1 `compose` su, nub (cs1 ++ (substitute su1 cs0)), pm)
                 solver
             (ty :~ ps) -> do
-                let pm' = foldl
-                          (\pm pred@(IsIn _ ty) ->
-                               updatePredMap ty pred pm)
-                          pm ps
-                put (su, cs0, pm')
+                let pm' = updatePredMap ty ps pm
+                put (su, cs0, substitute su pm')
                 solver
 
 runSolve :: [Constraint] -> Except TypeError (Frame, PredMap)
@@ -533,10 +536,12 @@ typecheck_defns defns te = runExcept $ do
     let pm = substitute frame2 pm2
     let scms2 = fmap (\ty ->
                          closeOver frame2
-                         ((lookupPreds ty pm) :=> (substitute frame2 ty)))
+                         ((lookupPreds
+                           (substitute frame2 ty)
+                           pm)
+                          :=> (substitute frame2 ty)))
                 tys_pass_2
-    return (scms2, substitute frame2 cs2)
-
+    return (scms2, cs2)
 
 typecheck_defn
     :: Definition
@@ -555,7 +560,6 @@ example_defns = [ "(def three (id 3.0))"
                 , "(def four (square 2))"
                 , "(defun fact (n) (if (< n 2) n (fact (* n (- n 1)))))"
                 , "(defun compose (f g x) (f (g x)))"
-                , "(defun wut (x) (if (< x 2) x (- x 1)))"
                 ]
 
 test :: IO ()
