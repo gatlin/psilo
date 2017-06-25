@@ -89,7 +89,6 @@ data CoreAst a
     | AppC { appFun :: a, appArgs :: [a] }
     | FunC { funCArgs :: [Symbol], funCBody :: a }
     | IfC { ifCond :: a, ifThen :: a, ifElse :: a }
---    | DefC { defSym :: Symbol, defValue :: a }
     | TailRecC { tailRecArgs :: [a] }
     deriving (Functor, Foldable, Traversable, Show, Eq, Ord)
 

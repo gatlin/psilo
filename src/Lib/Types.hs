@@ -264,17 +264,17 @@ initInferState = InferState 0
 -- type signatures.
 data Constraint
     = Type := Type -- ^ Equality constraint: two types are identical
-    | (Qual Type) :~ Sym
+    | Type :~ [Pred]
     deriving (Eq, Ord, Show)
 
 instance TypeLike Constraint where
     substitute frame c = case c of
         (t1 := t2) -> (substitute frame t1) := (substitute frame t2)
-        (t1 :~ sym) -> (substitute frame t1) :~ sym
+        (tv :~ ps) -> (substitute frame tv) :~ (substitute frame ps)
 
     ftv c = case c of
         (t1 := t2) -> (ftv t1) `S.union` (ftv t2)
-        (t1 :~ t2) -> (ftv t1)
+        (tv :~ ps) -> (ftv tv) `S.union` (ftv ps)
 
 -- | The @Infer@ monad:
 -- 1. reads and locally extends a type environment;
@@ -301,9 +301,9 @@ runInfer te inferState m = runRWST m te inferState
 (@=) :: Type -> Type -> Infer ()
 t1 @= t2 = tell [t1 := t2]
 
--- helper to record an instance constraint during inference
-(@~) :: Qual Type -> Sym -> Infer ()
-t @~ scm = tell [t :~ scm]
+(@~) :: Type -> [Pred] -> Infer ()
+ty @~ [] = return ()
+ty @~ ps = tell [ty :~ ps]
 
 -- temporarily extend the type environment for lambda abstraction
 withEnv :: [(Sym, Scheme)] -> Infer a -> Infer a
@@ -336,7 +336,10 @@ instantiate (Forall vs t) = do
 infer :: AnnotatedExpr a -> Infer Type
 
 -- Constants are straightforward, except integers could be any @Num@ instance.
-infer (_ :< IntC _) = fresh Star >>= \tv -> return $ TVar tv
+infer (_ :< IntC _) = do
+    ty <- fresh Star >>= \tv -> return $ TVar tv
+    ty @~ [IsIn "Num" ty]
+    return ty
 infer (_ :< BoolC _) = return $ typeBool
 infer (_ :< FloatC _) = return $ typeFloat
 
@@ -350,8 +353,8 @@ infer (_ :< IdC sym) = do
         Nothing -> throwError $ UnboundVariable sym
         Just scheme -> do
             qt@(ps :=> ty) <- instantiate scheme
---            qt @~ sym
             var @= ty
+            ty @~ ps
             return var
 
 -- | A lambda abstraction is a list of symbols and an 'AnnotatedExpr' body. Each
@@ -388,6 +391,28 @@ infer (_ :< IfC c t e) = do
 
 -- * Constraint solving
 
+-- | A map from type variables to predicates
+newtype PredMap = PMap (Map Type [Pred])
+    deriving (Monoid, Show)
+
+instance TypeLike PredMap where
+    ftv (PMap m) = ftv (M.elems m)
+    substitute frame (PMap m) = PMap $
+        M.mapKeys (substitute frame) $
+        M.map (substitute frame) m
+
+updatePredMap :: Type -> Pred -> PredMap -> PredMap
+updatePredMap ty p (PMap m) = PMap $ case M.lookup ty m of
+    Nothing -> M.insert ty [p] m
+    Just ps -> M.insert ty (p:ps) m
+
+lookupPreds :: Type -> PredMap -> [Pred]
+lookupPreds ty (PMap m) = concat $ fmap go tvs where
+    tvs = S.toList $ ftv ty
+    go tv = case M.lookup (TVar tv) m of
+        Nothing -> []
+        Just ps -> ps
+
 -- | A frame paired with constraints to solve.
 type Unifier = (Frame, [Constraint])
 
@@ -396,7 +421,7 @@ emptyUnifier = (mempty, [])
 
 -- | A monad for solving constraints. The state is a 'Unifier' being
 -- constructed. Execution may result in a raised 'TypeError'.
-type Solve = StateT Unifier (Except TypeError)
+type Solve = StateT (Frame, [Constraint], PredMap) (Except TypeError)
 
 -- | Unification of two 'Type's.
 unify :: Type -> Type -> Solve Unifier
@@ -430,20 +455,26 @@ occursCheck a t = a `S.member` (ftv t)
 -- | The actual solving algorithm. Reads the current 'Unifier' and iterates
 -- through the constraints generating 'Unifier's. These are then merged into the
 -- state.
-solver :: Solve Frame
+solver :: Solve (Frame, PredMap)
 solver = do
-    (su, cs) <- get
+    (su, cs, pm) <- get
     case cs of
-        [] -> return su
-        ((t1 := t2) : cs0) -> do
-            (su1, cs1) <- unify t1 t2
-            put (su1 `compose` su, nub $ cs1 ++ (substitute su1 cs0))
-            solver
+        [] -> return (su, pm)
+        (c:cs0) -> case c of
+            (t1 := t2) -> do
+                (su1, cs1) <- unify t1 t2
+                put (su1 `compose` su, nub (cs1 ++ (substitute su1 cs0)), pm)
+                solver
+            (ty :~ ps) -> do
+                let pm' = foldl
+                          (\pm pred@(IsIn _ ty) ->
+                               updatePredMap ty pred pm)
+                          pm ps
+                put (su, cs0, pm')
+                solver
 
-        ((t1 :~ t2) : cs0) -> return su
-
-runSolve :: [Constraint] -> Except TypeError Frame
-runSolve cs = evalStateT solver (mempty, cs)
+runSolve :: [Constraint] -> Except TypeError (Frame, PredMap)
+runSolve cs = evalStateT solver (mempty, cs, mempty)
 
 -- * Defaults!
 
@@ -473,17 +504,6 @@ defaultTypeEnv = TypeEnv $ M.fromList
                                                TVar (TyVar 0 Star)]))
     ]
 
--- * Test shit
-example_defns = [ "(def three (id 3.0))"
-                , "(defun times-2 (x) (* x 2.0))"
-                , "(def eight (times-2 4.0))"
-                , "(defun square (x) (* x x))"
-                , "(def nine (square 3.0))"
-                , "(def four (square 2))"
-                , "(defun fact (n) (if (< n 2.0) n (fact (* n (- n 1.0)))))"
-                , "(defun compose (f g x) (f (g x)))"
-                ]
-
 -- | Right now this is a two-pass inferencer.
 -- The first pass infers and solves for generic type schemes for each
 -- definition. These are then inserted into the default type environment and
@@ -505,13 +525,18 @@ typecheck_defns defns te = runExcept $ do
         inferred <- withEnv (zip syms scms) $ mapM infer exprs
         return inferred
 
-    frame1 <- runSolve cs1
+    (frame1, pm1) <- runSolve cs1
     let scms1 = map (\ty -> closeOver frame1 ([] :=> ty)) tys_pass_1
     let te = foldl extendEnv te' $ zip syms scms1
     (tys_pass_2, _, cs2) <- runInfer te initInferState $ mapM infer exprs
-    frame2 <- runSolve cs2
-    let scms2 = map (\ty -> closeOver frame2 ([] :=> ty)) tys_pass_2
-    return (scms2, cs2)
+    (frame2, pm2) <- runSolve cs2
+    let pm = substitute frame2 pm2
+    let scms2 = fmap (\ty ->
+                         closeOver frame2
+                         ((lookupPreds ty pm) :=> (substitute frame2 ty)))
+                tys_pass_2
+    return (scms2, substitute frame2 cs2)
+
 
 typecheck_defn
     :: Definition
@@ -521,14 +546,31 @@ typecheck_defn defn te = case typecheck_defns [defn] te of
     Left err -> Left err
     Right ((ty:_), cs) -> Right (ty, cs)
 
-{-
+-- * Test shit
+example_defns = [ --"(def three (id 3.0))"
+--                , "(defun times-2 (x) (* x 2.0))"
+--                , "(def eight (times-2 4.0))"
+                  "(defun square (x) (* x x))"
+--                , "(def nine (square 3.0))"
+                , "(def four (square 2))"
+--                , "(defun fact (n) (if (< n 2.0) n (fact (* n (- n 1.0)))))"
+--                , "(defun compose (f g x) (f (g x)))"
+                ]
+
 test :: IO ()
 test = do
     mDefns <- parse_multi . T.pack . concat $ example_defns
     case mDefns of
         Nothing -> putStrLn "Parser error T_T"
-        Just defns -> case typecheck defns mempty of
-            Left err -> putStrLn . show $ err
-            Right result -> putStrLn . show $ result
-
--}
+        Just defns -> do
+            let defns' = fmap (fromJust . surfaceToDefinition) defns
+            case typecheck_defns defns' defaultTypeEnv of
+                Left err -> putStrLn . show $ err
+                Right (schemes, cs) -> do
+                    putStrLn "Schemes"
+                    putStrLn "---"
+                    forM_ (zip example_defns schemes) $ \(d, s) -> do
+                        putStrLn $ d ++ " : " ++ (show s)
+                    putStrLn "Constraints"
+                    putStrLn "---"
+                    forM_ cs $ putStrLn . show
