@@ -547,14 +547,15 @@ typecheck_defn defn te = case typecheck_defns [defn] te of
     Right ((ty:_), cs) -> Right (ty, cs)
 
 -- * Test shit
-example_defns = [ --"(def three (id 3.0))"
---                , "(defun times-2 (x) (* x 2.0))"
---                , "(def eight (times-2 4.0))"
-                  "(defun square (x) (* x x))"
---                , "(def nine (square 3.0))"
+example_defns = [ "(def three (id 3.0))"
+                , "(defun times-2 (x) (* x 2.0))"
+                , "(def eight (times-2 4.0))"
+                , "(defun square (x) (* x x))"
+                , "(def nine (square 3.0))"
                 , "(def four (square 2))"
---                , "(defun fact (n) (if (< n 2.0) n (fact (* n (- n 1.0)))))"
---                , "(defun compose (f g x) (f (g x)))"
+                , "(defun fact (n) (if (< n 2) n (fact (* n (- n 1)))))"
+                , "(defun compose (f g x) (f (g x)))"
+                , "(defun wut (x) (if (< x 2) x (- x 1)))"
                 ]
 
 test :: IO ()
