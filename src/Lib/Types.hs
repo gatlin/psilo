@@ -26,7 +26,7 @@ import Control.Monad.RWS
 import Control.Monad.State
 import Control.Monad.Except
 import Control.Monad.IO.Class
-import Data.List (nub, union, intercalate, sort)
+import Data.List (nub, union, intercalate)
 import Data.Maybe (isNothing, fromMaybe, fromJust, isJust)
 import Data.Monoid
 import Data.Either (either)
@@ -44,11 +44,6 @@ import qualified Data.Text as T
 import Lib.Syntax
 import Lib.Parser (parse_expr, parse_multi)
 import Lib.Util
-
-typeInt, typeBool, typeFloat :: Type
-typeInt = TSym (TyCon "Int" Star)
-typeBool = TSym (TyCon "Boolean" Star)
-typeFloat = TSym (TyCon "Float" Star)
 
 -- * Type building blocks
 
@@ -141,6 +136,94 @@ u |-> t = M.fromList $ [(u, t)]
 
 compose :: Frame -> Frame -> Frame
 f1 `compose` f2 = M.map (substitute f1) f2 `M.union` f1
+
+-- * Typeclasses
+
+-- | A typeclass instance is a qualified predicate, eg
+-- @@
+-- [ IsIn "Ord" (TVar (TyVar 0 Star)),
+--   IsIn "Ord" (TVar (TyVar 1 Star)) ]
+--     :=> [ IsIn "Ord" (tPair (TVar (TyVar 0 Star))
+--                             (TVar (TyVar 1 Star)))]
+-- @@
+type Inst = Qual Pred
+
+-- | A typeclass carries information about its superclasses and its instances
+type Class = ([Symbol], [Qual Pred])
+
+-- | Provides information on
+newtype ClassEnv = ClassEnv (Map Symbol Class)
+    deriving (Show, Monoid)
+
+-- | Useful when querying or manipulating the class environment
+data ClassError
+    = ClassAlreadyDefined Symbol
+    | SuperclassNotDefined Symbol
+    | NoClassForInstance Symbol
+    | OverlappingInstance Symbol
+    deriving (Show)
+
+classes :: ClassEnv -> Symbol -> Maybe Class
+classes (ClassEnv ce) sym = M.lookup sym ce
+
+-- These two functions should not be used unless you really know the class exists
+super :: ClassEnv -> Symbol -> [Symbol]
+super ce i = case classes ce i of Just (is, its) -> is
+
+insts :: ClassEnv -> Symbol -> [Inst]
+insts ce i = case classes ce i of Just (is, its) -> its
+
+-- | Insert / Update a mapping in a 'ClassEnv'
+modifyCE :: ClassEnv -> Symbol -> Class -> ClassEnv
+modifyCE (ClassEnv ce) sym klass = ClassEnv $ M.insert sym klass ce
+
+-- | for readability in code
+defined :: Maybe Class -> Bool
+defined = isJust
+
+newtype EnvTransformer = EnvT {
+    transformCE :: ClassEnv -> Either ClassError ClassEnv }
+
+-- | Combine 'EnvTransformers'
+(<:>) :: EnvTransformer -> EnvTransformer -> EnvTransformer
+(EnvT f) <:> (EnvT g) = EnvT $ \ce -> do
+    ce' <- f ce
+    g ce'
+infixr 5 <:>
+
+-- | I have no idea if this is useful but w/e
+instance Monoid EnvTransformer where
+    mempty = EnvT Right
+    mappend = (<:>)
+
+-- | Adds a new class to a 'ClassEnv', ensuring the name is not already taken
+-- and that superclasses are already defined.
+addClass :: Symbol -> [Symbol] -> EnvTransformer
+addClass sym is = EnvT go where
+    go ce | defined (classes ce sym) = Left $ ClassAlreadyDefined sym
+          | any (not . defined . classes ce) is =
+                Left $ SuperclassNotDefined sym
+          | otherwise = return (modifyCE ce sym (is, []))
+
+-- | Adds an instance to a class, ensuring it does not overlap with others and
+-- that the class exists.
+addInst :: [Pred] -> Pred -> EnvTransformer
+addInst ps p@(IsIn sym _) = EnvT go where
+    go ce | not (defined (classes ce sym)) = Left $ NoClassForInstance sym
+          | any (overlap p) qs = Left $ OverlappingInstance sym
+          | otherwise = return $ modifyCE ce sym c
+          where its = insts ce sym
+                qs = [ q | (_ :=> q) <- its ]
+                c = (super ce sym, (ps :=> p) : its)
+
+-- | Make sure two predicates do not overlap
+overlap :: Pred -> Pred -> Bool
+overlap (IsIn _ t1) (IsIn _ t2) = case runSolve (unify t1 t2) st of
+    Left _ -> False
+    Right _ -> True
+    where st = initSolveState
+
+-- * TypeLike Things!
 
 -- | Things which have free variables and which may have 'Frame' substitutions
 -- applied on them
@@ -301,9 +384,9 @@ runInfer te inferState m = runRWST m te inferState
 (@=) :: Type -> Type -> Infer ()
 t1 @= t2 = tell [t1 := t2]
 
-(@~) :: Type -> [Pred] -> Infer ()
-ty @~ [] = return ()
-ty @~ ps = forM_ (ftv ps) $ \tv -> tell [TVar tv :~ ps]
+tyInst :: [Pred] -> Infer ()
+tyInst [] = return ()
+tyInst ps = forM_ (ftv ps) $ \tv -> tell [TVar tv :~ ps]
 
 -- temporarily extend the type environment for lambda abstraction
 withEnv :: [(Sym, Scheme)] -> Infer a -> Infer a
@@ -338,7 +421,7 @@ infer :: AnnotatedExpr a -> Infer Type
 -- Constants are straightforward, except integers could be any @Num@ instance.
 infer (_ :< IntC _) = do
     ty <- fresh Star >>= \tv -> return $ TVar tv
-    ty @~ [IsIn "Num" ty]
+    tyInst [IsIn "Num" ty]
     return ty
 infer (_ :< BoolC _) = return $ typeBool
 infer (_ :< FloatC _) = return $ typeFloat
@@ -354,7 +437,7 @@ infer (_ :< IdC sym) = do
         Just scheme -> do
             qt@(ps :=> ty) <- instantiate scheme
             var @= ty
-            ty @~ ps
+            tyInst ps
             return var
 
 -- | A lambda abstraction is a list of symbols and an 'AnnotatedExpr' body. Each
@@ -391,13 +474,16 @@ infer (_ :< IfC c t e) = do
 
 -- * Constraint solving
 
--- | A map from type variables to predicates
+-- | A map from types to the predicates they will hopefully satisfy
 newtype PredMap = PMap (Map Type [Pred])
     deriving (Monoid, Show)
 
 instance TypeLike PredMap where
     ftv (PMap m) = ftv (M.elems m)
 
+    -- potentially several distinct type variables will be combined into the
+    -- same new one, and thus we want to make sure to merge the various
+    -- constraints we have deduced for them
     substitute frame pmap@(PMap m) = pmap' where
         keys = M.keys m
         keys_subbed = substitute frame keys
@@ -407,11 +493,13 @@ instance TypeLike PredMap where
                               pm
         pmap' = foldl key_fold pmap (zip keys keys_subbed)
 
+-- | Insert (or merge) a list of `Pred`icates into a `PredMap`.
 updatePredMap :: Type -> [Pred] -> PredMap -> PredMap
 updatePredMap ty ps (PMap m) = PMap $ case M.lookup ty m of
     Nothing -> M.insert ty ps m
     Just ps' -> M.insert ty (nub $ (ps ++ ps')) m
 
+-- | Look up the list of `Pred` associated with a `Type`.
 lookupPreds :: Type -> PredMap -> [Pred]
 lookupPreds ty (PMap m) = concat $ fmap go tvs where
     tvs = S.toList $ ftv ty
@@ -425,9 +513,21 @@ type Unifier = (Frame, [Constraint])
 emptyUnifier :: Unifier
 emptyUnifier = (mempty, [])
 
+data SolveState = SolveState
+    { frame :: Frame
+    , constraints :: [Constraint]
+    , predMap :: PredMap
+    }
+
+initSolveState :: SolveState
+initSolveState = SolveState mempty mempty mempty
+
 -- | A monad for solving constraints. The state is a 'Unifier' being
 -- constructed. Execution may result in a raised 'TypeError'.
-type Solve = StateT (Frame, [Constraint], PredMap) (Except TypeError)
+type Solve = StateT SolveState (Except TypeError)
+
+runSolve :: Solve a -> SolveState -> Either TypeError a
+runSolve s st = runExcept (evalStateT s st)
 
 -- | Unification of two 'Type's.
 unify :: Type -> Type -> Solve Unifier
@@ -463,21 +563,28 @@ occursCheck a t = a `S.member` (ftv t)
 -- state.
 solver :: Solve (Frame, PredMap)
 solver = do
-    (su, cs, pm) <- get
+    cs <- gets constraints
     case cs of
-        [] -> return (su, pm)
+        [] -> get >>= \(SolveState f _ p) -> return (f, p)
         (c:cs0) -> case c of
             (t1 := t2) -> do
+                su <- gets frame
                 (su1, cs1) <- unify t1 t2
-                put (su1 `compose` su, nub (cs1 ++ (substitute su1 cs0)), pm)
+                modify $ \st -> st {
+                    frame = su1 `compose` su,
+                    constraints = nub $ cs1 ++ (substitute su1 cs0) }
                 solver
             (ty :~ ps) -> do
+                su <- gets frame
+                pm <- gets predMap
                 let pm' = updatePredMap ty ps pm
-                put (su, cs0, substitute su pm')
+                put $ SolveState su cs0 $ substitute su pm'
                 solver
 
-runSolve :: [Constraint] -> Except TypeError (Frame, PredMap)
-runSolve cs = evalStateT solver (mempty, cs, mempty)
+solveConstraints :: [Constraint] -> Except TypeError (Frame, PredMap)
+solveConstraints cs = evalStateT solver $ initSolveState {
+    constraints = cs
+    }
 
 -- * Defaults!
 
@@ -494,6 +601,16 @@ ord_binop = [IsIn "Ord" t_0] :=> (TFun [t_0, t_0, typeBool])
     where t_0 = TVar (TyVar 0 Star)
 
 -- | The default type environment.
+
+-- |Core types
+-- An 'int' is 32 bits (2 words in the stack vm)
+-- A float is a 16 bit floating point
+typeInt, typeBool, typeFloat :: Type
+typeInt = TSym (TyCon "Int" Star)
+typeBool = TSym (TyCon "Boolean" Star)
+typeFloat = TSym (TyCon "Float" Star)
+
+-- | Builtin operators and functions with explicit type schemes
 defaultTypeEnv :: TypeEnv
 defaultTypeEnv = TypeEnv $ M.fromList
     [ ("*", generalize mempty num_binop)
@@ -507,6 +624,23 @@ defaultTypeEnv = TypeEnv $ M.fromList
                                                TVar (TyVar 0 Star)]))
     ]
 
+addCoreClasses :: EnvTransformer
+addCoreClasses =     addClass "Eq" []
+                 <:> addClass "Ord" ["Eq"]
+--                 <:> addClass "Show" []
+                 <:> addClass "Enum" []
+                 <:> addClass "Num" ["Eq"]
+                 <:> addClass "Real" ["Num", "Ord"]
+                 <:> addClass "Fractional" ["Num"]
+                 <:> addClass "Integral" ["Real", "Enum"]
+                 <:> addClass "Floating" ["Fractional"]
+
+defaultClassEnv :: EnvTransformer
+defaultClassEnv =     addCoreClasses
+                  <:> addInst [] (IsIn "Integral" typeInt)
+                  <:> addInst [] (IsIn "Floating" typeFloat)
+                  <:> addInst [] (IsIn "Eq" typeBool)
+
 -- | Right now this is a two-pass inferencer.
 -- The first pass infers and solves for generic type schemes for each
 -- definition. These are then inserted into the default type environment and
@@ -518,29 +652,31 @@ typecheck_defns
     -> Either TypeError ([Scheme], [Constraint])
 typecheck_defns defns te = runExcept $ do
     let te' = defaultTypeEnv <> te
+
+    -- annotate expressions
     (syms, exprs) <- mapAndUnzipM
                      (\(Define sym expr) -> return (sym, annotated expr))
                      defns
+
+    -- pass 1: add tyvar placeholders to type env, infer
     (tys_pass_1, _, cs1) <- runInfer te' initInferState $ do
         scms <- forM exprs $ \_ -> do
             tv <- fresh Star
             return $ generalize te' $ [] :=> (TVar tv)
         inferred <- withEnv (zip syms scms) $ mapM infer exprs
         return inferred
-
-    (frame1, pm1) <- runSolve cs1
+    (frame1, pm1) <- solveConstraints cs1
     let scms1 = map (\ty -> closeOver frame1 ([] :=> ty)) tys_pass_1
+
+    -- pass 2: extend type env with results of pass 1, do it again
     let te = foldl extendEnv te' $ zip syms scms1
     (tys_pass_2, _, cs2) <- runInfer te initInferState $ mapM infer exprs
-    (frame2, pm2) <- runSolve cs2
+    (frame2, pm2) <- solveConstraints cs2
     let pm = substitute frame2 pm2
-    let scms2 = fmap (\ty ->
-                         closeOver frame2
-                         ((lookupPreds
-                           (substitute frame2 ty)
-                           pm)
-                          :=> (substitute frame2 ty)))
-                tys_pass_2
+    let toScheme ty =
+            let ty' = substitute frame2 ty
+            in  closeOver frame2 ((lookupPreds ty') pm :=> ty')
+    let scms2 = fmap toScheme tys_pass_2
     return (scms2, cs2)
 
 typecheck_defn
@@ -552,6 +688,7 @@ typecheck_defn defn te = case typecheck_defns [defn] te of
     Right ((ty:_), cs) -> Right (ty, cs)
 
 -- * Test shit
+
 example_defns = [ "(def three (id 3.0))"
                 , "(defun times-2 (x) (* x 2.0))"
                 , "(def eight (times-2 4.0))"
