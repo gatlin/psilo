@@ -70,8 +70,8 @@ replParse :: String -> Repl ()
 replParse src = do
     mParsed <- parse_expr $ Text.pack src
     case mParsed of
-        Nothing -> throwError $ ParseError "T_T"
-        Just e@(Free (DefS _ _)) -> do
+        Left err -> throwError $ ParseError err
+        Right e@(Free (DefS _ _)) -> do
             case surfaceToDefinition e of
                 Nothing -> throwError $ ParseError "T_T"
                 Just defn@(Define sym expr) -> do
@@ -80,7 +80,7 @@ replParse src = do
                     modify $ \st -> st {
                         defns = M.insert sym expr ds }
 
-        Just e -> liftIO . putStrLn $ src
+        Right e -> liftIO . putStrLn $ src
 
 -- | Type checks a 'Definition' during a REPL session
 replTypeCheckDefn :: Definition -> Repl ()

@@ -24,7 +24,7 @@ where
 -- It has been modified for a slightly different type and more flexible type
 -- grammar.
 
-import Control.Monad (forM_, forM, foldM, liftM2, zipWithM, mapAndUnzipM, when)
+import Control.Monad (forM_, forM, foldM, liftM2, zipWithM, mapAndUnzipM, guard)
 import Control.Monad.Except
 import Control.Monad.IO.Class
 import Data.Maybe (isNothing, fromMaybe, fromJust, isJust)
@@ -172,8 +172,8 @@ test :: IO ()
 test = do
     mDefns <- parse_multi . T.pack . concat $ example_defns
     case mDefns of
-        Nothing -> putStrLn "Parser error T_T"
-        Just defns -> case (runExcept $ typecheck defns) of
+        Left err -> putStrLn err
+        Right defns -> case (runExcept $ typecheck defns) of
             Left err -> putStrLn . show $ err
             Right syms_schemes -> do
                 putStrLn "Type Results"
