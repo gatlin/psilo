@@ -11,6 +11,7 @@ import Data.Char (isDigit, isAlpha)
 import Control.Monad (join)
 import Control.Monad.IO.Class
 import Control.Monad.Free
+import Control.Monad.Except
 import Lib.Syntax.Surface
 import Lib.Util
 

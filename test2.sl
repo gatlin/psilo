@@ -1,22 +1,8 @@
-; strictly speaking we don't have "ints" but "words"
-(defun negate-16 (word)
-    (add16 1 (comp word)))
-
-(defun minus-16 (a b)
-    (add16 a (negate-16 b)))
-
-; tail-recursive factorial
-(defun fact-rec (n prod)
-  (if (lt n 2)
-    prod
-    (fact-rec (minus-16 n 1) (mul16 prod n))))
-
-; kickstarter-function for factorial
-(defun fact (n) (fact-rec n 1))
-
-(defun add-1-if-even (n)
-  (if (eq 0 (modulo16 n 2))
-    (add16 1 n)
-    n))
-
-(defun main () (fact 5))
+(def three (id 3.0))
+(defun times-2 (x) (* x 2.0))
+(def eight (times-2 4.0))
+(defun square (x) (* x x))
+(def nine (square 3.0))
+(def four (square 2))
+(defun fact (n) (if (< n 2) n (fact (* n (- n 1)))))
+(defun compose (f g x) (f (g x)))

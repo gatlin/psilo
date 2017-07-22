@@ -95,6 +95,10 @@ replTypeCheckDefn defn@(Define sym expr) = do
             modify $ \st -> st {
                 typeEnv = extendEnv te (sym, ty) }
 
+-- | Process definitions
+replProcessDefinitions :: [Definition] -> Repl ()
+replProcessDefinitions defns = forM_ defns replTypeCheckDefn
+
 -- | Executes REPL shell commands
 replCommand :: String -> Repl ()
 replCommand cmd = case break isSpace cmd of
@@ -107,6 +111,11 @@ replCommand cmd = case break isSpace cmd of
             Just ty -> do
                 liftIO . putStrLn $
                     sym ++ " : " ++ (show ty)
+    ("l", file_path) -> do
+        result <- liftIO $ runExceptT $ process_file (ltrim file_path)
+        case result of
+            Left err -> throwError $ ParseError err
+            Right defns -> replProcessDefinitions defns
     (_, _) -> throwError $ UnknownCommand cmd
 
 -- | The actual REPL loop.

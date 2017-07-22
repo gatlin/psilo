@@ -41,5 +41,4 @@ main = execParser opts >>= begin where
 begin :: CmdLnOpts -> IO ()
 begin cmdLnOpts = case inputFile cmdLnOpts of
     Nothing -> replMain
-    Just inFile -> interpret_file (debugOut cmdLnOpts)
-                   (asmDump cmdLnOpts) inFile
+    Just inFile -> putStrLn "Coming soon"
