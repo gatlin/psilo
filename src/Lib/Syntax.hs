@@ -30,7 +30,8 @@ import Lib.Syntax.TopLevel
 import Control.Monad.Free
 
 -- | Converts a 'SurfaceExpr' to a 'CoreExpr' or fails.
--- TODO needs to make each symbol unique
+-- TODO needs to convert each bound symbol into a unique symbol. Suggests a
+-- reader monad.
 surfaceToCore :: SurfaceExpr () -> Maybe (CoreExpr ())
 surfaceToCore (Free (DefS _ _)) = Nothing
 surfaceToCore other = Just $ convert other
