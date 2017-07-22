@@ -29,7 +29,8 @@ import Lib.Syntax.TopLevel
 
 import Control.Monad.Free
 
--- | Converts a 'SurfaceExpr' to a 'CoreExpr' or fails
+-- | Converts a 'SurfaceExpr' to a 'CoreExpr' or fails.
+-- TODO needs to make each symbol unique
 surfaceToCore :: SurfaceExpr () -> Maybe (CoreExpr ())
 surfaceToCore (Free (DefS _ _)) = Nothing
 surfaceToCore other = Just $ convert other
@@ -50,6 +51,10 @@ surfaceToTopLevel :: SurfaceExpr () -> Maybe TopLevel
 surfaceToTopLevel (Free (DefS sym expr)) = do
     core <- surfaceToCore expr
     return $ Define sym core
+
+-- for signatures, we want to convert them into 'Signature' values. This
+-- involves converting each unique string type variable into legit actual type
+-- variables, etc.
 {-
         tailRec sym (Free (IfS c t e)) = Free $
             IfC (convert c) (tailRec sym t) (tailRec sym e)
