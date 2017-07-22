@@ -7,6 +7,10 @@ import Lib.Types.Frame
 import Data.Set (Set)
 import qualified Data.Set as S
 
+-- | Constraints used in type inference: equality constraints and instance
+-- constraints. An equality constraint means that two types are equivalent and
+-- will be unified with each other. An instance constraint means that a type
+-- holds for a set of predicates.
 data Constraint
     = Type := Type
     | Type :~ [Pred]

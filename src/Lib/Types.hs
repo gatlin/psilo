@@ -37,6 +37,7 @@ import Lib.Syntax ( Symbol
                   , CoreExpr
                   , CoreAst(..)
                   , Definition(..)
+                  , SurfaceExpr
                   , AnnotatedExpr
                   , annotated
                   , surfaceToDefinition
@@ -57,6 +58,8 @@ import Lib.Types.TypeError
 
 import Lib.Parser (parse_expr, parse_multi)
 
+-- * Defaults
+
 num_binop :: Qual Type
 num_binop = [IsIn "Num" t_0] :=> (TFun [t_0, t_0, t_0])
     where t_0 = TVar (TyVar 0 Star)
@@ -68,8 +71,6 @@ eq_binop = [IsIn "Eq" t_0] :=> (TFun [t_0, t_0, typeBool])
 ord_binop :: Qual Type
 ord_binop = [IsIn "Ord" t_0] :=> (TFun [t_0, t_0, typeBool])
     where t_0 = TVar (TyVar 0 Star)
-
--- | The default type environment.
 
 -- | Builtin operators and functions with explicit type schemes
 defaultTypeEnv :: TypeEnv
@@ -110,8 +111,8 @@ defaultClassEnv =     addCoreClasses
 typecheck_defns
     :: [Definition]
     -> TypeEnv
-    -> Either TypeError ([Scheme], [Constraint])
-typecheck_defns defns te = runExcept $ do
+    -> Except TypeError ([Scheme], [Constraint])
+typecheck_defns defns te = do
     let te' = defaultTypeEnv <> te
 
     -- annotate expressions
@@ -143,10 +144,10 @@ typecheck_defns defns te = runExcept $ do
 typecheck_defn
     :: Definition
     -> TypeEnv
-    -> Either TypeError (Scheme, [Constraint])
-typecheck_defn defn te = case typecheck_defns [defn] te of
-    Left err -> Left err
-    Right ((ty:_), cs) -> Right (ty, cs)
+    -> Except TypeError (Scheme, [Constraint])
+typecheck_defn defn te = do
+    ((ty:_), cs) <- (typecheck_defns [defn] te)
+    return (ty, cs)
 
 -- * Test shit
 
@@ -160,23 +161,22 @@ example_defns = [ "(def three (id 3.0))"
                 , "(defun compose (f g x) (f (g x)))"
                 ]
 
+typecheck :: [SurfaceExpr ()] -> Except TypeError [(Symbol, Scheme)]
+typecheck defns = do
+    let defns' = fmap (fromJust . surfaceToDefinition) defns
+    (schemes, cs) <- typecheck_defns defns' defaultTypeEnv
+    forM (zip defns' schemes) $ \((Define sym _), scheme) ->
+        return (sym, scheme)
+
 test :: IO ()
 test = do
     mDefns <- parse_multi . T.pack . concat $ example_defns
     case mDefns of
         Nothing -> putStrLn "Parser error T_T"
-        Just defns -> do
-            let defns' = fmap (fromJust . surfaceToDefinition) defns
-            case typecheck_defns defns' defaultTypeEnv of
-                Left err -> putStrLn . show $ err
-                Right (schemes, cs) -> do
-                    putStrLn "Schemes"
-                    putStrLn "---"
-                    forM_ (zip defns' schemes) $ \(d, s) -> do
-                        let (Define sym _) = d
-                        putStrLn $ sym ++ " : " ++ (show s)
-{-
-                    putStrLn "Constraints"
-                    putStrLn "---"
-                    forM_ cs $ putStrLn . show
--}
+        Just defns -> case (runExcept $ typecheck defns) of
+            Left err -> putStrLn . show $ err
+            Right syms_schemes -> do
+                putStrLn "Type Results"
+                putStrLn "---"
+                forM_ syms_schemes $ \(sym, scheme) ->
+                    putStrLn $ sym ++ " : " ++ (show scheme)

@@ -86,7 +86,7 @@ replParse src = do
 replTypeCheckDefn :: Definition -> Repl ()
 replTypeCheckDefn defn@(Define sym expr) = do
     te <- gets typeEnv
-    case typecheck_defn defn te of
+    case (runExcept $ typecheck_defn defn te) of
         Left err -> do
             throwError $ TypeCheckError err
         Right (ty, _) -> do

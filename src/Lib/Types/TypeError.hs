@@ -9,4 +9,5 @@ data TypeError
     | UnificationMismatch [Type] [Type]
     | InfiniteType TyVar Type
     | UnboundVariable Symbol
+    | OtherTypeError String
     deriving (Eq, Show)
