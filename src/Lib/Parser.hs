@@ -135,10 +135,77 @@ defun_parser = do
     body <- expr_parser
     return . join $ aDef name (join $ aFun args body)
 
+sig_type_parser :: Parser ([(String, String)], [[String]])
+sig_type_parser = (parens pred_type) <|> bare_type where
+
+    pred_type :: Parser ([(String, String)], [[String]])
+    pred_type = do
+        skipSpace
+        string "=>"
+        skipSpace
+        preds <- parens (pred `sepBy` (many space))
+        skipSpace
+        (_, t) <- bare_type
+        skipSpace
+        return (preds, t)
+
+    pred :: Parser (String, String)
+    pred = parens $ do
+        skipSpace
+        p <- sym
+        skipSpace
+        t <- sym
+        skipSpace
+        return (p, t)
+
+    bare_type :: Parser ([(String, String)], [[String]])
+    bare_type = (parens compound_type) <|> single_type
+
+    compound_type :: Parser ([(String, String)], [[String]])
+    compound_type = do
+        skipSpace
+        string "->"
+        skipSpace
+        ts <- sym' `sepBy` (many space)
+        skipSpace
+        return ([], ts)
+
+    single_type :: Parser ([(String, String)], [[String]])
+    single_type = do
+        t <- sym'
+        return ([], [t])
+
+    sym' :: Parser [String]
+    sym' = do
+        skipSpace
+        t <- one <|> (parens more)
+        skipSpace
+        return t
+
+    one :: Parser [String]
+    one = do
+        t <- sym
+        return [t]
+
+    more :: Parser [String]
+    more = do
+        ts <- sym `sepBy` (many space)
+        return ts
+
+sig_parser :: Parser (SurfaceExpr a)
+sig_parser = do
+    char ':'
+    skipSpace
+    name <- sym
+    skipSpace
+    t <- sig_type_parser
+    skipSpace
+    return . join $ aSig name [] t
+
 toplevel_parser :: Parser (SurfaceExpr a)
 toplevel_parser = do
     skipSpace
-    defn <- (parens defun_parser) <|> (parens def_parser)
+    defn <- (parens defun_parser) <|> (parens def_parser) <|> (parens sig_parser)
     skipSpace
     return defn
 
@@ -152,6 +219,7 @@ parse_expr
 parse_expr input = do
     let parse_result = parseOnly ((parens def_parser)
                                   <|> (parens defun_parser)
+                                  <|> (parens sig_parser)
                                   <|> expr_parser) input
     return parse_result
 
