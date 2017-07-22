@@ -3,11 +3,11 @@ module Lib.Syntax
     , builtin_syms
     , CoreExpr
     , CoreAst(..)
-    , Definition(..)
+    , TopLevel(..)
     , SurfaceExpr
     , SurfaceAst(..)
     , surfaceToCore
-    , surfaceToDefinition
+    , surfaceToTopLevel
     , aInt
     , aFloat
     , aBool
@@ -25,6 +25,7 @@ import Lib.Syntax.Symbol
 import Lib.Syntax.Core
 import Lib.Syntax.Surface
 import Lib.Syntax.Annotated
+import Lib.Syntax.TopLevel
 
 import Control.Monad.Free
 
@@ -44,9 +45,9 @@ surfaceToCore other = Just $ convert other
         convert (Free (IfS c t e)) = Free $
             IfC (convert c) (convert t) (convert e)
 
--- | Converts a 'SurfaceExpr' to a 'Definition' or fails
-surfaceToDefinition :: SurfaceExpr () -> Maybe Definition
-surfaceToDefinition (Free (DefS sym expr)) = do
+-- | Converts a 'SurfaceExpr' to a 'TopLevel' or fails
+surfaceToTopLevel :: SurfaceExpr () -> Maybe TopLevel
+surfaceToTopLevel (Free (DefS sym expr)) = do
     core <- surfaceToCore expr
     return $ Define sym core
 {-
@@ -60,4 +61,4 @@ surfaceToDefinition (Free (DefS sym expr)) = do
         tailRec _ other = convert other
 -}
 
-surfaceToDefinition _ = Nothing
+surfaceToTopLevel _ = Nothing

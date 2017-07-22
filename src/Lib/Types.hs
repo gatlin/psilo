@@ -36,11 +36,11 @@ import qualified Data.Text as T
 import Lib.Syntax ( Symbol
                   , CoreExpr
                   , CoreAst(..)
-                  , Definition(..)
+                  , TopLevel(..)
                   , SurfaceExpr
                   , AnnotatedExpr
                   , annotated
-                  , surfaceToDefinition
+                  , surfaceToTopLevel
                   )
 
 import Lib.Types.Kind
@@ -109,7 +109,7 @@ defaultClassEnv =     addCoreClasses
 -- inference and solving are re-run to produce the final type schemes.
 -- TODO: handle predicates.
 typecheck_defns
-    :: [Definition]
+    :: [TopLevel]
     -> TypeEnv
     -> Except TypeError ([Scheme], [Constraint])
 typecheck_defns defns te = do
@@ -142,7 +142,7 @@ typecheck_defns defns te = do
     return (scms2, cs2)
 
 typecheck_defn
-    :: Definition
+    :: TopLevel
     -> TypeEnv
     -> Except TypeError (Scheme, [Constraint])
 typecheck_defn defn te = do
@@ -163,7 +163,7 @@ example_defns = [ "(def three (id 3.0))"
 
 typecheck :: [SurfaceExpr ()] -> Except TypeError [(Symbol, Scheme)]
 typecheck defns = do
-    let defns' = fmap (fromJust . surfaceToDefinition) defns
+    let defns' = fmap (fromJust . surfaceToTopLevel) defns
     (schemes, cs) <- typecheck_defns defns' defaultTypeEnv
     forM (zip defns' schemes) $ \((Define sym _), scheme) ->
         return (sym, scheme)

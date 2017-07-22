@@ -13,13 +13,13 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as TextIO
 import Data.Maybe (fromJust)
 
-process_file :: FilePath -> ExceptT String IO [Definition]
+process_file :: FilePath -> ExceptT String IO [TopLevel]
 process_file file_path = do
     file_contents <- liftIO $ TextIO.readFile file_path
     defns <- liftIO $ parse_multi $ removeComments file_contents
     case defns of
         Left err -> throwError err
-        Right defns' -> return $ fmap (fromJust . surfaceToDefinition) defns'
+        Right defns' -> return $ fmap (fromJust . surfaceToTopLevel) defns'
 {-
 interpret_file optDebug optAsm inFile = do
     file_contents <- TextIO.readFile inFile

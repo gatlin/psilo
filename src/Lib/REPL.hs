@@ -9,10 +9,14 @@ import Lib.Parser
 import Lib.FileEval
 import Lib.Types
 import Lib.Util
-import Lib.Syntax (surfaceToDefinition)
-import Lib.Syntax.Symbol
-import Lib.Syntax.Core
-import Lib.Syntax.Surface
+import Lib.Syntax ( surfaceToTopLevel
+                  , CoreAst(..)
+                  , CoreExpr
+                  , SurfaceAst(..)
+                  , SurfaceExpr
+                  , TopLevel(..)
+                  , Symbol
+                  )
 import System.Console.Haskeline
 import Control.Monad.Trans
 import Control.Monad.IO.Class
@@ -72,7 +76,7 @@ replParse src = do
     case mParsed of
         Left err -> throwError $ ParseError err
         Right e@(Free (DefS _ _)) -> do
-            case surfaceToDefinition e of
+            case surfaceToTopLevel e of
                 Nothing -> throwError $ ParseError "T_T"
                 Just defn@(Define sym expr) -> do
                     replTypeCheckDefn defn
@@ -82,8 +86,8 @@ replParse src = do
 
         Right e -> liftIO . putStrLn $ src
 
--- | Type checks a 'Definition' during a REPL session
-replTypeCheckDefn :: Definition -> Repl ()
+-- | Type checks a 'TopLevel' during a REPL session
+replTypeCheckDefn :: TopLevel -> Repl ()
 replTypeCheckDefn defn@(Define sym expr) = do
     te <- gets typeEnv
     case (runExcept $ typecheck_defn defn te) of
@@ -96,7 +100,7 @@ replTypeCheckDefn defn@(Define sym expr) = do
                 typeEnv = extendEnv te (sym, ty) }
 
 -- | Process definitions
-replProcessDefinitions :: [Definition] -> Repl ()
+replProcessDefinitions :: [TopLevel] -> Repl ()
 replProcessDefinitions defns = forM_ defns replTypeCheckDefn
 
 -- | Executes REPL shell commands

@@ -33,7 +33,3 @@ data CoreAst a
 -- | The free monad of 'CoreAst' is a DSL which used by the type checker, code
 -- generators, and other subsystems.
 type CoreExpr = Free CoreAst
-
--- | A definition pairs a 'Symbol' with a 'CoreExpr'.
-data Definition = Define Symbol (CoreExpr ())
-    deriving (Show, Eq)
