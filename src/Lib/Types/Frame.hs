@@ -23,6 +23,8 @@ u |-> t = M.fromList $ [(u, t)]
 compose :: Frame -> Frame -> Frame
 f1 `compose` f2 = M.map (substitute f1) f2 `M.union` f1
 
+-- | This name is not optimal: entities which contain 'Type' information that
+-- can be updated with a 'Frame' and which potentially bind 'TyVar's in them.
 class TypeLike t where
     substitute :: Frame -> t -> t
     ftv :: t -> Set TyVar

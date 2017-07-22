@@ -31,6 +31,7 @@ data ClassError
     | OverlappingInstance Symbol
     deriving (Show)
 
+-- | Extracts typeclass information from a 'ClassEnv', if available.
 classes :: ClassEnv -> Symbol -> Maybe Class
 classes (ClassEnv ce) sym = M.lookup sym ce
 

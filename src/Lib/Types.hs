@@ -1,7 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Lib.Types
     ( typecheck_defn
@@ -28,25 +25,12 @@ where
 -- grammar.
 
 import Control.Monad (forM_, forM, foldM, liftM2, zipWithM, mapAndUnzipM, when)
-import Control.Monad.Free
-import Data.Functor.Identity
-import Control.Monad.RWS
-import Control.Monad.State
 import Control.Monad.Except
 import Control.Monad.IO.Class
-import Data.List (nub, union, intercalate)
 import Data.Maybe (isNothing, fromMaybe, fromJust, isJust)
-import Data.Monoid
-import Data.Either (either)
+import Data.Monoid ((<>))
 
-import Control.Comonad
-import Control.Comonad.Cofree
-
-import Data.Foldable (Foldable, fold)
-import Data.Map.Lazy (Map)
 import qualified Data.Map.Lazy as M
-import Data.Set (Set)
-import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Lib.Syntax ( Symbol
