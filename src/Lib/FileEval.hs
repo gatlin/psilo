@@ -20,16 +20,3 @@ process_file file_path = do
     case defns of
         Left err -> throwError err
         Right defns' -> return $ fmap (fromJust . surfaceToTopLevel) defns'
-{-
-interpret_file optDebug optAsm inFile = do
-    file_contents <- TextIO.readFile inFile
-    defns <- parse_multi $ removeComments file_contents
-    compiled' <- runCodegenT newCodegenContext newCodegenState $ do
-        compiled <- foldM (\ds c -> codegen c >>= \c' -> return $ c' : ds) [] defns
-        return $ concat . reverse $ compiled
-    when optAsm $ forM_ compiled' $ putStrLn . show
-    st <- run (take ((length compiled') - 1) compiled')
-    when (optDebug && (not optAsm)) $
-        putStrLn . show $ stackPeek $ machineStack st
-    return ()
--}
