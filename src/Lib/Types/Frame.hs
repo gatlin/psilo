@@ -2,7 +2,6 @@ module Lib.Types.Frame where
 
 import Lib.Syntax.Symbol
 import Lib.Types.Type (TyVar(..), Type(..))
-import Lib.Types.TypeLike
 import Data.Monoid (Monoid, (<>))
 
 import Data.Map (Map)

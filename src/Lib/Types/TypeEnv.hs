@@ -6,7 +6,6 @@ import Lib.Syntax.Symbol
 import Lib.Types.Kind
 import Lib.Types.Type
 import Lib.Types.Qual
-import Lib.Types.TypeLike
 import Lib.Types.Frame
 import Lib.Types.Scheme
 

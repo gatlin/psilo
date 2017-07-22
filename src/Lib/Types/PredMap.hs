@@ -6,7 +6,6 @@ import Lib.Syntax.Symbol
 import Lib.Types.Type (TyVar(..), Type(..))
 import Lib.Types.Qual
 import Lib.Types.Frame
-import Lib.Types.TypeLike
 
 import Data.List (nub)
 import Data.Map (Map)

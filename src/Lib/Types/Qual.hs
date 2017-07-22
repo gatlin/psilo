@@ -4,7 +4,6 @@ import Lib.Syntax.Symbol
 import Lib.Types.Kind
 import Lib.Types.Type
 import Lib.Types.Frame
-import Lib.Types.TypeLike
 
 import Data.List (intercalate)
 import Data.Set (Set)

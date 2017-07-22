@@ -7,7 +7,6 @@ import Lib.Syntax.Core
 import Lib.Types.Kind
 import Lib.Types.Type
 import Lib.Types.Qual
-import Lib.Types.TypeLike
 import Lib.Types.Frame
 import Lib.Types.Scheme
 import Lib.Types.TypeEnv
@@ -27,7 +26,6 @@ import Data.Either (either)
 
 import Control.Comonad
 import Control.Comonad.Cofree
-
 
 -- | The state we need to mutate during type inference
 data InferState = InferState
