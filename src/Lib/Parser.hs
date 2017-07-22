@@ -11,7 +11,7 @@ import Data.Char (isDigit, isAlpha)
 import Control.Monad (join)
 import Control.Monad.IO.Class
 import Control.Monad.Free
-import Lib.Syntax
+import Lib.Syntax.Surface
 import Lib.Util
 
 num_parser :: Parser (SurfaceExpr a)

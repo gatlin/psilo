@@ -9,7 +9,10 @@ import Lib.Parser
 import Lib.FileEval
 import Lib.Types
 import Lib.Util
-import Lib.Syntax
+import Lib.Syntax (surfaceToDefinition)
+import Lib.Syntax.Symbol
+import Lib.Syntax.Core
+import Lib.Syntax.Surface
 import System.Console.Haskeline
 import Control.Monad.Trans
 import Control.Monad.IO.Class
