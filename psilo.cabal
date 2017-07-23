@@ -20,6 +20,23 @@ library
                        Lib.Compiler.StackVM,
                        Lib.Compiler.StackVM.Codegen,
                        Lib.Compiler.StackVM.Machine,
+                       Lib.Syntax.Annotated,
+                       Lib.Syntax.Core,
+                       Lib.Syntax.Surface,
+                       Lib.Syntax.Symbol,
+                       Lib.Syntax.TopLevel,
+                       Lib.Types.Class,
+                       Lib.Types.Constraint,
+                       Lib.Types.Frame,
+                       Lib.Types.Infer,
+                       Lib.Types.Kind,
+                       Lib.Types.PredMap,
+                       Lib.Types.Qual,
+                       Lib.Types.Scheme,
+                       Lib.Types.Solve,
+                       Lib.Types.Type,
+                       Lib.Types.TypeEnv,
+                       Lib.Types.TypeError,
                        Lib.Types
   build-depends:       base >= 4.7 && < 5,
                        comonad,
@@ -38,7 +55,7 @@ library
 executable psilo-exe
   hs-source-dirs:      app
   main-is:             Main.hs
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -dynamic
   build-depends:       base
                      , psilo
                      , optparse-applicative
