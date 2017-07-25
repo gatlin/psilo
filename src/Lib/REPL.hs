@@ -61,12 +61,12 @@ runRepl rs m = runInputT defaultSettings $ runExceptT $ evalStateT m rs
 handleError :: ReplError -> Repl ()
 handleError err = do
     liftIO . putStrLn . show $ err
-    repl
+    replLoop
 
 -- | Called by the outside
 replMain :: IO ()
 replMain = do
-    runRepl defaultReplState $ repl `catchError` handleError
+    runRepl defaultReplState $ replLoop `catchError` handleError
     return ()
 
 -- | Parse an input string into either a definition or a bare expression
@@ -83,6 +83,8 @@ replParse src = do
                     ds <- gets defns
                     modify $ \st -> st {
                         defns = M.insert sym expr ds }
+
+        Right e@(Free (SigS _ _ _)) -> liftIO . putStrLn . show $ e
 
         Right e -> liftIO . putStrLn $ src
 
@@ -110,11 +112,12 @@ replCommand cmd = case break isSpace cmd of
         liftIO . putStrLn $ "boop"
     ("t", sym) -> do
         te <- gets typeEnv
-        case envLookup te (ltrim sym) of
+        let sym' = ltrim sym
+        case envLookup te sym' of
             Nothing -> throwError $ UndefinedSymbol sym
             Just ty -> do
                 liftIO . putStrLn $
-                    sym ++ " : " ++ (show ty)
+                    sym' ++ " : " ++ (show ty)
     ("l", file_path) -> do
         result <- liftIO $ runExceptT $ process_file (ltrim file_path)
         case result of
@@ -123,14 +126,14 @@ replCommand cmd = case break isSpace cmd of
     (_, _) -> throwError $ UnknownCommand cmd
 
 -- | The actual REPL loop.
-repl :: Repl ()
-repl = do
+replLoop :: Repl ()
+replLoop = do
     minput <- lift $ lift $ getInputLine "% "
     case fmap ltrim minput  of
         Nothing -> return ()
         Just (':':cmd) -> do
             replCommand cmd
-            repl
+            replLoop
         Just input -> do
             replParse input
-            repl
+            replLoop

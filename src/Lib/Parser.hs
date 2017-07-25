@@ -135,6 +135,7 @@ defun_parser = do
     body <- expr_parser
     return . join $ aDef name (join $ aFun args body)
 
+-- | For standalone type signatures
 sig_type_parser :: Parser ([(String, String)], [[String]])
 sig_type_parser = (parens pred_type) <|> bare_type where
 
@@ -166,31 +167,43 @@ sig_type_parser = (parens pred_type) <|> bare_type where
         skipSpace
         string "->"
         skipSpace
-        ts <- sym' `sepBy` (many space)
+        ts <- sig_typelit_parser `sepBy` (many space)
         skipSpace
         return ([], ts)
 
     single_type :: Parser ([(String, String)], [[String]])
     single_type = do
-        t <- sym'
+        t <- sig_typelit_parser
         return ([], [t])
 
-    sym' :: Parser [String]
-    sym' = do
-        skipSpace
-        t <- one <|> (parens more)
-        skipSpace
-        return t
 
-    one :: Parser [String]
-    one = do
-        t <- sym
-        return [t]
 
-    more :: Parser [String]
-    more = do
-        ts <- sym `sepBy` (many space)
-        return ts
+sig_typelit_parser :: Parser [String]
+sig_typelit_parser = do
+    skipSpace
+    t <- one <|> (parens more)
+    skipSpace
+    return t
+
+    where
+        one :: Parser [String]
+        one = do
+            t <- sym
+            return [t]
+
+        more :: Parser [String]
+        more = do
+            ts <- sym `sepBy` (many space)
+            return ts
+
+sig_vars_parser :: Parser [[String]]
+sig_vars_parser = do
+    skipSpace
+    string "all"
+    skipSpace
+    vars <- sig_typelit_parser `sepBy` (many space)
+    skipSpace
+    return vars
 
 sig_parser :: Parser (SurfaceExpr a)
 sig_parser = do
@@ -198,9 +211,11 @@ sig_parser = do
     skipSpace
     name <- sym
     skipSpace
+    vars <- (parens sig_vars_parser) <|> (return [])
+    skipSpace
     t <- sig_type_parser
     skipSpace
-    return . join $ aSig name [] t
+    return . join $ aSig name vars t
 
 toplevel_parser :: Parser (SurfaceExpr a)
 toplevel_parser = do
