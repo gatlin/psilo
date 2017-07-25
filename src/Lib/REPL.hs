@@ -11,6 +11,7 @@ import Lib.Types
 import Lib.Types.Scheme
 import Lib.Util
 import Lib.Syntax ( surfaceToTopLevel
+                  , surfaceToCore
                   , CoreAst(..)
                   , CoreExpr
                   , SurfaceAst(..)
@@ -39,10 +40,11 @@ ltrim = dropWhile isSpace
 data ReplState = ReplState
     { defns :: Map Symbol (CoreExpr ())
     , typeEnv :: TypeEnv
+    , exprCount :: Int
     } deriving (Show)
 
 defaultReplState :: ReplState
-defaultReplState = ReplState M.empty mempty
+defaultReplState = ReplState M.empty mempty 0
 
 -- | The kinds of exceptions that may be raised during REPL execution
 data ReplError
@@ -66,6 +68,12 @@ handleError err = do
     liftIO . putStrLn . show $ err
     replLoop
 
+gensym :: Repl Symbol
+gensym = do
+    c <- gets exprCount
+    modify $ \st -> st { exprCount = c + 1 }
+    return $ "sym#" ++ (show c)
+
 -- | Called by the outside
 replMain :: IO ()
 replMain = do
@@ -84,14 +92,21 @@ replLookupTypeEnv sym = do
     return $ envLookup te sym
 
 -- | Parse an input string into either a definition or a bare expression
-replParse :: String -> Repl ()
-replParse src = do
+replTypeCheck :: String -> Repl ()
+replTypeCheck src = do
     mParsed <- parse_expr $ Text.pack src
+    te <- gets typeEnv
     case mParsed of
         Left err -> throwError $ ParseError err
-        Right surface -> case surfaceToTopLevel surface of
+        Right surface -> case surfaceToCore surface of
             Nothing -> throwError $ OtherError "Clearly the parser is bad."
-            Just topLevel -> replTopLevel [topLevel]
+            Just expr -> do
+                sym <- gensym
+                case (runExcept $ typecheck_defn (sym, expr) te) of
+                    Left err -> throwError $ TypeCheckError err
+                    Right (ty, _) -> do
+                        liftIO . putStrLn . show $ ty
+
 
 replTopLevel :: [TopLevel] -> Repl ()
 replTopLevel topLevels = do
@@ -122,14 +137,7 @@ replCommand :: String -> Repl ()
 replCommand cmd = case break isSpace cmd of
     ("beep", _) -> do
         liftIO . putStrLn $ "boop"
-    ("t", sym) -> do
-        let sym' = ltrim sym
-        result <- replLookupTypeEnv sym'
-        case result of
-            Nothing -> throwError $ UndefinedSymbol sym'
-            Just ty -> do
-                liftIO . putStrLn $
-                    sym' ++ " : " ++ (show ty)
+    ("t", expr) -> replTypeCheck (ltrim expr)
     ("l", file_path) -> do
         result <- liftIO $ runExceptT $ process_file (ltrim file_path)
         case result of
@@ -147,5 +155,4 @@ replLoop = do
             replCommand cmd
             replLoop
         Just input -> do
-            replParse input
             replLoop
