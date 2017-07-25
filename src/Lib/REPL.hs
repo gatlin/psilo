@@ -102,25 +102,27 @@ replTypeCheck src = do
         Right (ty, _) -> do
             liftIO . putStrLn . show $ ty
 
+-- | Parses a REPL expression into a 'CoreExpr'.
 replParseExpr :: String -> Repl (CoreExpr ())
 replParseExpr src = do
     mParsed <- parse_expr $ Text.pack src
     case mParsed of
         Left err -> throwError $ ParseError err
         Right surface -> case surfaceToCore surface of
-            Nothing -> throwError $ OtherError "Malformed expression"
+            Nothing -> throwError $ OtherError "Invalid REPL expression"
             Just expr -> return expr
 
+-- | Type checks and extends the environment with a set of top level
+-- declarations.
 replTopLevel :: [TopLevel] -> Repl ()
 replTopLevel topLevels = do
     te <- gets typeEnv
     defns <- foldM
-        (\ds topLevel -> do
-                case topLevel of
-                    (Signature sym scheme) -> do
-                        replExtendTypeEnv sym scheme
-                        return ds
-                    d@(Define sym expr) -> return ((sym, expr):ds))
+        (\ds topLevel -> case topLevel of
+                (Signature sym scheme) -> do
+                    replExtendTypeEnv sym scheme
+                    return ds
+                (Define sym expr) -> return ((sym, expr):ds))
         []
         topLevels
     let syms = fmap fst defns

@@ -43,6 +43,7 @@ import qualified Data.Map as M
 -- reader monad.
 surfaceToCore :: SurfaceExpr () -> Maybe (CoreExpr ())
 surfaceToCore (Free (DefS _ _)) = Nothing
+surfaceToCore (Free (SigS _ _ _)) = Nothing
 surfaceToCore other = Just $ convert other
     where
         convert (Free (FunS args body)) = Free (FunC args (convert body))
