@@ -9,7 +9,6 @@
 (: eight Float)
 (def eight (times-2 4.0))
 
-
 (defun square (x) (* x x))
 
 (def nine (square 3.0))
@@ -26,10 +25,10 @@
 ;(defun unbox (bx) (bx id))
 ;(defun box-map (f bx) (box (f (unbox bx))))
 
-(defun Const (x) x)
-(defun const (x) (Const (\ (f) (f x))))
-(defun get-const (c) (c id))
-(defun const-map (f c) (const (get-const)))
+;(defun Const (x) x)
+;(defun const (x) (Const (\ (f) (f x))))
+;(defun get-const (c) (c id))
+;(defun const-map (f c) (const (get-const)))
 
 ;(defun over (l f s)
   (unbox ((l (compose box f) s) box-map)))
