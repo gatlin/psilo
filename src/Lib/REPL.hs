@@ -68,6 +68,8 @@ handleError err = do
     liftIO . putStrLn . show $ err
     replLoop
 
+-- | each anonymous repl expression is given a unique symbol for future
+-- debugging purposes
 gensym :: Repl Symbol
 gensym = do
     c <- gets exprCount
@@ -91,7 +93,8 @@ replLookupTypeEnv sym = do
     te <- gets typeEnv
     return $ envLookup te sym
 
--- | Parse an input string into either a definition or a bare expression
+-- | Typechecks a REPL expression, inserting it into the type environment on
+-- success.
 replTypeCheck :: String -> Repl ()
 replTypeCheck src = do
     te <- gets typeEnv
