@@ -13,6 +13,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as TextIO
 import Data.Maybe (fromJust)
 
+-- | reads a file, parses it, and returns top level declarations
 process_file :: FilePath -> ExceptT String IO [TopLevel]
 process_file file_path = do
     file_contents <- liftIO $ TextIO.readFile file_path

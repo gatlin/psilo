@@ -8,6 +8,7 @@ import qualified Prelude as P
 import Lib.Parser
 import Lib.FileEval
 import Lib.Types
+import Lib.Types.Scheme
 import Lib.Util
 import Lib.Syntax ( surfaceToTopLevel
                   , CoreAst(..)
@@ -24,7 +25,7 @@ import Control.Monad.State
 import Control.Monad.Except
 import Control.Monad.Free
 import Data.Char (isSpace)
-import Control.Monad (forM_)
+import Control.Monad (forM_, foldM, guard)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as TextIO
@@ -47,8 +48,10 @@ defaultReplState = ReplState M.empty mempty
 data ReplError
     = ParseError Symbol
     | TypeCheckError TypeError
+    | TypeMismatch Symbol
     | UndefinedSymbol Symbol
     | UnknownCommand Symbol
+    | OtherError String
     deriving (Eq, Show)
 
 -- | A monad encapsulating a REPL session
@@ -69,41 +72,50 @@ replMain = do
     runRepl defaultReplState $ replLoop `catchError` handleError
     return ()
 
+replExtendTypeEnv :: Symbol -> Scheme -> Repl ()
+replExtendTypeEnv sym scheme = do
+    te <- gets typeEnv
+    modify $ \st -> st {
+        typeEnv = extendEnv te (sym, scheme) }
+
+replLookupTypeEnv :: Symbol -> Repl (Maybe Scheme)
+replLookupTypeEnv sym = do
+    te <- gets typeEnv
+    return $ envLookup te sym
+
 -- | Parse an input string into either a definition or a bare expression
 replParse :: String -> Repl ()
 replParse src = do
     mParsed <- parse_expr $ Text.pack src
     case mParsed of
         Left err -> throwError $ ParseError err
-        Right e@(Free (DefS _ _)) -> do
-            case surfaceToTopLevel e of
-                Nothing -> throwError $ ParseError "T_T"
-                Just defn@(Define sym expr) -> do
-                    replTypeCheckDefn defn
-                    ds <- gets defns
-                    modify $ \st -> st {
-                        defns = M.insert sym expr ds }
+        Right surface -> case surfaceToTopLevel surface of
+            Nothing -> throwError $ OtherError "Clearly the parser is bad."
+            Just topLevel -> replTopLevel [topLevel]
 
-        Right e@(Free (SigS _ _ _)) -> liftIO . putStrLn . show $ e
-
-        Right e -> liftIO . putStrLn $ src
-
--- | Type checks a 'TopLevel' during a REPL session
-replTypeCheckDefn :: TopLevel -> Repl ()
-replTypeCheckDefn defn@(Define sym expr) = do
+replTopLevel :: [TopLevel] -> Repl ()
+replTopLevel topLevels = do
     te <- gets typeEnv
-    case (runExcept $ typecheck_defn defn te) of
-        Left err -> do
-            throwError $ TypeCheckError err
-        Right (ty, _) -> do
-            liftIO . putStrLn $
-                sym ++ " : " ++ (show ty)
-            modify $ \st -> st {
-                typeEnv = extendEnv te (sym, ty) }
-
--- | Process definitions
-replProcessDefinitions :: [TopLevel] -> Repl ()
-replProcessDefinitions defns = forM_ defns replTypeCheckDefn
+    defns <- foldM
+        (\ds topLevel -> do
+                case topLevel of
+                    (Signature sym scheme) -> do
+                        replExtendTypeEnv sym scheme
+                        return ds
+                    d@(Define sym expr) -> return ((sym, expr):ds))
+        []
+        topLevels
+    let syms = fmap fst defns
+    case (runExcept $ typecheck_defns defns te) of
+        Left err -> throwError $ TypeCheckError err
+        Right (schemes, _) -> forM_ (zip syms schemes) $ \(sym, scm) -> do
+            mScm <- replLookupTypeEnv sym
+            case mScm of
+                Nothing -> replExtendTypeEnv sym scm
+                Just old_scm -> if old_scm /= scm
+                    then throwError $
+                         OtherError $ "Conflicting types for " ++ sym
+                    else return ()
 
 -- | Executes REPL shell commands
 replCommand :: String -> Repl ()
@@ -111,10 +123,10 @@ replCommand cmd = case break isSpace cmd of
     ("beep", _) -> do
         liftIO . putStrLn $ "boop"
     ("t", sym) -> do
-        te <- gets typeEnv
         let sym' = ltrim sym
-        case envLookup te sym' of
-            Nothing -> throwError $ UndefinedSymbol sym
+        result <- replLookupTypeEnv sym'
+        case result of
+            Nothing -> throwError $ UndefinedSymbol sym'
             Just ty -> do
                 liftIO . putStrLn $
                     sym' ++ " : " ++ (show ty)
@@ -122,7 +134,7 @@ replCommand cmd = case break isSpace cmd of
         result <- liftIO $ runExceptT $ process_file (ltrim file_path)
         case result of
             Left err -> throwError $ ParseError err
-            Right defns -> replProcessDefinitions defns
+            Right topLevels -> replTopLevel topLevels
     (_, _) -> throwError $ UnknownCommand cmd
 
 -- | The actual REPL loop.

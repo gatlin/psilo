@@ -196,12 +196,12 @@ sig_typelit_parser = do
             ts <- sym `sepBy` (many space)
             return ts
 
-sig_vars_parser :: Parser [[String]]
+sig_vars_parser :: Parser [String]
 sig_vars_parser = do
     skipSpace
     string "all"
     skipSpace
-    vars <- sig_typelit_parser `sepBy` (many space)
+    vars <- sym `sepBy` (many space)
     skipSpace
     return vars
 

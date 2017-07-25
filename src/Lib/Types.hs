@@ -27,6 +27,7 @@ where
 import Control.Monad (forM_, forM, foldM, liftM2, zipWithM, mapAndUnzipM, guard)
 import Control.Monad.Except
 import Control.Monad.IO.Class
+import Control.Monad.Free
 import Data.Maybe (isNothing, fromMaybe, fromJust, isJust)
 import Data.Monoid ((<>))
 
@@ -38,9 +39,10 @@ import Lib.Syntax ( Symbol
                   , CoreAst(..)
                   , TopLevel(..)
                   , SurfaceExpr
+                  , SurfaceAst(..)
                   , AnnotatedExpr
                   , annotated
-                  , surfaceToTopLevel
+                  , surfaceToCore
                   )
 
 import Lib.Types.Kind
@@ -109,7 +111,7 @@ defaultClassEnv =     addCoreClasses
 -- inference and solving are re-run to produce the final type schemes.
 -- TODO: handle predicates.
 typecheck_defns
-    :: [TopLevel]
+    :: [(Symbol, CoreExpr ())]
     -> TypeEnv
     -> Except TypeError ([Scheme], [Constraint])
 typecheck_defns defns te = do
@@ -117,7 +119,7 @@ typecheck_defns defns te = do
 
     -- annotate expressions
     (syms, exprs) <- mapAndUnzipM
-                     (\(Define sym expr) -> return (sym, annotated expr))
+                     (\(sym, expr) -> return (sym, annotated expr))
                      defns
 
     -- pass 1: add tyvar placeholders to type env, infer
@@ -142,7 +144,7 @@ typecheck_defns defns te = do
     return (scms2, cs2)
 
 typecheck_defn
-    :: TopLevel
+    :: (Symbol, CoreExpr ())
     -> TypeEnv
     -> Except TypeError (Scheme, [Constraint])
 typecheck_defn defn te = do
@@ -163,10 +165,10 @@ example_defns = [ "(def three (id 3.0))"
 
 typecheck :: [SurfaceExpr ()] -> Except TypeError [(Symbol, Scheme)]
 typecheck defns = do
-    let defns' = fmap (fromJust . surfaceToTopLevel) defns
-    (schemes, cs) <- typecheck_defns defns' defaultTypeEnv
-    forM (zip defns' schemes) $ \((Define sym _), scheme) ->
-        return (sym, scheme)
+    let syms = fmap (\(Free (DefS sym _)) -> sym) defns
+    let defns' = fmap (fromJust . surfaceToCore) defns
+    (schemes, cs) <- typecheck_defns (zip syms defns') defaultTypeEnv
+    forM (zip syms schemes) return
 
 test :: IO ()
 test = do

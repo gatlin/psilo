@@ -28,7 +28,7 @@ data SurfaceAst a
     | IfS { ifCondS :: a, ifThenS :: a, ifElseS :: a }
     | DefS { defSymS :: Symbol, defValueS :: a }
     | SigS { sigSymS :: Symbol
-           , sigVarS :: [[Symbol]]
+           , sigVarS :: [Symbol]
            , sigTypeS :: ([(Symbol, Symbol)], [[Symbol]]) }
     deriving ( Functor
              , Foldable
@@ -72,7 +72,7 @@ aDef s b = liftF $ DefS s b
 aSig
     :: (MonadFree SurfaceAst m)
     => Symbol
-    -> [[Symbol]]
+    -> [Symbol]
     -> ([(Symbol, Symbol)], [[Symbol]])
     -> m a
 aSig sym v t = liftF $ SigS sym v t

@@ -1,3 +1,4 @@
+(: three Float)
 (def three (id 3.0))
 (defun times-2 (x) (* x 2.0))
 (def eight (times-2 4.0))
