@@ -94,19 +94,22 @@ replLookupTypeEnv sym = do
 -- | Parse an input string into either a definition or a bare expression
 replTypeCheck :: String -> Repl ()
 replTypeCheck src = do
-    mParsed <- parse_expr $ Text.pack src
     te <- gets typeEnv
+    expr <- replParseExpr src
+    sym <- gensym
+    case (runExcept $ typecheck_defn (sym, expr) te) of
+        Left err -> throwError $ TypeCheckError err
+        Right (ty, _) -> do
+            liftIO . putStrLn . show $ ty
+
+replParseExpr :: String -> Repl (CoreExpr ())
+replParseExpr src = do
+    mParsed <- parse_expr $ Text.pack src
     case mParsed of
         Left err -> throwError $ ParseError err
         Right surface -> case surfaceToCore surface of
-            Nothing -> throwError $ OtherError "Clearly the parser is bad."
-            Just expr -> do
-                sym <- gensym
-                case (runExcept $ typecheck_defn (sym, expr) te) of
-                    Left err -> throwError $ TypeCheckError err
-                    Right (ty, _) -> do
-                        liftIO . putStrLn . show $ ty
-
+            Nothing -> throwError $ OtherError "Malformed expression"
+            Just expr -> return expr
 
 replTopLevel :: [TopLevel] -> Repl ()
 replTopLevel topLevels = do
