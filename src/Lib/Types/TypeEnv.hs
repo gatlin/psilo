@@ -9,6 +9,8 @@ import Lib.Types.Qual
 import Lib.Types.Frame
 import Lib.Types.Scheme
 
+import Data.List (sort)
+
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Set (Set)
@@ -37,7 +39,7 @@ envLookup (TypeEnv env) sym = M.lookup sym env
 
 -- | Generalize a qualified type inta a type scheme in a given context
 generalize :: TypeEnv -> Qual Type -> Scheme
-generalize te t = Forall as t
+generalize te (ps :=> t) = Forall as ((sort ps) :=> t)
     where as = S.toList $ ftv t `S.difference` ftv te
 
 -- | Neatly lift qualified types up into type scheme

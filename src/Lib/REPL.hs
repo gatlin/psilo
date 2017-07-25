@@ -132,7 +132,10 @@ replTopLevel topLevels = do
                 Nothing -> replExtendTypeEnv sym scm
                 Just old_scm -> if old_scm /= scm
                     then throwError $
-                         OtherError $ "Conflicting types for " ++ sym
+                         OtherError $
+                         "[" ++ sym ++ "] " ++
+                         "Expected: " ++ (show old_scm) ++ ", actual: " ++
+                         (show scm)
                     else return ()
 
 -- | Executes REPL shell commands
