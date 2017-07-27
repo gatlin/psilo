@@ -18,6 +18,7 @@ import Lib.Syntax ( surfaceToTopLevel
                   , SurfaceExpr
                   , TopLevel(..)
                   , Symbol
+                  , annotated
                   )
 import System.Console.Haskeline
 import Control.Monad.Trans
@@ -32,6 +33,9 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as TextIO
 import Data.Map (Map)
 import qualified Data.Map as M
+
+import Control.Comonad
+import Control.Comonad.Cofree
 
 -- self-explanatory
 ltrim = dropWhile isSpace
@@ -111,9 +115,13 @@ replParseExpr src = do
     mParsed <- parse_expr $ Text.pack src
     case mParsed of
         Left err -> throwError $ ParseError err
-        Right surface -> case surfaceToCore surface of
-            Nothing -> throwError $ OtherError "Invalid REPL expression"
-            Just expr -> return expr
+        Right surface -> do
+            let annSurface = annotated surface
+            liftIO . putStrLn . show $ annSurface
+            liftIO . putStrLn $ "---"
+            case surfaceToCore surface of
+                Nothing -> throwError $ OtherError "Invalid REPL expression"
+                Just expr -> return expr
 
 -- | Type checks and extends the environment with a set of top level
 -- declarations.
@@ -166,4 +174,5 @@ replLoop = do
             replCommand cmd
             replLoop
         Just input -> do
+            replParseExpr input
             replLoop

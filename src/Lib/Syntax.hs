@@ -38,6 +38,14 @@ import Control.Monad.State
 import Data.Map (Map)
 import qualified Data.Map as M
 
+-- | ROADMAP
+-- 1. Convert each bound symbol into a unique symbol in expressions.
+-- 2. Allow surface syntax to mix types and expressions.
+-- 3. The conversion process should really be from surface to some composite
+-- structure containing definitions, type judgments, and anything else an
+-- evaluator would require.
+-- 4. Actually generate "assembly" and execute programs.
+
 -- | Converts a 'SurfaceExpr' to a 'CoreExpr' or fails.
 -- TODO needs to convert each bound symbol into a unique symbol. Suggests a
 -- reader monad.
@@ -62,21 +70,6 @@ surfaceToTopLevel :: SurfaceExpr () -> Maybe TopLevel
 surfaceToTopLevel (Free (DefS sym expr)) = do
     core <- surfaceToCore expr
     return $ Define sym core
-
--- for signatures, we want to convert them into 'Signature' values. This
--- involves converting each unique string type variable into legit actual type
--- variables, etc.
-{-
-        tailRec sym (Free (IfS c t e)) = Free $
-            IfC (convert c) (tailRec sym t) (tailRec sym e)
-
-        tailRec sym expr@(Free (AppS (Free (IdS fun)) ops))
-            | sym == fun = Free $ TailRecC (map convert ops)
-            | otherwise = convert expr
-
-        tailRec _ other = convert other
--}
-
 
 surfaceToTopLevel (Free (SigS sym vars (preds, ty))) = Just $ Signature sym schm
     where
@@ -109,3 +102,17 @@ surfaceToTopLevel (Free (SigS sym vars (preds, ty))) = Just $ Signature sym schm
                   in  case M.lookup s tyVarMap of
                           Nothing -> TSym (TyCon (t !! 0) Star)
                           Just n  -> TVar (TyVar n Star)
+
+-- for signatures, we want to convert them into 'Signature' values. This
+-- involves converting each unique string type variable into legit actual type
+-- variables, etc.
+{-
+        tailRec sym (Free (IfS c t e)) = Free $
+            IfC (convert c) (tailRec sym t) (tailRec sym e)
+
+        tailRec sym expr@(Free (AppS (Free (IdS fun)) ops))
+            | sym == fun = Free $ TailRecC (map convert ops)
+            | otherwise = convert expr
+
+        tailRec _ other = convert other
+-}
