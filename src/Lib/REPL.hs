@@ -10,9 +10,7 @@ import Lib.FileEval
 import Lib.Types
 import Lib.Types.Scheme
 import Lib.Util
-import Lib.Syntax ( surfaceToTopLevel
-                  , surfaceToCore
-                  , CoreAst(..)
+import Lib.Syntax ( CoreAst(..)
                   , CoreExpr
                   , SurfaceAst(..)
                   , SurfaceExpr

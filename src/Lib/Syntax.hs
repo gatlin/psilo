@@ -6,8 +6,6 @@ module Lib.Syntax
     , TopLevel(..)
     , SurfaceExpr
     , SurfaceAst(..)
-    , surfaceToCore
-    , surfaceToTopLevel
     , aInt
     , aFloat
     , aBool
@@ -53,6 +51,8 @@ import qualified Data.Map as M
 -- | Converts a 'SurfaceExpr' to a 'CoreExpr' or fails.
 -- TODO needs to convert each bound symbol into a unique symbol. Suggests a
 -- reader monad.
+
+{-
 surfaceToCore :: SurfaceExpr () -> Maybe (CoreExpr ())
 surfaceToCore (Free (DefS _ _)) = Nothing
 surfaceToCore (Free (SigS _ _ _)) = Nothing
@@ -75,7 +75,6 @@ surfaceToTopLevel (Free (DefS sym expr)) = do
     core <- surfaceToCore expr
     return $ Define sym core
 
-{-
 surfaceToTopLevel (Free (SigS sym vars (preds, ty))) = Just $ Signature sym schm
     where
 

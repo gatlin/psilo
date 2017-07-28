@@ -7,7 +7,6 @@ module Lib.Types
     , TypeError(..)
     , extendEnv
     , envLookup
-    , test
     )
 where
 
@@ -42,7 +41,6 @@ import Lib.Syntax ( Symbol
                   , SurfaceAst(..)
                   , AnnotatedExpr
                   , annotated
-                  , surfaceToCore
                   )
 
 import Lib.Types.Kind
@@ -163,6 +161,7 @@ example_defns = [ "(def three (id 3.0))"
                 , "(defun compose (f g x) (f (g x)))"
                 ]
 
+{-
 typecheck :: [SurfaceExpr ()] -> Except TypeError [(Symbol, Scheme)]
 typecheck defns = do
     let syms = fmap (\(Free (DefS sym _)) -> sym) defns
@@ -182,3 +181,4 @@ test = do
                 putStrLn "---"
                 forM_ syms_schemes $ \(sym, scheme) ->
                     putStrLn $ sym ++ " : " ++ (show scheme)
+-}
