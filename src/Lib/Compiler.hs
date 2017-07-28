@@ -7,6 +7,9 @@ module Lib.Compiler
     , runCodegenT
     , MachineT(..)
     , MachineState(..)
+    , Preprocess(..)
+    , runPreprocess
+    , uniqueIds
     )
 where
 

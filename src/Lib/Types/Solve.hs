@@ -7,7 +7,6 @@ import Lib.Types.Qual
 import Lib.Types.Frame
 import Lib.Types.PredMap
 import Lib.Types.Constraint
-import Lib.Types.TypeError
 
 import Data.Map (Map)
 import qualified Data.Map as M
@@ -19,6 +18,8 @@ import Control.Monad.Except
 import Control.Monad
 import Data.Either (either)
 import Data.List (nub)
+
+import Lib.Errors
 
 type Unifier = (Frame, [Constraint])
 
@@ -36,9 +37,9 @@ initSolveState = SolveState mempty mempty mempty
 
 -- | A monad for solving constraints. The state is a 'Unifier' being
 -- constructed. Execution may result in a raised 'TypeError'.
-type Solve = StateT SolveState (Except TypeError)
+type Solve = StateT SolveState (Except PsiloError)
 
-runSolve :: Solve a -> SolveState -> Either TypeError a
+runSolve :: Solve a -> SolveState -> Either PsiloError a
 runSolve s st = runExcept (evalStateT s st)
 
 -- | Unification of two 'Type's
@@ -93,7 +94,7 @@ solver = do
                 put $ SolveState su cs0 $ substitute su pm'
                 solver
 
-solveConstraints :: [Constraint] -> Except TypeError (Frame, PredMap)
+solveConstraints :: [Constraint] -> Except PsiloError (Frame, PredMap)
 solveConstraints cs = evalStateT solver $ initSolveState {
     constraints = cs
     }

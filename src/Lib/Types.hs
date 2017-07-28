@@ -4,7 +4,7 @@ module Lib.Types
     ( typecheck_defn
     , typecheck_defns
     , TypeEnv(..)
-    , TypeError(..)
+--    , TypeError(..)
     , extendEnv
     , envLookup
     )
@@ -54,9 +54,9 @@ import Lib.Types.Scheme
 import Lib.Types.TypeEnv
 import Lib.Types.Infer
 import Lib.Types.Solve
-import Lib.Types.TypeError
 
 import Lib.Parser (parse_expr, parse_multi)
+import Lib.Errors
 
 -- * Defaults
 
@@ -111,7 +111,7 @@ defaultClassEnv =     addCoreClasses
 typecheck_defns
     :: [(Symbol, CoreExpr ())]
     -> TypeEnv
-    -> Except TypeError ([Scheme], [Constraint])
+    -> Except PsiloError ([Scheme], [Constraint])
 typecheck_defns defns te = do
     let te' = defaultTypeEnv <> te
 
@@ -144,7 +144,7 @@ typecheck_defns defns te = do
 typecheck_defn
     :: (Symbol, CoreExpr ())
     -> TypeEnv
-    -> Except TypeError (Scheme, [Constraint])
+    -> Except PsiloError (Scheme, [Constraint])
 typecheck_defn defn te = do
     ((ty:_), cs) <- (typecheck_defns [defn] te)
     return (ty, cs)

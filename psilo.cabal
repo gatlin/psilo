@@ -39,7 +39,8 @@ library
                        Lib.Types.Type,
                        Lib.Types.TypeEnv,
                        Lib.Types.TypeError,
-                       Lib.Types
+                       Lib.Types,
+                       Lib.Errors
   build-depends:       base >= 4.7 && < 5,
                        comonad,
                        mtl,

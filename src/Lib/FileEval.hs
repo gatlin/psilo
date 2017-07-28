@@ -4,6 +4,7 @@ module Lib.FileEval where
 
 import Lib.Syntax
 import Lib.Parser
+import Lib.Compiler.Preprocessor
 import Lib.Compiler.StackVM
 import Control.Monad
 import Control.Monad.Except
@@ -21,4 +22,6 @@ process_file file_path = do
     defns <- liftIO $ parse_multi $ removeComments file_contents
     case defns of
         Left err -> throwError err
-        Right defns' -> return defns'
+        Right defns' -> case runPreprocess (mapM uniqueIds defns') of
+            Left err -> throwError "Preprocessing error"
+            Right ps -> return ps

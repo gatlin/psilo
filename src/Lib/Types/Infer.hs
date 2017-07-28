@@ -11,7 +11,8 @@ import Lib.Types.Frame
 import Lib.Types.Scheme
 import Lib.Types.TypeEnv
 import Lib.Types.Constraint
-import Lib.Types.TypeError
+
+import Lib.Errors
 
 import Data.Map (Map)
 import qualified Data.Map as M
@@ -39,13 +40,13 @@ type Infer = RWST
     TypeEnv            -- type environment
     [Constraint]       -- produced constraints
     InferState         -- mutable inference state
-    (Except TypeError) -- inference errors
+    (Except PsiloError) -- inference errors
 
 runInfer
     :: TypeEnv
     -> InferState
     -> Infer a
-    -> Except TypeError (a, InferState, [Constraint])
+    -> Except PsiloError (a, InferState, [Constraint])
 runInfer te inferState m = runRWST m te inferState
 
 -- | helper to record an equality constraint

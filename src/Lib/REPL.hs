@@ -18,6 +18,9 @@ import Lib.Syntax ( CoreAst(..)
                   , Symbol
                   , annotated
                   )
+
+import Lib.Errors
+
 import System.Console.Haskeline
 import Control.Monad.Trans
 import Control.Monad.IO.Class
@@ -51,7 +54,7 @@ defaultReplState = ReplState M.empty mempty 0
 -- | The kinds of exceptions that may be raised during REPL execution
 data ReplError
     = ParseError Symbol
-    | TypeCheckError TypeError
+    | TypeCheckError PsiloError
     | TypeMismatch Symbol
     | UndefinedSymbol Symbol
     | UnknownCommand Symbol

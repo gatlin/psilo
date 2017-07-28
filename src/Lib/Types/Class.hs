@@ -13,6 +13,8 @@ import qualified Data.Map as M
 import Data.Monoid
 import Data.Maybe
 
+import Lib.Errors
+
 -- | A typeclass instance is a qualified predicate
 type Inst = Qual Pred
 
@@ -24,12 +26,14 @@ newtype ClassEnv = ClassEnv (Map Symbol Class)
     deriving (Show, Monoid)
 
 -- | Errors one might encounter when dealing with typeclasses
+{-
 data ClassError
     = ClassAlreadyDefined Symbol
     | SuperclassNotDefined Symbol
     | NoClassForInstance Symbol
     | OverlappingInstance Symbol
     deriving (Show)
+-}
 
 -- | Extracts typeclass information from a 'ClassEnv', if available.
 classes :: ClassEnv -> Symbol -> Maybe Class
@@ -52,7 +56,7 @@ defined = isJust
 
 -- | Represents a 'ClassEnv' transformation
 newtype EnvTransformer = EnvT {
-    transformCE :: ClassEnv -> Either ClassError ClassEnv }
+    transformCE :: ClassEnv -> Either PsiloError ClassEnv }
 
 -- | Combine 'EnvTransformer's
 (<:>) :: EnvTransformer -> EnvTransformer -> EnvTransformer
