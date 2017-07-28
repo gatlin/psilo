@@ -97,61 +97,17 @@ replLookupTypeEnv sym = do
     te <- gets typeEnv
     return $ envLookup te sym
 
--- | Typechecks a REPL expression, inserting it into the type environment on
--- success.
-replTypeCheck :: String -> Repl ()
-replTypeCheck src = do
-    te <- gets typeEnv
-    expr <- replParseExpr src
-    sym <- gensym
-    case (runExcept $ typecheck_defn (sym, expr) te) of
-        Left err -> throwError $ TypeCheckError err
-        Right (ty, _) -> do
-            liftIO . putStrLn . show $ ty
-
 -- | Parses a REPL expression into a 'CoreExpr'.
-replParseExpr :: String -> Repl (CoreExpr ())
+replParseExpr :: String -> Repl ()
 replParseExpr src = do
     mParsed <- parse_expr $ Text.pack src
     case mParsed of
         Left err -> throwError $ ParseError err
         Right surface -> do
-            let annSurface = annotated surface
-            liftIO . putStrLn . show $ annSurface
-            liftIO . putStrLn $ "---"
-            case surfaceToCore surface of
-                Nothing -> throwError $ OtherError "Invalid REPL expression"
-                Just expr -> return expr
-
--- | Type checks and extends the environment with a set of top level
--- declarations.
-replTopLevel :: [TopLevel] -> Repl ()
-replTopLevel topLevels = do
-    te <- gets typeEnv
-    defns <- foldM
-        (\ds topLevel -> case topLevel of
-                (Signature sym scheme) -> do
-                    replExtendTypeEnv sym scheme
-                    return ds
-                (Define sym expr) -> return ((sym, expr):ds))
-        []
-        topLevels
-    let syms = fmap fst defns
-    case (runExcept $ typecheck_defns defns te) of
-        Left err -> throwError $ TypeCheckError err
-        Right (schemes, _) -> forM_ (zip syms schemes) $ \(sym, scm) -> do
-            mScm <- replLookupTypeEnv sym
-            case mScm of
-                Nothing -> replExtendTypeEnv sym scm
-                Just old_scm -> if old_scm /= scm
-                    then throwError $
-                         OtherError $
-                         "[" ++ sym ++ "] " ++
-                         "Expected: " ++ (show old_scm) ++ ", actual: " ++
-                         (show scm)
-                    else return ()
+            liftIO . putStrLn . show . annotated $ surface
 
 -- | Executes REPL shell commands
+{-
 replCommand :: String -> Repl ()
 replCommand cmd = case break isSpace cmd of
     ("beep", _) -> do
@@ -163,6 +119,7 @@ replCommand cmd = case break isSpace cmd of
             Left err -> throwError $ ParseError err
             Right topLevels -> replTopLevel topLevels
     (_, _) -> throwError $ UnknownCommand cmd
+-}
 
 -- | The actual REPL loop.
 replLoop :: Repl ()
@@ -170,9 +127,11 @@ replLoop = do
     minput <- lift $ lift $ getInputLine "% "
     case fmap ltrim minput  of
         Nothing -> return ()
+{-
         Just (':':cmd) -> do
             replCommand cmd
             replLoop
+-}
         Just input -> do
             replParseExpr input
             replLoop

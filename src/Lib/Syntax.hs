@@ -54,7 +54,7 @@ surfaceToCore (Free (DefS _ _)) = Nothing
 surfaceToCore (Free (SigS _ _ _)) = Nothing
 surfaceToCore other = Just $ convert other
     where
-        convert (Free (FunS args body)) = Free (FunC args (convert body))
+        convert (Free (FunS args body _)) = Free (FunC args (convert body))
         convert (Free (AppS op erands)) =
             Free (AppC (convert op) (map convert erands))
 

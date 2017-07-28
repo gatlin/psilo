@@ -24,7 +24,7 @@ data SurfaceAst a
     | BoolS { boolS :: Bool }
     | IdS { idS :: Symbol }
     | AppS { appFunS :: a, appArgsS :: [a] }
-    | FunS { funArgsS :: [Symbol], funBodyS :: a }
+    | FunS { funArgsS :: [Symbol], funBodyS :: a, funSigS :: [Maybe a] }
     | IfS { ifCondS :: a, ifThenS :: a, ifElseS :: a }
     | DefS { defSymS :: Symbol, defValueS :: a }
     | SigS { sigSymS :: Symbol
@@ -60,8 +60,8 @@ aId s = liftF $ IdS s
 aApp :: (MonadFree SurfaceAst m) => a -> [a] -> m a
 aApp f a = liftF $ AppS f a
 
-aFun :: (MonadFree SurfaceAst m) => [Symbol] -> a -> m a
-aFun a b = liftF $ FunS a b
+aFun :: (MonadFree SurfaceAst m) => [Symbol] -> a -> [Maybe a] -> m a
+aFun a b tys = liftF $ FunS a b tys
 
 aIf :: (MonadFree SurfaceAst m) => a -> a -> a -> m a
 aIf c t e = liftF $ IfS c t e

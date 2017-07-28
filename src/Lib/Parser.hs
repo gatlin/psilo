@@ -70,18 +70,24 @@ app_parser = do
 lam_parser :: Parser Text
 lam_parser =  (string "\\")
 
+typed_sym :: Parser (String, Maybe (SurfaceExpr a))
+typed_sym = (parens has_type) <|> (sym >>= \s -> return (s, Nothing))
+    where has_type = do
+              sig@(Free (SigS sym _ _))  <- sig_parser
+              return (sym, Just sig)
+
 fun_parser :: Parser (SurfaceExpr a)
 fun_parser = do
     char '\\'
     skipSpace
     char '('
     skipSpace
-    args <- sym `sepBy` (many space)
+    args <- typed_sym `sepBy` (many space)
     skipSpace
     char ')'
     skipSpace
     body <- expr_parser
-    return . join $ aFun args body
+    return . join $ aFun (map fst args) body (map snd args)
 
 if_parser :: Parser (SurfaceExpr a)
 if_parser = do
@@ -128,12 +134,13 @@ defun_parser = do
     name <- sym
     skipSpace
     char '('
-    args <- sym `sepBy` (many space)
+    args <- typed_sym `sepBy` (many space)
     skipSpace
     char ')'
     skipSpace
     body <- expr_parser
-    return . join $ aDef name (join $ aFun args body)
+    return . join $ aDef name (join $ aFun (map fst args) body
+                               (map snd args))
 
 -- | For standalone type signatures
 sig_type_parser :: Parser ([(String, String)], [[String]])
@@ -175,8 +182,6 @@ sig_type_parser = (parens pred_type) <|> bare_type where
     single_type = do
         t <- sig_typelit_parser
         return ([], [t])
-
-
 
 sig_typelit_parser :: Parser [String]
 sig_typelit_parser = do
