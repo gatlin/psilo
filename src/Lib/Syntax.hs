@@ -18,6 +18,8 @@ module Lib.Syntax
     , aDef
     , AnnotatedExpr
     , annotated
+    , TypeLit(..)
+    , fromTypeLit
     )
 where
 
@@ -33,8 +35,10 @@ import Lib.Types.Type
 import Lib.Types.Kind
 import Lib.Types.TypeEnv (TypeEnv(..), generalize)
 
+import Control.Monad (join)
 import Control.Monad.Free
 import Control.Monad.State
+import Control.Comonad.Cofree
 import Data.Map (Map)
 import qualified Data.Map as M
 
@@ -71,6 +75,7 @@ surfaceToTopLevel (Free (DefS sym expr)) = do
     core <- surfaceToCore expr
     return $ Define sym core
 
+{-
 surfaceToTopLevel (Free (SigS sym vars (preds, ty))) = Just $ Signature sym schm
     where
 
@@ -102,7 +107,7 @@ surfaceToTopLevel (Free (SigS sym vars (preds, ty))) = Just $ Signature sym schm
                   in  case M.lookup s tyVarMap of
                           Nothing -> TSym (TyCon (t !! 0) Star)
                           Just n  -> TVar (TyVar n Star)
-
+-}
 -- for signatures, we want to convert them into 'Signature' values. This
 -- involves converting each unique string type variable into legit actual type
 -- variables, etc.

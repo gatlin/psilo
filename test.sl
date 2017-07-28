@@ -9,15 +9,16 @@
 (: eight Float)
 (def eight (times-2 4.0))
 
+(: square (=> ((Num a)) (-> a a)))
 (defun square (x) (* x x))
 
-(def nine (square 3.0))
-(def four (square 2))
+;(def nine (square 3.0))
+;(def four (square 2))
 
-(: fact (all a) (=> ((Num a) (Ord a)) (-> a a)))
-(defun fact (n) (if (< n 2) n (fact (* n (- n 1)))))
+;(: fact (all a) (=> ((Num a) (Ord a)) (-> a a)))
+;(defun fact (n) (if (< n 2) n (fact (* n (- n 1)))))
 
-(defun compose (f g) (\ (x) (f (g x))))
+;(defun compose (f g) (\ (x) (f (g x))))
 
 ;;;;; For later
 

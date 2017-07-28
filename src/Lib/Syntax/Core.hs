@@ -30,6 +30,27 @@ data CoreAst a
              , Ord
              )
 
+cInt :: (MonadFree CoreAst m) => Integer -> m a
+cInt n = liftF $ IntC n
+
+cFloat :: (MonadFree CoreAst m) => Double -> m a
+cFloat n = liftF $ FloatC n
+
+cBool :: (MonadFree CoreAst m) => Bool -> m a
+cBool b = liftF $ BoolC b
+
+cId :: (MonadFree CoreAst m) => Symbol -> m a
+cId s = liftF $ IdC s
+
+cApp :: (MonadFree CoreAst m) => a -> [a] -> m a
+cApp f a = liftF $ AppC f a
+
+cFun :: (MonadFree CoreAst m) => [Symbol] -> a -> m a
+cFun a b = liftF $ FunC a b
+
+cIf :: (MonadFree CoreAst m) => a -> a -> a -> m a
+cIf c t e = liftF $ IfC c t e
+
 -- | The free monad of 'CoreAst' is a DSL which used by the type checker, code
 -- generators, and other subsystems.
 type CoreExpr = Free CoreAst

@@ -4,6 +4,7 @@ module Lib
 --    , interpret_file
     , parse_expr
 --    , parse_multi
+    , process_file
     ) where
 
 import Prelude hiding (map, take, filter, sequence, mapM)

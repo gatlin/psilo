@@ -3,6 +3,8 @@ module Main where
 import Options.Applicative
 import Options.Applicative.Common
 import Data.Monoid ((<>))
+import Control.Monad.Except
+import Control.Monad (forM_)
 import Lib
 
 data CmdLnOpts = CmdLnOpts
@@ -41,4 +43,8 @@ main = execParser opts >>= begin where
 begin :: CmdLnOpts -> IO ()
 begin cmdLnOpts = case inputFile cmdLnOpts of
     Nothing -> replMain
-    Just inFile -> putStrLn "Coming soon"
+    Just inFile -> do
+        result <- runExceptT $ process_file inFile
+        case result of
+            Left err -> putStrLn . show $ err
+            Right defns -> forM_ defns $ putStrLn . show

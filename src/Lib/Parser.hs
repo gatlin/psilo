@@ -51,7 +51,7 @@ string_parser = do
     char '"'
     str <- many' $ notChar '"'
     char '"'
-    return $ aString $ Text.pack str
+    Return $ aString $ Text.pack str
 -}
 
 bool_parser :: Parser (SurfaceExpr a)
@@ -143,10 +143,10 @@ defun_parser = do
                                (map snd args))
 
 -- | For standalone type signatures
-sig_type_parser :: Parser ([(String, String)], [[String]])
+sig_type_parser :: Parser ([(String, TypeLit)], [[TypeLit]])
 sig_type_parser = (parens pred_type) <|> bare_type where
 
-    pred_type :: Parser ([(String, String)], [[String]])
+    pred_type :: Parser ([(String, TypeLit)], [[TypeLit]])
     pred_type = do
         skipSpace
         string "=>"
@@ -157,19 +157,19 @@ sig_type_parser = (parens pred_type) <|> bare_type where
         skipSpace
         return (preds, t)
 
-    pred :: Parser (String, String)
+    pred :: Parser (String, TypeLit)
     pred = parens $ do
         skipSpace
         p <- sym
         skipSpace
-        t <- sym
+        t <- ty_sym
         skipSpace
         return (p, t)
 
-    bare_type :: Parser ([(String, String)], [[String]])
+    bare_type :: Parser ([(String, TypeLit)], [[TypeLit]])
     bare_type = (parens compound_type) <|> single_type
 
-    compound_type :: Parser ([(String, String)], [[String]])
+    compound_type :: Parser ([(String, TypeLit)], [[TypeLit]])
     compound_type = do
         skipSpace
         string "->"
@@ -178,12 +178,19 @@ sig_type_parser = (parens pred_type) <|> bare_type where
         skipSpace
         return ([], ts)
 
-    single_type :: Parser ([(String, String)], [[String]])
+    single_type :: Parser ([(String, TypeLit)], [[TypeLit]])
     single_type = do
         t <- sig_typelit_parser
         return ([], [t])
 
-sig_typelit_parser :: Parser [String]
+ty_sym :: Parser TypeLit
+ty_sym = do
+    s@(c:cs) <- sym
+    return $ if elem c ['a'..'z']
+                 then TyVarLit s
+                 else TyConLit s
+
+sig_typelit_parser :: Parser [TypeLit]
 sig_typelit_parser = do
     skipSpace
     t <- one <|> (parens more)
@@ -191,24 +198,15 @@ sig_typelit_parser = do
     return t
 
     where
-        one :: Parser [String]
+        one :: Parser [TypeLit]
         one = do
-            t <- sym
+            t <- ty_sym
             return [t]
 
-        more :: Parser [String]
+        more :: Parser [TypeLit]
         more = do
-            ts <- sym `sepBy` (many space)
+            ts <- ty_sym `sepBy` (many space)
             return ts
-
-sig_vars_parser :: Parser [String]
-sig_vars_parser = do
-    skipSpace
-    string "all"
-    skipSpace
-    vars <- sym `sepBy` (many space)
-    skipSpace
-    return vars
 
 sig_parser :: Parser (SurfaceExpr a)
 sig_parser = do
@@ -216,11 +214,9 @@ sig_parser = do
     skipSpace
     name <- sym
     skipSpace
-    vars <- (parens sig_vars_parser) <|> (return [])
-    skipSpace
     t <- sig_type_parser
     skipSpace
-    return . join $ aSig name vars t
+    return . join $ aSig name [] t
 
 toplevel_parser :: Parser (SurfaceExpr a)
 toplevel_parser = do

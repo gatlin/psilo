@@ -12,6 +12,13 @@ import Control.Monad.Free
 
 -- * Surface Syntax
 
+data TypeLit = TyConLit String | TyVarLit String
+    deriving (Eq, Ord, Show)
+
+fromTypeLit :: TypeLit -> String
+fromTypeLit (TyConLit s) = s
+fromTypeLit (TyVarLit s) = s
+
 -- | Surface level AST
 -- This is the AST of surface level syntax that actual code is written in. It is
 -- separate from the core syntax so that superficial changes (including those
@@ -28,8 +35,8 @@ data SurfaceAst a
     | IfS { ifCondS :: a, ifThenS :: a, ifElseS :: a }
     | DefS { defSymS :: Symbol, defValueS :: a }
     | SigS { sigSymS :: Symbol
-           , sigVarS :: [Symbol]
-           , sigTypeS :: ([(Symbol, Symbol)], [[Symbol]]) }
+           , sigVarS :: [TypeLit]
+           , sigTypeS :: ([(Symbol, TypeLit)], [[TypeLit]]) }
     deriving ( Functor
              , Foldable
              , Traversable
@@ -72,7 +79,7 @@ aDef s b = liftF $ DefS s b
 aSig
     :: (MonadFree SurfaceAst m)
     => Symbol
-    -> [Symbol]
-    -> ([(Symbol, Symbol)], [[Symbol]])
+    -> [TypeLit]
+    -> ([(Symbol, TypeLit)], [[TypeLit]])
     -> m a
 aSig sym v t = liftF $ SigS sym v t

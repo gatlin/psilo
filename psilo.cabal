@@ -59,6 +59,7 @@ executable psilo-exe
   build-depends:       base
                      , psilo
                      , optparse-applicative
+                     , mtl
   default-language:    Haskell2010
 
 test-suite psilo-test
