@@ -11,5 +11,4 @@ module Lib.Compiler
 where
 
 import Lib.Compiler.StackVM
-
--- | A compiler 
+import Lib.Compiler.Preprocessor

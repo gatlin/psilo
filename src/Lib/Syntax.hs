@@ -52,64 +52,8 @@ import qualified Data.Map as M
 -- TODO needs to convert each bound symbol into a unique symbol. Suggests a
 -- reader monad.
 
-{-
-surfaceToCore :: SurfaceExpr () -> Maybe (CoreExpr ())
-surfaceToCore (Free (DefS _ _)) = Nothing
-surfaceToCore (Free (SigS _ _ _)) = Nothing
-surfaceToCore other = Just $ convert other
-    where
-        convert (Free (FunS args body _)) = Free (FunC args (convert body))
-        convert (Free (AppS op erands)) =
-            Free (AppC (convert op) (map convert erands))
-
-        convert (Free (IntS n)) = Free (IntC n)
-        convert (Free (FloatS n)) = Free (FloatC n)
-        convert (Free (BoolS b)) = Free (BoolC b)
-        convert (Free (IdS s)) = Free (IdC s)
-        convert (Free (IfS c t e)) = Free $
-            IfC (convert c) (convert t) (convert e)
-
--- | Converts a 'SurfaceExpr' to a 'TopLevel' or fails
-surfaceToTopLevel :: SurfaceExpr () -> Maybe TopLevel
-surfaceToTopLevel (Free (DefS sym expr)) = do
-    core <- surfaceToCore expr
-    return $ Define sym core
-
-surfaceToTopLevel (Free (SigS sym vars (preds, ty))) = Just $ Signature sym schm
-    where
-
-        tyVarMap :: Map Symbol Int
-        tyVarMap = M.fromList (zip vars [0..])
-
-        schm :: Scheme
-        schm = generalize mempty qualType
-
-        qualType :: Qual Type
-        qualType = (convertPreds [] preds) :=> (convertTypes ty)
-
-        convertPreds :: [Pred] -> [(Symbol, Symbol)] -> [Pred]
-        convertPreds result [] = result
-        convertPreds result ((p, t):ps) =
-            convertPreds
-            ((IsIn p (TVar (TyVar (tyVarMap M.! t) Star))):result)
-            ps
-
-        convertTypes :: [[Symbol]] -> Type
-        convertTypes tys
-            | length tys == 1 = convertType (tys !! 0)
-            | otherwise = TFun (fmap convertType tys)
-
-        convertType :: [Symbol] -> Type
-        convertType t
-            | length t == 1 =
-                  let s = t !! 0
-                  in  case M.lookup s tyVarMap of
-                          Nothing -> TSym (TyCon (t !! 0) Star)
-                          Just n  -> TVar (TyVar n Star)
--}
--- for signatures, we want to convert them into 'Signature' values. This
--- involves converting each unique string type variable into legit actual type
--- variables, etc.
+-- This is a remnant of some old code I will use again and don't want to figure
+-- out again
 {-
         tailRec sym (Free (IfS c t e)) = Free $
             IfC (convert c) (tailRec sym t) (tailRec sym e)
