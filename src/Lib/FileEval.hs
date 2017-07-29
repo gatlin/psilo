@@ -21,4 +21,4 @@ process_file :: FilePath -> ExceptT PsiloError IO [SurfaceExpr ()]
 process_file file_path = do
     file_contents <- liftIO $ TextIO.readFile file_path
     defns <- parse_multi $ removeComments file_contents
-    runPreprocess $ mapM uniqueIds defns
+    preprocess $ mapM uniqueIds defns

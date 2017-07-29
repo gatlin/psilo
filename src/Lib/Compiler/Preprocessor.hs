@@ -40,11 +40,11 @@ newtype Preprocess m a = Preprocess {
                , MonadError PsiloError
                )
 
-runPreprocess
+preprocess
     :: (Monad m)
     => Preprocess m a
     -> ExceptT PsiloError m a
-runPreprocess (Preprocess p) = runReaderT (evalStateT p 0) M.empty
+preprocess (Preprocess p) = runReaderT (evalStateT p 0) M.empty
 
 gensym :: Monad m => Preprocess m String
 gensym = do

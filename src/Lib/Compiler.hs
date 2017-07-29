@@ -8,7 +8,7 @@ module Lib.Compiler
     , MachineT(..)
     , MachineState(..)
     , Preprocess(..)
-    , runPreprocess
+    , preprocess
     , uniqueIds
     )
 where
