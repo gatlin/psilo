@@ -6,6 +6,7 @@ import Lib.Syntax
 import Lib.Parser
 import Lib.Compiler.Preprocessor
 import Lib.Compiler.StackVM
+import Lib.Errors
 import Control.Monad
 import Control.Monad.Except
 import Control.Monad.IO.Class
@@ -16,12 +17,8 @@ import qualified Data.Text.IO as TextIO
 import Data.Maybe (fromJust)
 
 -- | reads a file, parses it, and returns top level declarations
-process_file :: FilePath -> ExceptT String IO [SurfaceExpr ()]
+process_file :: FilePath -> ExceptT PsiloError IO [SurfaceExpr ()]
 process_file file_path = do
     file_contents <- liftIO $ TextIO.readFile file_path
-    defns <- liftIO $ parse_multi $ removeComments file_contents
-    case defns of
-        Left err -> throwError err
-        Right defns' -> case runPreprocess (mapM uniqueIds defns') of
-            Left err -> throwError "Preprocessing error"
-            Right ps -> return ps
+    defns <- parse_multi $ removeComments file_contents
+    runPreprocess $ mapM uniqueIds defns

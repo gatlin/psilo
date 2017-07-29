@@ -36,29 +36,30 @@ data InferState = InferState
 initInferState :: InferState
 initInferState = InferState 0
 
-type Infer = RWST
+type Infer m = RWST
     TypeEnv            -- type environment
     [Constraint]       -- produced constraints
     InferState         -- mutable inference state
-    (Except PsiloError) -- inference errors
+    (ExceptT PsiloError m) -- inference errors
 
 runInfer
-    :: TypeEnv
+    :: Monad m
+    => TypeEnv
     -> InferState
-    -> Infer a
-    -> Except PsiloError (a, InferState, [Constraint])
+    -> Infer m a
+    -> ExceptT PsiloError m (a, InferState, [Constraint])
 runInfer te inferState m = runRWST m te inferState
 
 -- | helper to record an equality constraint
-(@=) :: Type -> Type -> Infer ()
+(@=) :: Monad m => Type -> Type -> Infer m ()
 t1 @= t2 = tell [t1 := t2]
 
-tyInst :: [Pred] -> Infer ()
+tyInst :: Monad m => [Pred] -> Infer m ()
 tyInst [] = return ()
 tyInst ps = forM_ (ftv ps) $ \tv -> tell [TVar tv :~ ps]
 
 -- | temporarily extend the type environment for lambda abstraction
-withEnv :: [(Symbol, Scheme)] -> Infer a -> Infer a
+withEnv :: Monad m => [(Symbol, Scheme)] -> Infer m a -> Infer m a
 withEnv xs m = do
     let scope e = foldl
                   (\e' (sym, scheme) ->
@@ -67,25 +68,25 @@ withEnv xs m = do
                   xs
     local scope m
 
-getEnv :: Infer TypeEnv
+getEnv :: Monad m => Infer m TypeEnv
 getEnv = ask
 
 -- | Generate a fresh type variable with a specific 'Kind'
-fresh :: Kind -> Infer TyVar
+fresh :: Monad m => Kind -> Infer m TyVar
 fresh k = do
     c <- gets varCount
     modify $ \st -> st { varCount = c + 1 }
     return $ TyVar c k
 
 -- | Instantiate a type scheme into a qualified type
-instantiate :: Scheme -> Infer (Qual Type)
+instantiate :: Monad m => Scheme -> Infer m (Qual Type)
 instantiate (Forall vs t) = do
     vs' <- mapM (const $ fresh Star) vs >>= mapM (return . TVar)
     let frame = M.fromList $ zip vs vs'
     return $ substitute frame t
 
 -- | Constraint generation and type generation
-infer :: AnnotatedExpr a -> Infer Type
+infer :: Monad m => AnnotatedExpr a -> Infer m Type
 
 -- constants are straightforward, except integers could be any @Num@ instance
 infer (_ :< IntC _) = do

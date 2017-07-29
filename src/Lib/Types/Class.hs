@@ -6,12 +6,14 @@ import Lib.Syntax.Symbol
 import Lib.Types.Kind (Kind(..), HasKind)
 import Lib.Types.Type (TyVar(..), TyCon(..), Type(..))
 import Lib.Types.Qual (Pred(..), Qual(..))
-import Lib.Types.Solve (Solve, initSolveState, runSolve, unify)
+import Lib.Types.Solve (Solve, initSolveState, runSolve, unify, Unifier)
 
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Monoid
 import Data.Maybe
+
+import Data.Functor.Identity
 
 import Lib.Errors
 
@@ -24,16 +26,6 @@ type Class = ([Symbol], [Qual Pred])
 -- | Organizes information about the typeclass environment
 newtype ClassEnv = ClassEnv (Map Symbol Class)
     deriving (Show, Monoid)
-
--- | Errors one might encounter when dealing with typeclasses
-{-
-data ClassError
-    = ClassAlreadyDefined Symbol
-    | SuperclassNotDefined Symbol
-    | NoClassForInstance Symbol
-    | OverlappingInstance Symbol
-    deriving (Show)
--}
 
 -- | Extracts typeclass information from a 'ClassEnv', if available.
 classes :: ClassEnv -> Symbol -> Maybe Class
@@ -92,7 +84,9 @@ addInst ps p@(IsIn sym _) = EnvT go where
 
 -- | Make sure two predicates do not overlap
 overlap :: Pred -> Pred -> Bool
-overlap (IsIn _ t1) (IsIn _ t2) = case runSolve (unify t1 t2) st of
+overlap (IsIn _ t1) (IsIn _ t2) = case runIdentity $ runSolve u st of
     Left _ -> False
     Right _ -> True
     where st = initSolveState
+          u :: Solve Identity Unifier
+          u = unify t1 t2

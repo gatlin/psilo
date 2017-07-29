@@ -14,8 +14,7 @@ import Control.Monad.Free
 import Control.Monad.Except
 import Lib.Syntax.Surface
 import Lib.Util
-
-data ParserError = ParserError String deriving (Show, Eq)
+import Lib.Errors
 
 num_parser :: Parser (SurfaceExpr a)
 num_parser = do
@@ -228,25 +227,45 @@ toplevel_parser = do
 module_parser :: Parser [SurfaceExpr a]
 module_parser = toplevel_parser `sepBy` (many space)
 
-parse_expr
+parse_expr'
     :: (Monad m)
     => Text
     -> m (Either String (SurfaceExpr ()))
-parse_expr input = do
+parse_expr' input = do
     let parse_result = parseOnly ((parens def_parser)
                                   <|> (parens defun_parser)
                                   <|> (parens sig_parser)
                                   <|> expr_parser) input
     return parse_result
 
-parse_multi
+parse_expr
+    :: (Monad m)
+    => Text
+    -> ExceptT PsiloError m (SurfaceExpr ())
+parse_expr t = do
+    result <- parse_expr' t
+    case result of
+        Left err -> throwError $ ParserError err
+        Right result' -> return result'
+
+parse_multi'
     :: MonadIO m
     => Text
     -> m (Either String [SurfaceExpr ()])
-parse_multi inp = do
+parse_multi' inp = do
     let the_parser = module_parser
     let parse_result = parseOnly the_parser inp
     return parse_result
+
+parse_multi
+    :: MonadIO m
+    => Text
+    -> ExceptT PsiloError m [SurfaceExpr ()]
+parse_multi t = do
+    result <- parse_multi' t
+    case result of
+        Left err -> throwError $ ParserError err
+        Right result' -> return result'
 
 -- | Remove ";" comments from source code
 removeComments :: Text -> Text

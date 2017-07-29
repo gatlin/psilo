@@ -13,11 +13,14 @@ import Lib.Types.Scheme
 import Lib.Types.Class
 import Lib.Types (typecheck_defns)
 
+import Lib.Errors
+
 import Control.Monad (forM)
 
 import Control.Monad.Free
 import Control.Comonad.Cofree
 
+import Control.Monad.Trans
 import Control.Monad.State
 import Control.Monad.Reader
 import Control.Monad.Except
@@ -25,40 +28,46 @@ import Control.Monad.Except
 import Data.Map (Map)
 import qualified Data.Map as M
 
--- | Errors one might encounter while preprocessing
-data PreprocessError
-    = OtherPreprocessError
-
 -- | The preprocessor performs syntactic transformations on 'SurfaceExpr's.
-newtype Preprocess a = Preprocess {
-    unPreprocess :: StateT Int
-                    (ReaderT (Map Symbol Symbol)
-                    (Except PreprocessError)) a
+newtype Preprocess m a = Preprocess {
+    unPreprocess
+        :: StateT Int (ReaderT (Map Symbol Symbol) (ExceptT PsiloError m)) a
     } deriving ( Functor
                , Applicative
                , Monad
                , MonadState Int
                , MonadReader (Map Symbol Symbol)
-               , MonadError PreprocessError
+               , MonadError PsiloError
                )
 
-runPreprocess :: Preprocess a -> Either PreprocessError a
-runPreprocess (Preprocess p) = runExcept (runReaderT (evalStateT p 0) M.empty)
+runPreprocess
+    :: (Monad m)
+    => Preprocess m a
+    -> ExceptT PsiloError m a
+runPreprocess (Preprocess p) = runReaderT (evalStateT p 0) M.empty
 
-gensym :: Preprocess String
+gensym :: Monad m => Preprocess m String
 gensym = do
     n <- get
     modify $ \n -> n + 1
     return $ "-" ++ (show n)
 
-readBoundVars :: Preprocess (Map Symbol Symbol)
+readBoundVars :: Monad m => Preprocess m (Map Symbol Symbol)
 readBoundVars = ask
 
-withBoundVars :: (Map Symbol Symbol) -> Preprocess a -> Preprocess a
+withBoundVars
+    :: Monad m
+    => (Map Symbol Symbol)
+    -> Preprocess m a
+    -> Preprocess m a
 withBoundVars bvs m = local (M.union bvs) m
 
 -- | Give each symbol a globally unique identifier
-uniqueIds :: SurfaceExpr () -> Preprocess (SurfaceExpr ())
+uniqueIds
+    :: Monad m
+    => SurfaceExpr ()
+    -> Preprocess m (SurfaceExpr ())
+
 uniqueIds (Free (IdS s)) = do
     boundVars <- readBoundVars
     case M.lookup s boundVars of
@@ -73,7 +82,10 @@ uniqueIds (Free (FunS args body sigs)) = do
         return $ arg ++ suffix
     let bvs = M.fromList $ zip args uniqueVars
     body' <- withBoundVars bvs $ uniqueIds body
-    return . join $ aFun uniqueVars body' sigs
+    sigs' <- withBoundVars bvs $ forM sigs $ \sig -> do
+        sig' <- sequence $ fmap uniqueIds sig
+        return sig'
+    return . join $ aFun uniqueVars body' sigs'
 
 uniqueIds (Free (AppS op erands)) = do
     op' <- uniqueIds op
@@ -89,5 +101,10 @@ uniqueIds (Free (IfS c t e)) = do
 uniqueIds (Free (DefS sym val)) = do
     val' <- uniqueIds val
     return . join $ aDef sym val'
+
+uniqueIds (Free (SigS sym vars pt)) = do
+    boundVars <- readBoundVars
+    let sym' = maybe sym id $ M.lookup sym boundVars
+    return . join $ aSig sym' vars pt
 
 uniqueIds whatever = return whatever

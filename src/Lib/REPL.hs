@@ -97,7 +97,7 @@ replLookupTypeEnv :: Symbol -> Repl (Maybe Scheme)
 replLookupTypeEnv sym = do
     te <- gets typeEnv
     return $ envLookup te sym
-
+{-
 -- | Parses a REPL expression into a 'CoreExpr'.
 replParseExpr :: String -> Repl ()
 replParseExpr src = do
@@ -106,6 +106,7 @@ replParseExpr src = do
         Left err -> throwError $ ParseError err
         Right surface -> do
             liftIO . putStrLn . show . annotated $ surface
+-}
 
 -- | Executes REPL shell commands
 {-
@@ -134,5 +135,5 @@ replLoop = do
             replLoop
 -}
         Just input -> do
-            replParseExpr input
+--            replParseExpr input
             replLoop

@@ -3,8 +3,8 @@
 ;(: three Float)
 ;(def three (id 3.0))
 
-(: times-2 (-> Float Float))
-(defun times-2 (x) (* x 2.0))
+;(: times-2 (-> Float Float))
+(defun times-2 ((: x (=> ((Num a)) a))) (* x 2))
 
 ;(: eight Float)
 ;(def eight (times-2 4.0))
