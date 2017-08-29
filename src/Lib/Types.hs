@@ -7,6 +7,7 @@ module Lib.Types
 --    , TypeError(..)
     , extendEnv
     , envLookup
+    , defaultTypeEnv
     )
 where
 
@@ -150,37 +151,3 @@ typecheck_defn
 typecheck_defn defn te = do
     ((ty:_), cs) <- (typecheck_defns [defn] te)
     return (ty, cs)
-
--- * Test shit
-
-example_defns = [ "(def three (id 3.0))"
-                , "(defun times-2 (x) (* x 2.0))"
-                , "(def eight (times-2 4.0))"
-                , "(defun square (x) (* x x))"
-                , "(def nine (square 3.0))"
-                , "(def four (square 2))"
-                , "(defun fact (n) (if (< n 2) n (fact (* n (- n 1)))))"
-                , "(defun compose (f g x) (f (g x)))"
-                ]
-
-{-
-typecheck :: [SurfaceExpr ()] -> Except TypeError [(Symbol, Scheme)]
-typecheck defns = do
-    let syms = fmap (\(Free (DefS sym _)) -> sym) defns
-    let defns' = fmap (fromJust . surfaceToCore) defns
-    (schemes, cs) <- typecheck_defns (zip syms defns') defaultTypeEnv
-    forM (zip syms schemes) return
-
-test :: IO ()
-test = do
-    mDefns <- parse_multi . T.pack . concat $ example_defns
-    case mDefns of
-        Left err -> putStrLn err
-        Right defns -> case (runExcept $ typecheck defns) of
-            Left err -> putStrLn . show $ err
-            Right syms_schemes -> do
-                putStrLn "Type Results"
-                putStrLn "---"
-                forM_ syms_schemes $ \(sym, scheme) ->
-                    putStrLn $ sym ++ " : " ++ (show scheme)
--}

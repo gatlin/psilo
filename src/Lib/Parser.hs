@@ -9,7 +9,6 @@ import Data.Attoparsec.Text
 import Control.Applicative
 import Data.Char (isDigit, isAlpha)
 import Control.Monad (join)
-import Control.Monad.IO.Class
 import Control.Monad.Free
 import Control.Monad.Except
 import Lib.Syntax.Surface
@@ -72,7 +71,7 @@ lam_parser =  (string "\\")
 typed_sym :: Parser (String, Maybe (SurfaceExpr a))
 typed_sym = (parens has_type) <|> (sym >>= \s -> return (s, Nothing))
     where has_type = do
-              sig@(Free (SigS sym _ _))  <- sig_parser
+              sig@(Free (SigS sym _))  <- sig_parser
               return (sym, Just sig)
 
 fun_parser :: Parser (SurfaceExpr a)
@@ -171,8 +170,8 @@ sig_type_parser = (parens pred_type) <|> bare_type where
     compound_type :: Parser ([(String, TypeLit)], [[TypeLit]])
     compound_type = do
         skipSpace
-        string "->"
-        skipSpace
+--        string "->"
+--        skipSpace
         ts <- sig_typelit_parser `sepBy` (many space)
         skipSpace
         return ([], ts)
@@ -215,7 +214,7 @@ sig_parser = do
     skipSpace
     t <- sig_type_parser
     skipSpace
-    return $ aSig name [] t
+    return $ aSig name t where
 
 toplevel_parser :: Parser (SurfaceExpr a)
 toplevel_parser = do
@@ -249,7 +248,7 @@ parse_expr t = do
         Right result' -> return result'
 
 parse_multi'
-    :: MonadIO m
+    :: Monad m
     => Text
     -> m (Either String [SurfaceExpr ()])
 parse_multi' inp = do
@@ -258,7 +257,7 @@ parse_multi' inp = do
     return parse_result
 
 parse_multi
-    :: MonadIO m
+    :: Monad m
     => Text
     -> ExceptT PsiloError m [SurfaceExpr ()]
 parse_multi t = do

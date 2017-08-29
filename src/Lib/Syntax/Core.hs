@@ -8,6 +8,7 @@ module Lib.Syntax.Core where
 
 import Lib.Syntax.Symbol
 import Control.Monad.Free
+import Control.Monad (join)
 
 -- | The psilo core syntax tree
 -- Expressions represented in terms of 'CoreAst' have been parsed from surface
@@ -42,14 +43,14 @@ cBool b = liftF $ BoolC b
 cId :: (MonadFree CoreAst m) => Symbol -> m a
 cId s = liftF $ IdC s
 
-cApp :: (MonadFree CoreAst m) => a -> [a] -> m a
-cApp f a = liftF $ AppC f a
+cApp :: (MonadFree CoreAst m) => m a -> [m a] -> m a
+cApp f a = join . liftF $ AppC f a
 
-cFun :: (MonadFree CoreAst m) => [Symbol] -> a -> m a
-cFun a b = liftF $ FunC a b
+cFun :: (MonadFree CoreAst m) => [Symbol] -> m a -> m a
+cFun a b = join . liftF $ FunC a b
 
-cIf :: (MonadFree CoreAst m) => a -> a -> a -> m a
-cIf c t e = liftF $ IfC c t e
+cIf :: (MonadFree CoreAst m) => m a -> m a -> m a -> m a
+cIf c t e = join . liftF $ IfC c t e
 
 -- | The free monad of 'CoreAst' is a DSL which used by the type checker, code
 -- generators, and other subsystems.

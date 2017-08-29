@@ -8,4 +8,5 @@ import Lib.Syntax.Core
 data TopLevel
     = Define Symbol (CoreExpr ()) -- ^ A value definition
     | Signature Symbol Scheme -- ^ A top level type scheme
+    | TopLevelNull String
     deriving (Show, Eq)

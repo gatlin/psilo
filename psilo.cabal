@@ -21,7 +21,7 @@ library
                        Lib.Compiler.StackVM,
                        Lib.Compiler.StackVM.Codegen,
                        Lib.Compiler.StackVM.Machine,
-                       Lib.Compiler.Preprocessor
+                       Lib.Preprocessor
                        Lib.Syntax.Annotated,
                        Lib.Syntax.Core,
                        Lib.Syntax.Surface,
@@ -40,7 +40,8 @@ library
                        Lib.Types.TypeEnv,
                        Lib.Types.TypeError,
                        Lib.Types,
-                       Lib.Errors
+                       Lib.Errors,
+                       Lib.Test
   build-depends:       base >= 4.7 && < 5,
                        comonad,
                        mtl,

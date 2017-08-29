@@ -4,7 +4,7 @@ module Lib.FileEval where
 
 import Lib.Syntax
 import Lib.Parser
-import Lib.Compiler.Preprocessor
+import Lib.Preprocessor
 import Lib.Compiler.StackVM
 import Lib.Errors
 import Control.Monad
