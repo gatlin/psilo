@@ -144,7 +144,7 @@ data TypeLit = TyConLit String | TyVarLit String
 
 data Scheme = Forall [TyVar] (Qual Type) deriving (Eq, Ord)
 -}
-surfaceToTopLevel s@(Free (SigS sym (ps, ty))) =
+surfaceToTopLevel s@(Free (SigS sym scheme)) =
     return $ TopLevelNull (show s)
 
 surfaceToTopLevel _ = throwError $

@@ -1,4 +1,4 @@
-(: wut (-> (-> (-> a b) a b) a))
+(: huh (-> (-> (-> (-> a b c) a) b) c))
 
 ;(defun id (x) x)
 

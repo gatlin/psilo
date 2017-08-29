@@ -7,13 +7,27 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Attoparsec.Text
 import Control.Applicative
-import Data.Char (isDigit, isAlpha)
+import Data.Char (isDigit, isAlpha, ord)
 import Control.Monad (join)
 import Control.Monad.Free
 import Control.Monad.Except
 import Lib.Syntax.Surface
 import Lib.Util
 import Lib.Errors
+import Lib.Types.Scheme
+import Lib.Types.Qual
+import Lib.Types.Type
+import Lib.Types.Kind
+
+-- String hashing
+type HashFunction f = f Char -> Int
+
+make_hash_function :: Foldable f => Int -> HashFunction f
+make_hash_function x = go where
+    go = foldl (\hashVal ch -> x * hashVal + (ord ch)) 0
+
+string_hash :: HashFunction []
+string_hash = make_hash_function 31
 
 num_parser :: Parser (SurfaceExpr a)
 num_parser = do
@@ -140,71 +154,60 @@ defun_parser = do
     return $ aDef name (join $ aFun (map fst args) body
                                (map snd args))
 
--- | For standalone type signatures
-sig_type_parser :: Parser ([(String, TypeLit)], [[TypeLit]])
-sig_type_parser = (parens pred_type) <|> bare_type where
+scheme_parser :: Parser Scheme
+scheme_parser = (parens pred_type) <|> bare_type where
 
-    pred_type :: Parser ([(String, TypeLit)], [[TypeLit]])
+    pred_type :: Parser Scheme
     pred_type = do
         skipSpace
         string "=>"
         skipSpace
         preds <- parens (pred `sepBy` (many space))
         skipSpace
-        (_, t) <- bare_type
+        t <- type_parser
         skipSpace
-        return (preds, t)
+        return $ Forall [] (preds :=> t)
 
-    pred :: Parser (String, TypeLit)
+    pred :: Parser Pred
     pred = parens $ do
         skipSpace
         p <- sym
         skipSpace
         t <- ty_sym
         skipSpace
-        return (p, t)
+        return $ IsIn p t
 
-    bare_type :: Parser ([(String, TypeLit)], [[TypeLit]])
-    bare_type = (parens compound_type) <|> single_type
+    bare_type :: Parser Scheme
+    bare_type = do
+        t <- type_parser
+        return $ Forall [] ([] :=> t)
 
-    compound_type :: Parser ([(String, TypeLit)], [[TypeLit]])
-    compound_type = do
-        skipSpace
---        string "->"
---        skipSpace
-        ts <- sig_typelit_parser `sepBy` (many space)
-        skipSpace
-        return ([], ts)
-
-    single_type :: Parser ([(String, TypeLit)], [[TypeLit]])
-    single_type = do
-        t <- sig_typelit_parser
-        return ([], [t])
-
-ty_sym :: Parser TypeLit
-ty_sym = do
-    s@(c:cs) <- sym
-    return $ if elem c ['a'..'z']
-                 then TyVarLit s
-                 else TyConLit s
-
-sig_typelit_parser :: Parser [TypeLit]
-sig_typelit_parser = do
+type_parser :: Parser Type
+type_parser = do
     skipSpace
     t <- one <|> (parens more)
     skipSpace
     return t
 
     where
-        one :: Parser [TypeLit]
-        one = do
-            t <- ty_sym
-            return [t]
+        one :: Parser Type
+        one = ty_sym
 
-        more :: Parser [TypeLit]
+        more :: Parser Type
         more = do
-            ts <- ty_sym `sepBy` (many space)
-            return ts
+            skipSpace
+            string "->"
+            skipSpace
+            ts <- type_parser `sepBy` (many space)
+            skipSpace
+            return $ TFun ts
+
+ty_sym :: Parser Type
+ty_sym = do
+    s@(c:cs) <- sym
+    return $ if (elem c ['a'..'z'])
+                then TVar (TyVar (string_hash s) Star)
+                else TSym (TyCon s Star)
 
 sig_parser :: Parser (SurfaceExpr a)
 sig_parser = do
@@ -212,7 +215,7 @@ sig_parser = do
     skipSpace
     name <- sym
     skipSpace
-    t <- sig_type_parser
+    t <- scheme_parser
     skipSpace
     return $ aSig name t where
 
