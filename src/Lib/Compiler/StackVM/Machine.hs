@@ -48,8 +48,10 @@ import Control.Monad
 import Control.Monad.Trans
 import Control.Monad.IO.Class
 import Control.Monad.State
+import Control.Monad.Except
 
 import Lib.Syntax
+import Lib.Errors
 
 type Location = Int
 
@@ -161,17 +163,21 @@ data MachineState = M
     } deriving (Show)
 
 newtype MachineT m a = Machine {
-    unMachineT :: StateT MachineState m a
+    unMachineT :: StateT MachineState (ExceptT PsiloError m) a
     } deriving ( Functor
                , Applicative
                , Monad
                , MonadState MachineState
-               , MonadIO
-               , MonadTrans )
+               , MonadError PsiloError
+               , MonadIO )
 
 type Machine = MachineT IO
 
-runMachine :: Monad m => MachineState -> MachineT m a -> m (a, MachineState)
+runMachine
+    :: Monad m
+    => MachineState
+    -> MachineT m a
+    -> ExceptT PsiloError m (a, MachineState)
 runMachine ms m = runStateT (unMachineT m) ms
 
 newMachineState :: Int {- ^ Memory size -} -> MachineState
@@ -486,7 +492,7 @@ setMain :: MachineState -> MachineState
 setMain m = setCounter _main m
     where _main = envGet "main" $ machineLabels m
 
-run :: Monad m => [Asm] -> m MachineState
+run :: Monad m => [Asm] -> ExceptT PsiloError m MachineState
 run is = run' (V.fromList $ execute <$> is)
     (setMain . setCounter 0 . prepare is $ newMachineState 65536)
 
@@ -494,7 +500,7 @@ run'
     :: Monad m
     => Vector (MachineT m ())
     -> MachineState
-    -> m MachineState
+    -> ExceptT PsiloError m MachineState
 run' is ms
     | end pc = return ms
     | otherwise = do
