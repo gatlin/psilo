@@ -3,10 +3,10 @@
 -- |
 -- This module facilitates turning parsed surface expressions into the data
 -- needed by the compiler to generate code. These tasks include:
--- - Generating unique identifiers for every distinct variable
--- - Converting surface expressions into top level expressions
+-- [x] Generating unique identifiers for every distinct variable
+-- [x] Converting surface expressions into top level expressions
 --   (core expressions, type schemes, etc)
--- - Lambda lifting
+-- [ ] Lambda lifting
 
 module Lib.Preprocessor where
 
@@ -66,7 +66,7 @@ gensym :: Monad m => Preprocess m String
 gensym = do
     n <- gets uniqueInt
     modify $ \s -> s { uniqueInt = n + 1 }
-    return $ "-" ++ (show n)
+    return $ "_" ++ (show n)
 
 readBoundVars :: Monad m => Preprocess m SymbolMap
 readBoundVars = ask
