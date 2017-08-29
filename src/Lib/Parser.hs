@@ -19,15 +19,9 @@ import Lib.Types.Qual
 import Lib.Types.Type
 import Lib.Types.Kind
 
--- String hashing
-type HashFunction f = f Char -> Int
-
-make_hash_function :: Foldable f => Int -> HashFunction f
-make_hash_function x = go where
-    go = foldl (\hashVal ch -> x * hashVal + (ord ch)) 0
-
-string_hash :: HashFunction []
-string_hash = make_hash_function 31
+-- String hashing, for getting a unique Int from type variables
+string_hash :: String -> Int
+string_hash = foldl (\hashVal ch -> 31 * hashVal + (ord ch)) 0
 
 num_parser :: Parser (SurfaceExpr a)
 num_parser = do

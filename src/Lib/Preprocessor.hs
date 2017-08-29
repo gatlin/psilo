@@ -4,8 +4,10 @@
 -- This module facilitates turning parsed surface expressions into the data
 -- needed by the compiler to generate code. These tasks include:
 -- [x] Generating unique identifiers for every distinct variable
--- [x] Converting surface expressions into top level expressions
---   (core expressions, type schemes, etc)
+-- [x] Converting surface-level definitions into TopLevel
+-- [x] Converting surface-level signatures into TopLevel
+-- [ ] Forming a default type environment for type checking
+-- [ ] Gathering predicate information to form a class environment
 -- [ ] Lambda lifting
 
 module Lib.Preprocessor where
@@ -62,6 +64,7 @@ preprocess
     -> ExceptT PsiloError m a
 preprocess (Preprocess p) = runReaderT (evalStateT p pState ) M.empty
 
+-- | Generate unique symbols
 gensym :: Monad m => Preprocess m String
 gensym = do
     n <- gets uniqueInt
@@ -71,6 +74,8 @@ gensym = do
 readBoundVars :: Monad m => Preprocess m SymbolMap
 readBoundVars = ask
 
+-- | Perform a preprocessing computation with a temporarily extended bound
+-- variable map
 withBoundVars
     :: Monad m
     => SymbolMap
@@ -78,7 +83,7 @@ withBoundVars
     -> Preprocess m a
 withBoundVars bvs m = local (M.union bvs) m
 
--- | Give each symbol a globally unique identifier
+-- | Give each symbol in a 'SurfaceExpr' a globally unique identifier
 uniqueIds
     :: Monad m
     => SurfaceExpr ()
@@ -125,6 +130,7 @@ uniqueIds (Free (SigS sym pt)) = do
 
 uniqueIds whatever = return whatever
 
+-- | Transforms a 'SurfaceExpr' into a 'TopLevel' expression
 surfaceToTopLevel
     :: Monad m
     => SurfaceExpr ()
@@ -141,6 +147,7 @@ surfaceToTopLevel _ = throwError $
     PreprocessError $
     "Expression is not a top level expression"
 
+-- | Called by 'surfaceToTopLevel' on a subset of 'SurfaceExpr's
 surfaceToCore
     :: Monad m
     => SurfaceExpr ()
