@@ -129,23 +129,13 @@ surfaceToTopLevel
     :: Monad m
     => SurfaceExpr ()
     -> Preprocess m TopLevel
-surfaceToTopLevel s@(Free (DefS sym val)) = do
-    s' <- uniqueIds s
-    val' <- surfaceToCore val
+surfaceToTopLevel (Free (DefS sym val)) = do
+    uval <- uniqueIds val
+    val' <- surfaceToCore uval
     return $ Define sym val'
 
-{-
-    | SigS { sigSymS :: Symbol
-           , sigVarS :: [TypeLit]
-           , sigTypeS :: ([(Symbol, TypeLit)], [[TypeLit]]) }
-
-data TypeLit = TyConLit String | TyVarLit String
-    deriving (Eq, Ord, Show)
-
-data Scheme = Forall [TyVar] (Qual Type) deriving (Eq, Ord)
--}
-surfaceToTopLevel s@(Free (SigS sym scheme)) =
-    return $ TopLevelNull (show s)
+surfaceToTopLevel (Free (SigS sym scheme)) = return $
+    Signature sym $ normalize scheme
 
 surfaceToTopLevel _ = throwError $
     PreprocessError $
