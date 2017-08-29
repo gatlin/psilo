@@ -4,7 +4,7 @@ import Lib.Syntax.Symbol
 import Lib.Types.Type (Type(..), TyVar(..))
 
 -- Basically every kind of error message will go in here so we can have one big
--- Except/ExceptT jamboree throughout the whole
+-- Except/ExceptT jamboree throughout the whole project
 
 data PsiloError
     -- type inference

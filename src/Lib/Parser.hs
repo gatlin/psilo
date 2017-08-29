@@ -64,7 +64,7 @@ bool_parser = do
 app_parser :: Parser (SurfaceExpr a)
 app_parser = do
     (op:operands) <- expr_parser `sepBy1` (many space)
-    return . join $ aApp op operands
+    return $ aApp op operands
 
 lam_parser :: Parser Text
 lam_parser =  (string "\\")
@@ -86,7 +86,7 @@ fun_parser = do
     char ')'
     skipSpace
     body <- expr_parser
-    return . join $ aFun (map fst args) body (map snd args)
+    return $ aFun (map fst args) body (map snd args)
 
 if_parser :: Parser (SurfaceExpr a)
 if_parser = do
@@ -97,7 +97,7 @@ if_parser = do
     t <- expr_parser
     skipSpace
     e <- expr_parser
-    return . join $ aIf c t e
+    return $ aIf c t e
 
 parens :: Parser a -> Parser a
 parens p = do
@@ -124,7 +124,7 @@ def_parser = do
     sym <- sym
     skipSpace
     val <- expr_parser
-    return . join $ aDef sym val
+    return $ aDef sym val
 
 defun_parser :: Parser (SurfaceExpr a)
 defun_parser = do
@@ -138,7 +138,7 @@ defun_parser = do
     char ')'
     skipSpace
     body <- expr_parser
-    return . join $ aDef name (join $ aFun (map fst args) body
+    return $ aDef name (join $ aFun (map fst args) body
                                (map snd args))
 
 -- | For standalone type signatures
@@ -215,7 +215,7 @@ sig_parser = do
     skipSpace
     t <- sig_type_parser
     skipSpace
-    return . join $ aSig name [] t
+    return $ aSig name [] t
 
 toplevel_parser :: Parser (SurfaceExpr a)
 toplevel_parser = do

@@ -9,6 +9,7 @@ module Lib.Syntax.Surface where
 import Lib.Syntax.Symbol
 import Lib.Syntax.Core
 import Control.Monad.Free
+import Control.Monad (join)
 
 -- * Surface Syntax
 
@@ -64,17 +65,17 @@ aBool b = liftF $ BoolS b
 aId :: (MonadFree SurfaceAst m) => Symbol -> m a
 aId s = liftF $ IdS s
 
-aApp :: (MonadFree SurfaceAst m) => a -> [a] -> m a
-aApp f a = liftF $ AppS f a
+aApp :: (MonadFree SurfaceAst m) => m a -> [m a] -> m a
+aApp f a = join . liftF $ AppS f a
 
-aFun :: (MonadFree SurfaceAst m) => [Symbol] -> a -> [Maybe a] -> m a
-aFun a b tys = liftF $ FunS a b tys
+aFun :: (MonadFree SurfaceAst m) => [Symbol] -> m a -> [Maybe (m a)] -> m a
+aFun a b tys = join . liftF $ FunS a b tys
 
-aIf :: (MonadFree SurfaceAst m) => a -> a -> a -> m a
-aIf c t e = liftF $ IfS c t e
+aIf :: (MonadFree SurfaceAst m) => m a -> m a -> m a -> m a
+aIf c t e = join . liftF $ IfS c t e
 
-aDef :: (MonadFree SurfaceAst m) => Symbol -> a -> m a
-aDef s b = liftF $ DefS s b
+aDef :: (MonadFree SurfaceAst m) => Symbol -> m a -> m a
+aDef s b = join . liftF $ DefS s b
 
 aSig
     :: (MonadFree SurfaceAst m)
@@ -82,4 +83,4 @@ aSig
     -> [TypeLit]
     -> ([(Symbol, TypeLit)], [[TypeLit]])
     -> m a
-aSig sym v t = liftF $ SigS sym v t
+aSig sym v t = join . liftF $ SigS sym v t

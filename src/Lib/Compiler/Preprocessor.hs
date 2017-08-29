@@ -85,26 +85,26 @@ uniqueIds (Free (FunS args body sigs)) = do
     sigs' <- withBoundVars bvs $ forM sigs $ \sig -> do
         sig' <- sequence $ fmap uniqueIds sig
         return sig'
-    return . join $ aFun uniqueVars body' sigs'
+    return $ aFun uniqueVars body' sigs'
 
 uniqueIds (Free (AppS op erands)) = do
     op' <- uniqueIds op
     erands' <- forM erands uniqueIds
-    return . join $ aApp op' erands'
+    return $ aApp op' erands'
 
 uniqueIds (Free (IfS c t e)) = do
     c' <- uniqueIds c
     t' <- uniqueIds t
     e' <- uniqueIds e
-    return . join $ aIf c' t' e'
+    return $ aIf c' t' e'
 
 uniqueIds (Free (DefS sym val)) = do
     val' <- uniqueIds val
-    return . join $ aDef sym val'
+    return $ aDef sym val'
 
 uniqueIds (Free (SigS sym vars pt)) = do
     boundVars <- readBoundVars
     let sym' = maybe sym id $ M.lookup sym boundVars
-    return . join $ aSig sym' vars pt
+    return $ aSig sym' vars pt
 
 uniqueIds whatever = return whatever

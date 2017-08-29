@@ -224,7 +224,7 @@ data Asm
     | Add32           -- ^ 32-bit addition
     | Mul32           -- ^ 32-bit multiplication
     | Mod32           -- ^ 32-bit modulus
-    | Lt              -- ^ second stack value < first stack value
+    | Lt              -- ^ top stack value < second stack value
     | Le              -- ^ '' <= ''
     | Gt              -- ^ '' > ''
     | Ge              -- ^ '' >= ''
