@@ -1,6 +1,5 @@
 module Lib
-    ( replMain
-    , parse_expr
+    ( parse_expr
     , parse_multi
     , Preprocess(..)
     , preprocess
@@ -8,12 +7,10 @@ module Lib
     , PsiloError(..)
     , removeComments
     , surfaceToTopLevel
-    , replMain
     ) where
 
 import Lib.Parser
 import Lib.Syntax
-import Lib.REPL
 import Lib.Compiler.StackVM
 import Lib.Preprocessor
 import Lib.Errors

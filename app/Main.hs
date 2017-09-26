@@ -13,7 +13,6 @@ import Lib ( parse_multi
            , removeComments
            , preprocess
            , surfaceToTopLevel
-           , replMain
            )
 
 data CmdLnOpts = CmdLnOpts
@@ -51,7 +50,7 @@ main = execParser opts >>= begin where
 
 begin :: CmdLnOpts -> IO ()
 begin cmdLnOpts = case inputFile cmdLnOpts of
-    Nothing -> replMain
+    Nothing -> return ()
     Just inFile -> do
         file_contents <- TextIO.readFile inFile
         result <- return $ do
