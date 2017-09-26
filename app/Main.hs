@@ -17,9 +17,9 @@ import Lib ( parse_multi
 
 data CmdLnOpts = CmdLnOpts
     { inputFile :: Maybe String
-    , debugOut :: Bool
+--    , debugOut :: Bool
     , asmDump :: Bool
-    , execRepl  :: Bool
+--    , execRepl  :: Bool
     } deriving (Show)
 
 optParser :: Parser CmdLnOpts
@@ -28,18 +28,22 @@ optParser = CmdLnOpts
          (long "in")
       <> (metavar "FILE_INPUT")
       <> (help "Path to input file."))
+{-
     <*> (switch $
          (long "debug")
       <> (short 'd')
       <> (help "Enable debug output"))
+-}
     <*> (switch $
          (long "asm")
       <> (short 'm')
       <> (help "Dump generated assembly code (when applicable)"))
+{-
     <*> (switch $
          (long "repl")
       <> (short 'r')
       <> (help "Enter a psilo repl"))
+-}
 
 main :: IO ()
 main = execParser opts >>= begin where
