@@ -7,6 +7,7 @@ module Lib
     , PsiloError(..)
     , removeComments
     , surfaceToTopLevel
+    , TopLevel(..)
     ) where
 
 import Lib.Parser

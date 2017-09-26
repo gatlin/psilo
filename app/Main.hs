@@ -7,12 +7,14 @@ import Options.Applicative.Common
 import Data.Monoid ((<>))
 import Control.Monad.Except
 import Control.Monad (forM_, mapM)
-import qualified Data.Text as Text
+import Data.Text (Text)
 import qualified Data.Text.IO as TextIO
 import Lib ( parse_multi
            , removeComments
            , preprocess
            , surfaceToTopLevel
+           , PsiloError
+           , TopLevel(..)
            )
 
 data CmdLnOpts = CmdLnOpts
@@ -58,10 +60,12 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
     Nothing -> return ()
     Just inFile -> do
         file_contents <- TextIO.readFile inFile
-        result <- return $ do
-            defns <- parse_multi $ removeComments file_contents
-            preprocess $ mapM surfaceToTopLevel defns
-
+        result <- return $ process_file file_contents
         case runExcept result of
             Left err -> putStrLn . show $ err
             Right defns -> forM_ defns $ putStrLn . show
+
+process_file :: Text -> Except PsiloError [TopLevel]
+process_file file_contents = do
+    defns <- parse_multi $ removeComments file_contents
+    preprocess $ mapM surfaceToTopLevel defns
