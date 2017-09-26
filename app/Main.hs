@@ -46,7 +46,7 @@ main = execParser opts >>= begin where
     opts = info (helper <*> optParser)
         ( fullDesc
        <> progDesc "Execute psilo programs."
-       <> header "psilo - a practical, safe, interpreted, linear operation language")
+       <> header "psilo"
 
 begin :: CmdLnOpts -> IO ()
 begin cmdLnOpts = case inputFile cmdLnOpts of
