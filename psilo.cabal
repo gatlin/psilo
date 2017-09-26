@@ -16,7 +16,8 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Lib, Lib.Parser, Lib.Syntax,
-                       Lib.REPL, Lib.FileEval, Lib.Util,
+                       Lib.REPL,
+                       Lib.Util,
                        Lib.Compiler,
                        Lib.Compiler.StackVM,
                        Lib.Compiler.StackVM.Codegen,
