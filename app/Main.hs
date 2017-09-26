@@ -9,13 +9,7 @@ import Control.Monad.Except
 import Control.Monad (forM_, mapM, foldM)
 import Data.Text (Text)
 import qualified Data.Text.IO as TextIO
-import Lib ( parse_multi
-           , removeComments
-           , preprocess
-           , surfaceToTopLevel
-           , PsiloError
-           , TopLevel(..)
-           )
+import Lib
 
 data CmdLnOpts = CmdLnOpts
     { inputFile :: Maybe String
@@ -55,15 +49,49 @@ main = execParser opts >>= begin where
        <> header "psilo"
         )
 
+type Defn = (Symbol, AnnotatedExpr ())
+type Sig = (Symbol, Scheme)
+
+splitUp
+    :: [TopLevel]
+    -> ([Defn], [Sig])
+splitUp = foldl go ([], [])
+    where go (defns, sigs) tl =
+              case tl of
+                  (Define s d) -> ((s, d):defns, sigs)
+                  (Signature s t) -> (defns, (s, t):sigs)
+
+buildTypeEnv :: [Sig] -> TypeEnv
+buildTypeEnv = foldl go emptyTypeEnv
+    where go tyEnv sig = extendEnv tyEnv sig
+
 begin :: CmdLnOpts -> IO ()
 begin cmdLnOpts = case inputFile cmdLnOpts of
     Nothing -> return ()
     Just inFile -> do
         file_contents <- TextIO.readFile inFile
-        result <- return $ process_file file_contents
-        case runExcept result of
+        result <- return . runExcept $ do
+            toplevels <- process_file file_contents
+            let (defns, sigs) = splitUp toplevels
+            let tyEnv = buildTypeEnv sigs
+            (sigs, constraints) <- typecheck_defns defns tyEnv
+            return (toplevels, sigs, constraints)
+        case result of
             Left err -> putStrLn . show $ err
-            Right defns -> forM_ defns $ putStrLn . show
+            Right (toplevels, schemes, constraints) -> do
+                putStrLn "Type schemes"
+                putStrLn "---"
+                forM_ schemes $ \ (sym, sig) ->
+                    putStrLn $ sym ++ " : " ++ (show sig)
+                putStrLn "---"
+                putStrLn "Top Level Definitions"
+                putStrLn "---"
+                forM_ toplevels $ putStrLn . show
+                putStrLn "---"
+                putStrLn "Constraints"
+                putStrLn "---"
+                forM_ constraints $ putStrLn . show
+
 
 process_file :: Text -> Except PsiloError [TopLevel]
 process_file file_contents = do

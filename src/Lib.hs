@@ -7,6 +7,7 @@ module Lib
     , AnnotatedExpr
     , annotated
     , TopLevel(..)
+    , Symbol
       -- * Preprocessing
     , Preprocess(..)
     , preprocess
@@ -19,6 +20,8 @@ module Lib
     , extendEnv
     , envLookup
     , defaultTypeEnv
+    , emptyTypeEnv
+    , Scheme(..)
       -- * Errors
     , PsiloError(..)
     ) where

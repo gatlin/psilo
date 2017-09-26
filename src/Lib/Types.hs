@@ -7,6 +7,8 @@ module Lib.Types
     , extendEnv
     , envLookup
     , defaultTypeEnv
+    , emptyTypeEnv
+    , Scheme(..)
     )
 where
 
@@ -111,10 +113,11 @@ defaultClassEnv =     addCoreClasses
 typecheck_defns
     :: [(Symbol, AnnotatedExpr ())]
     -> TypeEnv
-    -> Except PsiloError ([Scheme], [Constraint])
+    -> Except PsiloError ([(Symbol, Scheme)], [Constraint])
 typecheck_defns defns te = do
     let te' = defaultTypeEnv <> te
 
+    -- !!! FIXME not needed anymore
     -- annotate expressions
     (syms, exprs) <- mapAndUnzipM
                      (\(sym, expr) -> return (sym, expr))
@@ -139,12 +142,13 @@ typecheck_defns defns te = do
             let ty' = substitute frame2 ty
             in  closeOver frame2 ((lookupPreds ty') pm :=> ty')
     let scms2 = fmap toScheme tys_pass_2
-    return (scms2, cs2)
+--    return (scms2, cs2, exprs)
+    return (zip syms scms2, cs2)
 
 typecheck_defn
     :: (Symbol, AnnotatedExpr ())
     -> TypeEnv
-    -> Except PsiloError (Scheme, [Constraint])
+    -> Except PsiloError (Symbol, Scheme, [Constraint])
 typecheck_defn defn te = do
-    ((ty:_), cs) <- (typecheck_defns [defn] te)
-    return (ty, cs)
+    (((e, s):_), cs) <- (typecheck_defns [defn] te)
+    return (e, s, cs)
