@@ -47,6 +47,7 @@ main = execParser opts >>= begin where
         ( fullDesc
        <> progDesc "Execute psilo programs."
        <> header "psilo"
+        )
 
 begin :: CmdLnOpts -> IO ()
 begin cmdLnOpts = case inputFile cmdLnOpts of
