@@ -4,7 +4,6 @@ module Lib.Types
     ( typecheck_defn
     , typecheck_defns
     , TypeEnv(..)
---    , TypeError(..)
     , extendEnv
     , envLookup
     , defaultTypeEnv
@@ -110,7 +109,7 @@ defaultClassEnv =     addCoreClasses
 -- inference and solving are re-run to produce the final type schemes.
 -- TODO: handle predicates.
 typecheck_defns
-    :: [(Symbol, CoreExpr ())]
+    :: [(Symbol, AnnotatedExpr ())]
     -> TypeEnv
     -> Except PsiloError ([Scheme], [Constraint])
 typecheck_defns defns te = do
@@ -118,7 +117,7 @@ typecheck_defns defns te = do
 
     -- annotate expressions
     (syms, exprs) <- mapAndUnzipM
-                     (\(sym, expr) -> return (sym, annotated expr))
+                     (\(sym, expr) -> return (sym, expr))
                      defns
 
     -- pass 1: add tyvar placeholders to type env, infer
@@ -143,7 +142,7 @@ typecheck_defns defns te = do
     return (scms2, cs2)
 
 typecheck_defn
-    :: (Symbol, CoreExpr ())
+    :: (Symbol, AnnotatedExpr ())
     -> TypeEnv
     -> Except PsiloError (Scheme, [Constraint])
 typecheck_defn defn te = do

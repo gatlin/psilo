@@ -2,7 +2,7 @@ module Lib.Syntax.Annotated where
 
 import Lib.Syntax.Symbol
 import Lib.Syntax.Core
-import Lib.Syntax.Surface (SurfaceExpr(), SurfaceAst)
+import Lib.Syntax.Surface (SurfaceExpr (), SurfaceAst)
 import Control.Monad.Free
 import Control.Comonad
 import Control.Comonad.Cofree

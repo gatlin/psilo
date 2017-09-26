@@ -15,6 +15,7 @@ module Lib.Preprocessor where
 import Lib.Syntax.Symbol
 import Lib.Syntax.Surface
 import Lib.Syntax.Core
+import Lib.Syntax.Annotated
 import Lib.Syntax.TopLevel
 
 import Lib.Types.Type (TyVar(..), Type(..))
@@ -134,7 +135,7 @@ surfaceToTopLevel
 surfaceToTopLevel (Free (DefS sym val)) = do
     uval <- uniqueIds val
     val' <- surfaceToCore uval
-    return $ Define sym val'
+    return $ Define sym (annotated val')
 
 surfaceToTopLevel (Free (SigS sym scheme)) = return $
     Signature sym $ normalize scheme

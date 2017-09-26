@@ -6,7 +6,7 @@ import Options.Applicative
 import Options.Applicative.Common
 import Data.Monoid ((<>))
 import Control.Monad.Except
-import Control.Monad (forM_, mapM)
+import Control.Monad (forM_, mapM, foldM)
 import Data.Text (Text)
 import qualified Data.Text.IO as TextIO
 import Lib ( parse_multi
