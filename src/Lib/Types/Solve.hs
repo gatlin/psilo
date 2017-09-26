@@ -37,13 +37,14 @@ initSolveState = SolveState mempty mempty mempty
 
 -- | A monad for solving constraints. The state is a 'Unifier' being
 -- constructed. Execution may result in a raised 'TypeError'.
-type Solve m = StateT SolveState (ExceptT PsiloError m)
+type Solve = StateT SolveState (Except PsiloError)
 
-runSolve :: Monad m => Solve m a -> SolveState -> m (Either PsiloError a)
-runSolve s st = runExceptT (evalStateT s st)
+--runSolve :: Monad m => Solve m a -> SolveState -> m (Either PsiloError a)
+runSolve :: Solve a -> SolveState -> Either PsiloError a
+runSolve s st = runExcept (evalStateT s st)
 
 -- | Unification of two 'Type's
-unify :: Monad m => Type -> Type -> Solve m Unifier
+unify :: Type -> Type -> Solve Unifier
 unify t1 t2 | t1 == t2 = return emptyUnifier
 unify (TVar v) t = v `bind` t
 unify t (TVar v) = v `bind` t
@@ -51,7 +52,7 @@ unify (TFun as) (TFun bs) = unifyMany as bs
 unify t1 t2 = throwError $ UnificationFail t1 t2
 
 -- | Unification of a list of 'Type's.
-unifyMany :: Monad m => [Type] -> [Type] -> Solve m Unifier
+unifyMany :: [Type] -> [Type] -> Solve Unifier
 unifyMany [] [] = return emptyUnifier
 unifyMany (t1 : ts1) (t2 : ts2) = do
     (su1, cs1) <- unify t1 t2
@@ -61,7 +62,7 @@ unifyMany t1 t2 = throwError $ UnificationMismatch t1 t2
 
 -- | Bind a 'TyVar' to a 'Type' in the 'Frame', unless the result would be an
 -- infinite type.
-bind :: Monad m => TyVar -> Type -> Solve m Unifier
+bind :: TyVar -> Type -> Solve Unifier
 bind a t | t == TVar a = return emptyUnifier
          | occursCheck a t = throwError $ InfiniteType a t
          | otherwise = do
@@ -74,7 +75,7 @@ occursCheck a t = a `S.member` (ftv t)
 -- | The actual solving algorithm. Reads the current 'Unifier' and iterates
 -- through the constraints generating 'Unifier's. These are then merged into the
 -- state.
-solver :: Monad m => Solve m (Frame, PredMap)
+solver :: Solve (Frame, PredMap)
 solver = do
     cs <- gets constraints
     case cs of
@@ -94,7 +95,9 @@ solver = do
                 put $ SolveState su cs0 $ substitute su pm'
                 solver
 
-solveConstraints :: Monad m => [Constraint] -> ExceptT PsiloError m (Frame, PredMap)
+solveConstraints
+    :: [Constraint]
+    -> Except PsiloError (Frame, PredMap)
 solveConstraints cs = evalStateT solver $ initSolveState {
     constraints = cs
     }

@@ -84,9 +84,9 @@ addInst ps p@(IsIn sym _) = EnvT go where
 
 -- | Make sure two predicates do not overlap
 overlap :: Pred -> Pred -> Bool
-overlap (IsIn _ t1) (IsIn _ t2) = case runIdentity $ runSolve u st of
+overlap (IsIn _ t1) (IsIn _ t2) = case runSolve u st of
     Left _ -> False
     Right _ -> True
     where st = initSolveState
-          u :: Solve Identity Unifier
+          u :: Solve Unifier
           u = unify t1 t2
