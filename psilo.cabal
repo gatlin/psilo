@@ -64,6 +64,7 @@ executable psilo-exe
                      , psilo
                      , optparse-applicative
                      , mtl
+                     , text
   default-language:    Haskell2010
 
 test-suite psilo-test

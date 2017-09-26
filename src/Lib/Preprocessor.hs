@@ -47,9 +47,9 @@ pState :: PState
 pState = PState 0
 
 -- | A monad for transforming parsed surface syntax into what the compiler needs
-newtype Preprocess m a = Preprocess {
+newtype Preprocess a = Preprocess {
     runPreprocess
-        :: StateT PState (ReaderT SymbolMap (ExceptT PsiloError m)) a
+        :: StateT PState (ReaderT SymbolMap (Except PsiloError)) a
     } deriving ( Functor
                , Applicative
                , Monad
@@ -59,35 +59,32 @@ newtype Preprocess m a = Preprocess {
                )
 
 preprocess
-    :: (Monad m)
-    => Preprocess m a
-    -> ExceptT PsiloError m a
+    :: Preprocess a
+    -> Except PsiloError a
 preprocess (Preprocess p) = runReaderT (evalStateT p pState ) M.empty
 
 -- | Generate unique symbols
-gensym :: Monad m => Preprocess m String
+gensym :: Preprocess String
 gensym = do
     n <- gets uniqueInt
     modify $ \s -> s { uniqueInt = n + 1 }
     return $ "_" ++ (show n)
 
-readBoundVars :: Monad m => Preprocess m SymbolMap
+readBoundVars :: Preprocess SymbolMap
 readBoundVars = ask
 
 -- | Perform a preprocessing computation with a temporarily extended bound
 -- variable map
 withBoundVars
-    :: Monad m
-    => SymbolMap
-    -> Preprocess m a
-    -> Preprocess m a
+    :: SymbolMap
+    -> Preprocess a
+    -> Preprocess a
 withBoundVars bvs m = local (M.union bvs) m
 
 -- | Give each symbol in a 'SurfaceExpr' a globally unique identifier
 uniqueIds
-    :: Monad m
-    => SurfaceExpr ()
-    -> Preprocess m (SurfaceExpr ())
+    :: SurfaceExpr ()
+    -> Preprocess (SurfaceExpr ())
 
 uniqueIds (Free (IdS s)) = do
     boundVars <- readBoundVars
@@ -132,9 +129,8 @@ uniqueIds whatever = return whatever
 
 -- | Transforms a 'SurfaceExpr' into a 'TopLevel' expression
 surfaceToTopLevel
-    :: Monad m
-    => SurfaceExpr ()
-    -> Preprocess m TopLevel
+    :: SurfaceExpr ()
+    -> Preprocess TopLevel
 surfaceToTopLevel (Free (DefS sym val)) = do
     uval <- uniqueIds val
     val' <- surfaceToCore uval
@@ -149,9 +145,8 @@ surfaceToTopLevel _ = throwError $
 
 -- | Called by 'surfaceToTopLevel' on a subset of 'SurfaceExpr's
 surfaceToCore
-    :: Monad m
-    => SurfaceExpr ()
-    -> Preprocess m (CoreExpr ())
+    :: SurfaceExpr ()
+    -> Preprocess (CoreExpr ())
 surfaceToCore (Free (IntS n)) = return $ cInt n
 surfaceToCore (Free (FloatS n)) = return $ cFloat n
 surfaceToCore (Free (BoolS b)) = return $ cBool b

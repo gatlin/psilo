@@ -1,11 +1,20 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main where
 
 import Options.Applicative
 import Options.Applicative.Common
 import Data.Monoid ((<>))
 import Control.Monad.Except
-import Control.Monad (forM_)
-import Lib
+import Control.Monad (forM_, mapM)
+import qualified Data.Text as Text
+import qualified Data.Text.IO as TextIO
+import Lib ( parse_multi
+           , removeComments
+           , preprocess
+           , surfaceToTopLevel
+           , replMain
+           )
 
 data CmdLnOpts = CmdLnOpts
     { inputFile :: Maybe String
@@ -44,7 +53,11 @@ begin :: CmdLnOpts -> IO ()
 begin cmdLnOpts = case inputFile cmdLnOpts of
     Nothing -> replMain
     Just inFile -> do
-        result <- runExceptT $ process_file inFile
-        case result of
+        file_contents <- TextIO.readFile inFile
+        result <- return $ do
+            defns <- parse_multi $ removeComments file_contents
+            preprocess $ mapM surfaceToTopLevel defns
+
+        case runExcept result of
             Left err -> putStrLn . show $ err
             Right defns -> forM_ defns $ putStrLn . show

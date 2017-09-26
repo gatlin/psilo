@@ -235,9 +235,8 @@ parse_expr' input = do
     return parse_result
 
 parse_expr
-    :: (Monad m)
-    => Text
-    -> ExceptT PsiloError m (SurfaceExpr ())
+    :: Text
+    -> Except PsiloError (SurfaceExpr ())
 parse_expr t = do
     result <- parse_expr' t
     case result of
@@ -254,9 +253,8 @@ parse_multi' inp = do
     return parse_result
 
 parse_multi
-    :: Monad m
-    => Text
-    -> ExceptT PsiloError m [SurfaceExpr ()]
+    :: Text
+    -> Except PsiloError [SurfaceExpr ()]
 parse_multi t = do
     result <- parse_multi' t
     case result of

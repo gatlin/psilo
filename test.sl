@@ -18,4 +18,4 @@
 (: fact (=> ((Num a) (Ord a)) (-> a a)))
 (defun fact (n) (if (< n 2) n (fact (* n (- n 1)))))
 
-;(defun compose (f g) (\ (x) (f (g x))))
+(defun compose (f g) (\ (x) (f (g x))))

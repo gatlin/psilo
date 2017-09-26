@@ -110,10 +110,9 @@ defaultClassEnv =     addCoreClasses
 -- inference and solving are re-run to produce the final type schemes.
 -- TODO: handle predicates.
 typecheck_defns
-    :: Monad m
-    => [(Symbol, CoreExpr ())]
+    :: [(Symbol, CoreExpr ())]
     -> TypeEnv
-    -> ExceptT PsiloError m ([Scheme], [Constraint])
+    -> Except PsiloError ([Scheme], [Constraint])
 typecheck_defns defns te = do
     let te' = defaultTypeEnv <> te
 
@@ -144,10 +143,9 @@ typecheck_defns defns te = do
     return (scms2, cs2)
 
 typecheck_defn
-    :: Monad m
-    => (Symbol, CoreExpr ())
+    :: (Symbol, CoreExpr ())
     -> TypeEnv
-    -> ExceptT PsiloError m (Scheme, [Constraint])
+    -> Except PsiloError (Scheme, [Constraint])
 typecheck_defn defn te = do
     ((ty:_), cs) <- (typecheck_defns [defn] te)
     return (ty, cs)

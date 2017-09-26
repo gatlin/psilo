@@ -17,8 +17,9 @@ import qualified Data.Text.IO as TextIO
 import Data.Maybe (fromJust)
 
 -- | reads a file, parses it, and returns top level declarations
-process_file :: FilePath -> ExceptT PsiloError IO [TopLevel]
+process_file :: FilePath -> IO (Except PsiloError [TopLevel])
 process_file file_path = do
-    file_contents <- liftIO $ TextIO.readFile file_path
-    defns <- parse_multi $ removeComments file_contents
-    preprocess $ mapM surfaceToTopLevel defns
+    file_contents <- TextIO.readFile file_path
+    return $ do
+        defns <- parse_multi $ removeComments file_contents
+        preprocess $ mapM surfaceToTopLevel defns
