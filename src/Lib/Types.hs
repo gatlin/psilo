@@ -127,7 +127,7 @@ typecheck_defn defn te = do
     ((e, s):_) <- (typecheck_defns [defn] te)
     return (e, s)
 
-toScheme frame pm expr  =
+toScheme frame pm expr =
     let ty = extract expr
         ty' = substitute frame ty
     in  closeOver frame ((lookupPreds ty') pm :=> ty')

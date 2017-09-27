@@ -10,6 +10,7 @@ import Control.Monad (forM_, mapM, foldM)
 import Control.Comonad
 import Data.Text (Text)
 import qualified Data.Text.IO as TextIO
+import Data.Map (Map)
 import qualified Data.Map as M
 import Lib
 
