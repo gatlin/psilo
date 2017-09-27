@@ -6,6 +6,7 @@
 -- [x] Generating unique identifiers for every distinct variable
 -- [x] Converting surface-level definitions into TopLevel
 -- [x] Converting surface-level signatures into TopLevel
+-- [x] Ensuring all symbols are either bound or top level
 -- [ ] Forming a default type environment for type checking
 -- [ ] Gathering predicate information to form a class environment
 -- [ ] Lambda lifting
@@ -176,38 +177,39 @@ surfaceToCore (Free (IfS c t e)) = do
 surfaceToCore s = throwError $ PreprocessError $
     "Expression " ++ show s ++ " cannot be converted into a core expression."
 
-boundVarCheck :: [TopLevel] -> Preprocess [TopLevel]
-boundVarCheck toplevels = withBoundVars bvs $ mapM go toplevels
+-- | Ensures that all symbols are either bound or global
+boundVarCheck :: [TopLevel] -> Preprocess ()
+boundVarCheck toplevels = withBoundVars bvs $ mapM_ go toplevels
     where
         syms = fmap (\x -> (x,x)) $ fmap fst $ fst $ splitUp toplevels
         builtins = fmap (\x -> (x,x)) $ S.toList builtin_syms
         bvs = M.fromList $ builtins ++ syms
 
-        go :: TopLevel -> Preprocess TopLevel
-        go (Define s core) = check core >>= return . Define s
-        go whatever      = return whatever
+        go :: TopLevel -> Preprocess ()
+        go (Define s core) = check core
+        go whatever = return ()
 
-        check :: CoreExpr () -> Preprocess (CoreExpr ())
+        check :: CoreExpr () -> Preprocess ()
         check (Free (FunC args body)) = do
             let argSyms = fmap (\x -> (x, x)) args
             b' <- withBoundVars (M.fromList argSyms) $ check body
-            return $ cFun args b'
+            return ()
 
         check (Free (IdC s)) = do
             boundVars <- readBoundVars
-            if not (M.member s boundVars)
-                then throwError $ UnboundVariable s
-                else return $ cId s
+            when (M.notMember s boundVars) $
+                throwError $ UnboundVariable s
+            return ()
 
         check (Free (AppC op erands)) = do
             op' <- check op
             erands' <- mapM check erands
-            return $ cApp op' erands'
+            return ()
 
         check (Free (IfC c t e)) = do
             c' <- check c
             t' <- check t
             e' <- check e
-            return $ cIf c' t' e'
+            return ()
 
-        check whatever = return whatever
+        check whatever = return ()

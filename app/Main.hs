@@ -47,7 +47,7 @@ begin :: CmdLnOpts -> IO ()
 begin cmdLnOpts = case inputFile cmdLnOpts of
     Nothing -> return ()
     Just inFile -> do
-        contents <- openFile inFile
+        contents <- TextIO.readFile inFile
         let result = runExcept $ do
                 toplevels <- process_file contents
                 let (defns, sigs) = splitUp toplevels
@@ -59,23 +59,10 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
                 forM_ tys $ \(sym, expr) -> do
                     putStrLn $ sym ++ " : " ++ (show $ extract expr)
 
-
-openFile :: FilePath -> IO Text
-openFile = TextIO.readFile
-
-loadTest = do
-    contents <- openFile "test.sl"
-    let result = runExcept $ do
-            toplevels <- process_file contents
-            let (defns, sigs) = splitUp toplevels
-            let tyEnv = buildTypeEnv sigs
-            let defns' = fmap (\(x, y) -> (x, annotated y)) defns
-            return $ (defns, tyEnv)
-    return result
-
 process_file :: Text -> Except PsiloError [TopLevel]
 process_file file_contents = do
     defns <- parse_multi $ removeComments file_contents
     preprocess $ do
         toplevels <- mapM surfaceToTopLevel defns
         boundVarCheck toplevels
+        return toplevels

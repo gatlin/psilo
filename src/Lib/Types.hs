@@ -92,7 +92,7 @@ defaultTypeEnv = TypeEnv $ M.fromList
 addCoreClasses :: EnvTransformer
 addCoreClasses =     addClass "Eq" []
                  <:> addClass "Ord" ["Eq"]
---                 <:> addClass "Show" []
+                 <:> addClass "Show" []
                  <:> addClass "Enum" []
                  <:> addClass "Num" ["Eq"]
                  <:> addClass "Real" ["Num", "Ord"]
@@ -105,11 +105,6 @@ defaultClassEnv =     addCoreClasses
                   <:> addInst [] (IsIn "Integral" typeInt)
                   <:> addInst [] (IsIn "Floating" typeFloat)
                   <:> addInst [] (IsIn "Eq" typeBool)
-
--- | Right now this is a two-pass inferencer.
--- The first pass infers and solves for generic type schemes for each
--- definition. These are then inserted into the default type environment and
--- inference and solving are re-run to produce the final type schemes.
 
 typecheck_defns
     :: [(Symbol, CoreExpr ())]
