@@ -4,6 +4,7 @@ module Lib.Compiler.StackVM.Codegen where
 
 import Lib.Util
 import Lib.Syntax
+import Lib.Types.Scheme
 import Lib.Compiler.StackVM.Machine
 import Data.Word
 import Control.Monad.Free
@@ -13,6 +14,8 @@ import Control.Monad
 import Control.Monad.Reader
 import Control.Monad.State
 import Control.Monad.IO.Class
+import Control.Comonad
+import Control.Comonad.Cofree
 
 asm_ops :: Symbol -> Maybe Asm
 asm_ops "add16" = Just Add16
@@ -81,38 +84,28 @@ gensym = do
     modify $ \cc -> cc { gensymValue = gs + 1 }
     return gs
 
-codegen :: MonadIO m => CoreExpr () -> CodegenT m [Asm]
-codegen _ = return []
-{-
+codegen :: MonadIO m => AnnotatedExpr Scheme -> CodegenT m [Asm]
 codegen expr = go expr where
+    go (scheme :< (FloatC n)) = return [ Push $ fromInteger $ round n ]
+    go (scheme :< (IntC n)) = return [ Push $ fromInteger n ]
+    go (scheme :< (BoolC b)) = return [ Push $ if b then 0x1 else 0x0 ]
 
-    go (Free (IntC n)) = return [ Push $ fromInteger n ]
-    go (Free (FloatC n)) = return [ Push $ fromInteger $ round n ]
-    go (Free (BoolC b)) = return [ Push $ if b then 0x1 else 0x0 ]
-
-    go (Free (IdC s)) = do
+    go (scheme :< (IdC s)) = do
         env <- asks symbolEnv
         hb <- asks heapBase
         case safeEnvGet s env of
             Just loc -> return [ ReadLocal loc ]
-            Nothing  -> error $ "sym = " ++ s ++ ", Env = " ++ show env ++
+            Nothing -> error $ "sym = " ++ s ++ ", Env = " ++ show env ++
                 ", heap pointer = " ++ show hb
 
-    go (Free (AppC fun operands)) = do
-        operands' <- push_on_stack (reverse operands)
-        case fun of
-            (Free (IdC sym)) -> case asm_ops sym of
-                Just op -> return $ operands' ++ [ op ]
-                Nothing -> return $ operands' ++ [ Call sym ]
+    go (scheme :< (AppC op erands)) = do
+        erands' <- push_on_stack (reverse erands)
+        case op of
+            (_ :< (IdC sym)) -> case asm_ops sym of
+                Just op' -> return $ erands' ++ [ op' ]
+                Nothing -> return $ erands' ++ [ Call sym ]
 
-    go (Free (TailRecC operands)) = do
-        operands' <- push_on_stack (reverse operands)
-        mTld <- gets currTopLevel
-        case mTld of
-            Nothing -> error $ "Cannot make tail-recursive call"
-            Just tld -> return $ operands' ++ [ Jump tld ]
-
-    go (Free (FunC args body)) = do
+    go (scheme :< (FunC args body)) = do
         let numbered_args = zip args [0..]
         body' <- local (store_args numbered_args) $ do
             b <- go body
@@ -129,7 +122,7 @@ codegen expr = go expr where
         -- for tail call elimination: is the last thing in body' a Call?
         return $ (concat args') ++ body' ++ [ Ret ]
 
-    go (Free (IfC c t e)) = do
+    go (scheme :< (IfC c t e)) = do
         c' <- go c
         t' <- go t
         e' <- go e
@@ -138,13 +131,14 @@ codegen expr = go expr where
         return $ c' ++ [ JumpIf if_label ] ++
             e' ++ [ Ret,  Label if_label ] ++ t'
 
+    go _ = return []
+
+    push_on_stack :: MonadIO m => [ AnnotatedExpr Scheme ] -> CodegenT m [ Asm ]
+    push_on_stack exprs = do
+        exprs' <- forM exprs go
+        return $ concat exprs'
+
     store_args :: [(Symbol, Location)] -> CodegenContext -> CodegenContext
     store_args syms cc = cc { symbolEnv = se, heapBase = hb }
         where se = (envFrom syms) <> (symbolEnv cc)
               hb = (heapBase cc) + (length syms)
-
-    push_on_stack :: MonadIO m => [ CoreExpr () ] -> CodegenT m [ Asm ]
-    push_on_stack exprs = do
-        exprs' <- forM exprs go
-        return $ concat exprs'
--}

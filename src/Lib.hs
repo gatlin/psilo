@@ -24,6 +24,15 @@ module Lib
     , defaultTypeEnv
     , emptyTypeEnv
     , Scheme(..)
+      -- * Codegen
+    , run
+    , codegen
+    , stackPeek
+    , newCodegenContext
+    , newCodegenState
+    , runCodegenT
+    , MachineT(..)
+    , MachineState(..)
       -- * Errors
     , PsiloError(..)
     ) where

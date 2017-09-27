@@ -59,6 +59,9 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
             Right tys -> do
                 forM_ tys $ \(sym, expr) -> do
                     putStrLn $ sym ++ " : " ++ (show $ extract expr)
+                    asm <- runCodegenT newCodegenContext newCodegenState $
+                        codegen expr
+                    putStrLn . show $ asm
 
 process_file :: Text -> Except PsiloError [TopLevel]
 process_file file_contents = do

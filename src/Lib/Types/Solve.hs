@@ -101,5 +101,3 @@ solveConstraints
 solveConstraints cs = evalStateT solver $ initSolveState {
     constraints = cs
     }
-
--- * Defaults!
