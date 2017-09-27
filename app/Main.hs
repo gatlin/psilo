@@ -53,15 +53,19 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
                 toplevels <- process_file contents
                 let (defns, sigs) = splitUp toplevels
                 let tyEnv = buildTypeEnv sigs
-                typecheck_defns defns tyEnv
+                tys <- typecheck defns tyEnv
+                return (toplevels, tys)
         case result of
             Left err -> putStrLn . show $ err
-            Right tys -> do
+            Right (toplevels, tys) -> do
                 forM_ tys $ \(sym, expr) -> do
                     putStrLn $ sym ++ " : " ++ (show $ extract expr)
+                    putStrLn . show $ expr
                     asm <- runCodegenT newCodegenContext newCodegenState $
                         codegen expr
                     putStrLn . show $ asm
+                    putStrLn "---"
+                    forM_ toplevels $ putStrLn . show
 
 process_file :: Text -> Except PsiloError [TopLevel]
 process_file file_contents = do

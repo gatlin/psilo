@@ -1,8 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Lib.Types
-    ( typecheck_defn
-    , typecheck_defns
+    ( typecheck
     , TypeEnv(..)
     , extendEnv
     , envLookup
@@ -106,11 +105,11 @@ defaultClassEnv =     addCoreClasses
                   <:> addInst [] (IsIn "Floating" typeFloat)
                   <:> addInst [] (IsIn "Eq" typeBool)
 
-typecheck_defns
+typecheck
     :: [(Symbol, CoreExpr ())]
     -> TypeEnv
     -> Except PsiloError ([(Symbol, AnnotatedExpr Scheme)])
-typecheck_defns defns te = do
+typecheck defns te = do
     let te' = defaultTypeEnv <> te
     (syms, exprs) <- mapAndUnzipM (\(s,e) -> return (s, annotated e)) defns
     (inferred, _, cs) <- runInfer te' initInferState $
@@ -118,14 +117,6 @@ typecheck_defns defns te = do
     (frame, pm) <- solveConstraints cs
     let schemes = fmap (extend $ toScheme frame pm) inferred
     return $ zip syms schemes
-
-typecheck_defn
-    :: (Symbol, CoreExpr ())
-    -> TypeEnv
-    -> Except PsiloError (Symbol, AnnotatedExpr Scheme)
-typecheck_defn defn te = do
-    ((e, s):_) <- (typecheck_defns [defn] te)
-    return (e, s)
 
 toScheme frame pm expr =
     let ty = extract expr

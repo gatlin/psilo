@@ -5,6 +5,8 @@ module Lib.Compiler.StackVM.Codegen where
 import Lib.Util
 import Lib.Syntax
 import Lib.Types.Scheme
+import Lib.Types.Qual
+import Lib.Types.Type
 import Lib.Compiler.StackVM.Machine
 import Data.Word
 import Control.Monad.Free
@@ -101,16 +103,15 @@ codegen expr = go expr where
     go (scheme :< (AppC op erands)) = do
         erands' <- push_on_stack (reverse erands)
         case op of
-            (_ :< (IdC sym)) -> case asm_ops sym of
+            (opScheme :< (IdC sym)) -> case asm_ops sym of
                 Just op' -> return $ erands' ++ [ op' ]
-                Nothing -> return $ erands' ++ [ Call sym ]
+--                Nothing -> return $ erands' ++ [ Call sym ]
 
     go (scheme :< (FunC args body)) = do
         let numbered_args = zip args [0..]
         body' <- local (store_args numbered_args) $ do
             b <- go body
-            let b' = reverse b
-            case reverse b' of
+            case b of
                 (Call sym):rest -> do
                     mTld <- gets currTopLevel
                     case fmap (== sym) mTld of

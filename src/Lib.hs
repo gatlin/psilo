@@ -16,8 +16,7 @@ module Lib
     , splitUp
     , boundVarCheck
       -- * Type checking
-    , typecheck_defn
-    , typecheck_defns
+    , typecheck
     , TypeEnv(..)
     , extendEnv
     , envLookup

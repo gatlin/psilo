@@ -18,13 +18,7 @@ import Lib.Syntax.Surface
 import Lib.Syntax.Core
 import Lib.Syntax.Annotated
 import Lib.Syntax.TopLevel
-
-import Lib.Types.Type (TyVar(..), Type(..))
-import Lib.Types.Qual
-import Lib.Types.TypeEnv
 import Lib.Types.Scheme
-import Lib.Types.Class
-import Lib.Types (typecheck_defns)
 
 import Lib.Util
 
