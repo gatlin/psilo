@@ -111,7 +111,7 @@ defaultClassEnv =     addCoreClasses
 -- inference and solving are re-run to produce the final type schemes.
 -- TODO: handle predicates.
 typecheck_defns
-    :: [(Symbol, AnnotatedExpr ())]
+    :: [(Symbol, CoreExpr ())]
     -> TypeEnv
     -> Except PsiloError ([(Symbol, Scheme)], [Constraint])
 typecheck_defns defns te = do
@@ -120,7 +120,7 @@ typecheck_defns defns te = do
     -- !!! FIXME not needed anymore
     -- annotate expressions
     (syms, exprs) <- mapAndUnzipM
-                     (\(sym, expr) -> return (sym, expr))
+                     (\(sym, expr) -> return (sym, annotated expr))
                      defns
 
     -- pass 1: add tyvar placeholders to type env, infer
@@ -146,7 +146,7 @@ typecheck_defns defns te = do
     return (zip syms scms2, cs2)
 
 typecheck_defn
-    :: (Symbol, AnnotatedExpr ())
+    :: (Symbol, CoreExpr ())
     -> TypeEnv
     -> Except PsiloError (Symbol, Scheme, [Constraint])
 typecheck_defn defn te = do

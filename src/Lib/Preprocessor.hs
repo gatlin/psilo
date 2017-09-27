@@ -25,9 +25,11 @@ import Lib.Types.Scheme
 import Lib.Types.Class
 import Lib.Types (typecheck_defns)
 
+import Lib.Util
+
 import Lib.Errors
 
-import Control.Monad (forM, mapM)
+import Control.Monad (forM, mapM, mapM_, when)
 import Control.Monad.Free
 import Control.Comonad.Cofree
 
@@ -38,6 +40,9 @@ import Control.Monad.Except
 
 import Data.Map (Map)
 import qualified Data.Map as M
+
+import Data.Set (Set)
+import qualified Data.Set as S
 
 type SymbolMap = Map Symbol Symbol
 data PState = PState
@@ -135,7 +140,7 @@ surfaceToTopLevel
 surfaceToTopLevel (Free (DefS sym val)) = do
     uval <- uniqueIds val
     val' <- surfaceToCore uval
-    return $ Define sym (annotated val')
+    return $ Define sym val'
 
 surfaceToTopLevel (Free (SigS sym scheme)) = return $
     Signature sym $ normalize scheme
@@ -152,6 +157,7 @@ surfaceToCore (Free (IntS n)) = return $ cInt n
 surfaceToCore (Free (FloatS n)) = return $ cFloat n
 surfaceToCore (Free (BoolS b)) = return $ cBool b
 surfaceToCore (Free (IdS s)) = return $ cId s
+
 surfaceToCore (Free (AppS op erands)) = do
     op' <- surfaceToCore op
     erands' <- mapM surfaceToCore erands
@@ -169,3 +175,39 @@ surfaceToCore (Free (IfS c t e)) = do
 
 surfaceToCore s = throwError $ PreprocessError $
     "Expression " ++ show s ++ " cannot be converted into a core expression."
+
+boundVarCheck :: [TopLevel] -> Preprocess [TopLevel]
+boundVarCheck toplevels = withBoundVars bvs $ mapM go toplevels
+    where
+        syms = fmap (\x -> (x,x)) $ fmap fst $ fst $ splitUp toplevels
+        builtins = fmap (\x -> (x,x)) $ S.toList builtin_syms
+        bvs = M.fromList $ builtins ++ syms
+
+        go :: TopLevel -> Preprocess TopLevel
+        go (Define s core) = check core >>= return . Define s
+        go whatever      = return whatever
+
+        check :: CoreExpr () -> Preprocess (CoreExpr ())
+        check (Free (FunC args body)) = do
+            let argSyms = fmap (\x -> (x, x)) args
+            b' <- withBoundVars (M.fromList argSyms) $ check body
+            return $ cFun args b'
+
+        check (Free (IdC s)) = do
+            boundVars <- readBoundVars
+            if not (M.member s boundVars)
+                then throwError $ UnboundVariable s
+                else return $ cId s
+
+        check (Free (AppC op erands)) = do
+            op' <- check op
+            erands' <- mapM check erands
+            return $ cApp op' erands'
+
+        check (Free (IfC c t e)) = do
+            c' <- check c
+            t' <- check t
+            e' <- check e
+            return $ cIf c' t' e'
+
+        check whatever = return whatever

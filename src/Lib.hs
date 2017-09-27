@@ -13,6 +13,8 @@ module Lib
     , preprocess
     , uniqueIds
     , surfaceToTopLevel
+    , splitUp
+    , boundVarCheck
       -- * Type checking
     , typecheck_defn
     , typecheck_defns
@@ -32,3 +34,4 @@ import Lib.Compiler.StackVM
 import Lib.Preprocessor
 import Lib.Errors
 import Lib.Types
+import Lib.Util

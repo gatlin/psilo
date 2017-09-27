@@ -64,6 +64,8 @@ executable psilo-exe
                      , optparse-applicative
                      , mtl
                      , text
+                     , comonad
+                     , containers
   default-language:    Haskell2010
 
 test-suite psilo-test

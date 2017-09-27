@@ -7,8 +7,10 @@ import Options.Applicative.Common
 import Data.Monoid ((<>))
 import Control.Monad.Except
 import Control.Monad (forM_, mapM, foldM)
+import Control.Comonad
 import Data.Text (Text)
 import qualified Data.Text.IO as TextIO
+import qualified Data.Map as M
 import Lib
 
 data CmdLnOpts = CmdLnOpts
@@ -24,22 +26,10 @@ optParser = CmdLnOpts
          (long "in")
       <> (metavar "FILE_INPUT")
       <> (help "Path to input file."))
-{-
-    <*> (switch $
-         (long "debug")
-      <> (short 'd')
-      <> (help "Enable debug output"))
--}
     <*> (switch $
          (long "asm")
       <> (short 'm')
       <> (help "Dump generated assembly code (when applicable)"))
-{-
-    <*> (switch $
-         (long "repl")
-      <> (short 'r')
-      <> (help "Enter a psilo repl"))
--}
 
 main :: IO ()
 main = execParser opts >>= begin where
@@ -49,19 +39,7 @@ main = execParser opts >>= begin where
        <> header "psilo"
         )
 
-type Defn = (Symbol, AnnotatedExpr ())
-type Sig = (Symbol, Scheme)
-
-splitUp
-    :: [TopLevel]
-    -> ([Defn], [Sig])
-splitUp = foldl go ([], [])
-    where go (defns, sigs) tl =
-              case tl of
-                  (Define s d) -> ((s, d):defns, sigs)
-                  (Signature s t) -> (defns, (s, t):sigs)
-
-buildTypeEnv :: [Sig] -> TypeEnv
+buildTypeEnv :: [(Symbol, Scheme)] -> TypeEnv
 buildTypeEnv = foldl go emptyTypeEnv
     where go tyEnv sig = extendEnv tyEnv sig
 
@@ -69,31 +47,39 @@ begin :: CmdLnOpts -> IO ()
 begin cmdLnOpts = case inputFile cmdLnOpts of
     Nothing -> return ()
     Just inFile -> do
-        file_contents <- TextIO.readFile inFile
-        result <- return . runExcept $ do
-            toplevels <- process_file file_contents
-            let (defns, sigs) = splitUp toplevels
-            let tyEnv = buildTypeEnv sigs
-            (sigs, constraints) <- typecheck_defns defns tyEnv
-            return (toplevels, sigs, constraints)
+        contents <- openFile inFile
+        let result = runExcept $ do
+                toplevels <- process_file contents
+                let (defns, sigs) = splitUp toplevels
+                let tyEnv = buildTypeEnv sigs
+                (tys, cs) <- typecheck_defns defns tyEnv
+                return (toplevels, tys, cs)
         case result of
             Left err -> putStrLn . show $ err
-            Right (toplevels, schemes, constraints) -> do
-                putStrLn "Type schemes"
+            Right (tls, tys, cs) -> do
+                forM_ tys $ putStrLn . show
                 putStrLn "---"
-                forM_ schemes $ \ (sym, sig) ->
-                    putStrLn $ sym ++ " : " ++ (show sig)
+                forM_ cs $ putStrLn . show
                 putStrLn "---"
-                putStrLn "Top Level Definitions"
-                putStrLn "---"
-                forM_ toplevels $ putStrLn . show
-                putStrLn "---"
-                putStrLn "Constraints"
-                putStrLn "---"
-                forM_ constraints $ putStrLn . show
+                forM_ tls $ putStrLn . show
 
+
+openFile :: FilePath -> IO Text
+openFile = TextIO.readFile
+
+loadTest = do
+    contents <- openFile "test.sl"
+    let result = runExcept $ do
+            toplevels <- process_file contents
+            let (defns, sigs) = splitUp toplevels
+            let tyEnv = buildTypeEnv sigs
+            let defns' = fmap (\(x, y) -> (x, annotated y)) defns
+            return $ (toplevels, defns, defns', tyEnv)
+    return result
 
 process_file :: Text -> Except PsiloError [TopLevel]
 process_file file_contents = do
     defns <- parse_multi $ removeComments file_contents
-    preprocess $ mapM surfaceToTopLevel defns
+    preprocess $ do
+        toplevels <- mapM surfaceToTopLevel defns
+        boundVarCheck toplevels

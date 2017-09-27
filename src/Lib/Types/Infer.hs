@@ -103,7 +103,7 @@ infer (_ :< IdC sym) = do
     tEnv <- getEnv
     var <- fresh Star >>= return . TVar
     case envLookup tEnv sym of
-        Nothing -> throwError $ UnboundVariable sym
+        Nothing -> return var
         Just scheme -> do
             qt@(ps :=> ty) <- instantiate scheme
             var @= ty
