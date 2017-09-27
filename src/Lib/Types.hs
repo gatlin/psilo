@@ -29,6 +29,7 @@ import Control.Monad (forM_, forM, foldM, liftM2, zipWithM, mapAndUnzipM, guard)
 import Control.Monad.Except
 import Control.Monad.IO.Class
 import Control.Monad.Free
+import Control.Comonad (extend, extract, (=>>))
 import Data.Maybe (isNothing, fromMaybe, fromJust, isJust)
 import Data.Monoid ((<>))
 
@@ -109,46 +110,29 @@ defaultClassEnv =     addCoreClasses
 -- The first pass infers and solves for generic type schemes for each
 -- definition. These are then inserted into the default type environment and
 -- inference and solving are re-run to produce the final type schemes.
--- TODO: handle predicates.
+
 typecheck_defns
     :: [(Symbol, CoreExpr ())]
     -> TypeEnv
-    -> Except PsiloError ([(Symbol, Scheme)], [Constraint])
+    -> Except PsiloError ([(Symbol, AnnotatedExpr Scheme)])
 typecheck_defns defns te = do
     let te' = defaultTypeEnv <> te
-
-    -- !!! FIXME not needed anymore
-    -- annotate expressions
-    (syms, exprs) <- mapAndUnzipM
-                     (\(sym, expr) -> return (sym, annotated expr))
-                     defns
-
-    -- pass 1: add tyvar placeholders to type env, infer
-    (tys_pass_1, _, cs1) <- runInfer te' initInferState $ do
-        scms <- forM exprs $ \_ -> do
-            tv <- fresh Star
-            return $ generalize te' $ [] :=> (TVar tv)
-        inferred <- withEnv (zip syms scms) $ mapM infer exprs
-        return inferred
-    (frame1, pm1) <- solveConstraints cs1
-    let scms1 = map (\ty -> closeOver frame1 ([] :=> ty)) tys_pass_1
-
-    -- pass 2: extend type env with results of pass 1, do it again
-    let te = foldl extendEnv te' $ zip syms scms1
-    (tys_pass_2, _, cs2) <- runInfer te initInferState $ mapM infer exprs
-    (frame2, pm2) <- solveConstraints cs2
-    let pm = substitute frame2 pm2
-    let toScheme ty =
-            let ty' = substitute frame2 ty
-            in  closeOver frame2 ((lookupPreds ty') pm :=> ty')
-    let scms2 = fmap toScheme tys_pass_2
---    return (scms2, cs2, exprs)
-    return (zip syms scms2, cs2)
+    (syms, exprs) <- mapAndUnzipM (\(s,e) -> return (s, annotated e)) defns
+    (inferred, _, cs) <- runInfer te' initInferState $
+        mapM (sequence . extend infer) exprs
+    (frame, pm) <- solveConstraints cs
+    let schemes = fmap (extend $ toScheme frame pm) inferred
+    return $ zip syms schemes
 
 typecheck_defn
     :: (Symbol, CoreExpr ())
     -> TypeEnv
-    -> Except PsiloError (Symbol, Scheme, [Constraint])
+    -> Except PsiloError (Symbol, AnnotatedExpr Scheme)
 typecheck_defn defn te = do
-    (((e, s):_), cs) <- (typecheck_defns [defn] te)
-    return (e, s, cs)
+    ((e, s):_) <- (typecheck_defns [defn] te)
+    return (e, s)
+
+toScheme frame pm expr  =
+    let ty = extract expr
+        ty' = substitute frame ty
+    in  closeOver frame ((lookupPreds ty') pm :=> ty')

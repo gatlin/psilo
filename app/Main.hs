@@ -52,16 +52,12 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
                 toplevels <- process_file contents
                 let (defns, sigs) = splitUp toplevels
                 let tyEnv = buildTypeEnv sigs
-                (tys, cs) <- typecheck_defns defns tyEnv
-                return (toplevels, tys, cs)
+                typecheck_defns defns tyEnv
         case result of
             Left err -> putStrLn . show $ err
-            Right (tls, tys, cs) -> do
-                forM_ tys $ putStrLn . show
-                putStrLn "---"
-                forM_ cs $ putStrLn . show
-                putStrLn "---"
-                forM_ tls $ putStrLn . show
+            Right tys -> do
+                forM_ tys $ \(sym, expr) -> do
+                    putStrLn $ sym ++ " : " ++ (show $ extract expr)
 
 
 openFile :: FilePath -> IO Text
@@ -74,7 +70,7 @@ loadTest = do
             let (defns, sigs) = splitUp toplevels
             let tyEnv = buildTypeEnv sigs
             let defns' = fmap (\(x, y) -> (x, annotated y)) defns
-            return $ (toplevels, defns, defns', tyEnv)
+            return $ (defns, tyEnv)
     return result
 
 process_file :: Text -> Except PsiloError [TopLevel]
