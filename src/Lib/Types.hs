@@ -25,9 +25,16 @@ where
 -- It has been modified for a slightly different type and more flexible type
 -- grammar.
 
-import Control.Monad (forM_, forM, foldM, liftM2, zipWithM, mapAndUnzipM, guard)
+import Control.Monad
+    ( forM_
+    , forM
+    , foldM
+    , liftM2
+    , zipWithM
+    , mapAndUnzipM
+    , guard
+    )
 import Control.Monad.Except
-import Control.Monad.IO.Class
 import Control.Monad.Free
 import Control.Comonad (extend, extract, (=>>))
 import Data.Maybe (isNothing, fromMaybe, fromJust, isJust)
@@ -106,19 +113,31 @@ defaultClassEnv =     addCoreClasses
                   <:> addInst [] (IsIn "Floating" typeFloat)
                   <:> addInst [] (IsIn "Eq" typeBool)
 
+-- | This is a two-pass situation.
 typecheck
     :: [(Symbol, CoreExpr ())]
     -> TypeEnv
     -> Except PsiloError [(Symbol, AnnotatedExpr Scheme)]
-typecheck defns te = do
-    let te' = defaultTypeEnv <> te
+typecheck defns _te = do
+    let te = defaultTypeEnv <> _te
     (syms, exprs) <- mapAndUnzipM (\(s,e) -> return (s, annotated e)) defns
-    (inferred, nextInferState, cs) <- runInfer te' initInferState $
+    (_, te') <- typecheck_pass (syms, exprs) te
+    (schemes, te'') <- typecheck_pass (syms, exprs) te'
+    return $ zip syms schemes
+
+typecheck_pass
+    :: ([Symbol], [AnnotatedExpr ()])
+    -> TypeEnv
+    -> Except PsiloError ([AnnotatedExpr Scheme], TypeEnv)
+typecheck_pass (syms, exprs) te = do
+    (exprs', inferState, cs) <- runInfer te $
         mapM (sequence . extend infer) exprs
     (frame, pm) <- solveConstraints cs
-    let schemes = map (extend $ toScheme frame pm) inferred
-    return (zip syms schemes)
+    let schemes = fmap (extend $ toScheme frame pm) exprs'
+    let te' = buildTypeEnv $ zip syms (fmap extract schemes)
+    return $ (schemes, te' <> (typeEnv inferState))
 
+toScheme :: Frame -> PredMap -> AnnotatedExpr Type -> Scheme
 toScheme frame pm expr =
     let ty = extract expr
         ty' = substitute frame ty

@@ -22,7 +22,8 @@ import Data.Set (Set)
 import qualified Data.Set as S
 
 import Control.Monad
-import Control.Monad.RWS
+import Control.Monad.State
+import Control.Monad.Writer
 import Control.Monad.Except
 import Data.Functor.Identity
 import Data.Either (either)
@@ -39,24 +40,25 @@ data InferState = InferState
 initInferState :: InferState
 initInferState = InferState 0 mempty
 
-newtype Infer a = Infer {
-    unInfer
-        :: RWST TypeEnv [Constraint] InferState (Except PsiloError) a
-    } deriving ( Functor
-               , Applicative
-               , Monad
-               , MonadState InferState
-               , MonadReader TypeEnv
-               , MonadWriter [Constraint]
-               , MonadError PsiloError
-               )
+newtype Infer a =
+    Infer (StateT InferState (WriterT [Constraint] (Except PsiloError)) a)
+    deriving ( Functor
+             , Applicative
+             , Monad
+             , MonadState InferState
+             , MonadWriter [Constraint]
+             , MonadError PsiloError
+             )
 
 runInfer
     :: TypeEnv
-    -> InferState
     -> Infer  a
     -> Except PsiloError (a, InferState, [Constraint])
-runInfer te inferState (Infer m) = runRWST m te (inferState { typeEnv = te })
+
+runInfer te (Infer m) = do
+    let inferState = initInferState { typeEnv = te }
+    ((a, inferState'), cs) <- runWriterT (runStateT m inferState)
+    return (a, inferState', cs)
 
 -- | helper to record an equality constraint
 (@=) :: Type -> Type -> Infer ()
@@ -69,7 +71,6 @@ tyInst ps = forM_ (ftv ps) $ \tv -> tell [TVar tv :~ ps]
 -- | temporarily extend the type environment for lambda abstraction
 
 withEnv :: [(Symbol, Scheme)] -> Infer a -> Infer a
---withEnv xs m = local ((buildTypeEnv xs) <>) m
 withEnv xs m = do
     modify $ \st -> st {
         typeEnv = (buildTypeEnv xs) <> (typeEnv st)
@@ -77,7 +78,7 @@ withEnv xs m = do
     m
 
 getEnv :: Infer TypeEnv
-getEnv = gets typeEnv -- ask
+getEnv = gets typeEnv
 
 -- | Generate a fresh type variable with a specific 'Kind'
 fresh :: Kind -> Infer TyVar

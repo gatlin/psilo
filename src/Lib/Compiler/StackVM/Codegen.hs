@@ -104,7 +104,6 @@ codegen expr = go expr where
                 Nothing -> return [ Call s ]
 
     go (scheme :< (AppC op erands)) = do
---        liftIO . putStrLn $ "scheme = " ++ (show scheme) ++ ", op = " ++ (show op)
         erands' <- push_on_stack (reverse erands)
         op' <- go op
         return $ erands' ++ op'
