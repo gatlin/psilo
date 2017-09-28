@@ -16,11 +16,19 @@ import qualified Data.Map as M
 import Data.Set (Set)
 import qualified Data.Set as S
 
-newtype TypeEnv = TypeEnv (Map Symbol Scheme) deriving (Monoid, Show)
+newtype TypeEnv = TypeEnv (Map Symbol Scheme) deriving (Show)
+
+instance Monoid TypeEnv where
+    mempty = TypeEnv M.empty
+    (TypeEnv t1) `mappend` (TypeEnv t2) = TypeEnv $ M.union t1 t2
 
 instance TypeLike TypeEnv where
     substitute frame (TypeEnv env) = TypeEnv $ M.map (substitute frame) env
     ftv (TypeEnv env) = ftv $ M.elems env
+
+buildTypeEnv :: [(Symbol, Scheme)] -> TypeEnv
+buildTypeEnv = foldl go emptyTypeEnv
+    where go tyEnv sig = extendEnv tyEnv sig
 
 emptyTypeEnv :: TypeEnv
 emptyTypeEnv = TypeEnv M.empty

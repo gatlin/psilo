@@ -7,6 +7,7 @@ module Lib.Types
     , envLookup
     , defaultTypeEnv
     , emptyTypeEnv
+    , buildTypeEnv
     , Scheme(..)
     )
 where
@@ -108,15 +109,15 @@ defaultClassEnv =     addCoreClasses
 typecheck
     :: [(Symbol, CoreExpr ())]
     -> TypeEnv
-    -> Except PsiloError ([(Symbol, AnnotatedExpr Scheme)])
+    -> Except PsiloError [(Symbol, AnnotatedExpr Scheme)]
 typecheck defns te = do
     let te' = defaultTypeEnv <> te
     (syms, exprs) <- mapAndUnzipM (\(s,e) -> return (s, annotated e)) defns
-    (inferred, _, cs) <- runInfer te' initInferState $
+    (inferred, nextInferState, cs) <- runInfer te' initInferState $
         mapM (sequence . extend infer) exprs
     (frame, pm) <- solveConstraints cs
-    let schemes = fmap (extend $ toScheme frame pm) inferred
-    return $ zip syms schemes
+    let schemes = map (extend $ toScheme frame pm) inferred
+    return (zip syms schemes)
 
 toScheme frame pm expr =
     let ty = extract expr

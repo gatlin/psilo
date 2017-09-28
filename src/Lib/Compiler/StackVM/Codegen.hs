@@ -92,20 +92,22 @@ codegen expr = go expr where
     go (scheme :< (IntC n)) = return [ Push $ fromInteger n ]
     go (scheme :< (BoolC b)) = return [ Push $ if b then 0x1 else 0x0 ]
 
-    go (scheme :< (IdC s)) = do
+    go ((Forall _ (_ :=> ty)) :< (IdC s)) = do
+        --liftIO . putStrLn $ s ++  " : " ++ (show ty)
         env <- asks symbolEnv
-        hb <- asks heapBase
         case safeEnvGet s env of
-            Just loc -> return [ ReadLocal loc ]
-            Nothing -> error $ "sym = " ++ s ++ ", Env = " ++ show env ++
-                ", heap pointer = " ++ show hb
+            Just loc -> case ty of
+                TFun _ -> return [ ReadLocal loc, CallA ]
+                _    -> return [ ReadLocal loc ]
+            Nothing -> case asm_ops s of
+                Just asm -> return [ asm ]
+                Nothing -> return [ Call s ]
 
     go (scheme :< (AppC op erands)) = do
+--        liftIO . putStrLn $ "scheme = " ++ (show scheme) ++ ", op = " ++ (show op)
         erands' <- push_on_stack (reverse erands)
-        case op of
-            (opScheme :< (IdC sym)) -> case asm_ops sym of
-                Just op' -> return $ erands' ++ [ op' ]
---                Nothing -> return $ erands' ++ [ Call sym ]
+        op' <- go op
+        return $ erands' ++ op'
 
     go (scheme :< (FunC args body)) = do
         let numbered_args = zip args [0..]

@@ -22,6 +22,7 @@ module Lib
     , envLookup
     , defaultTypeEnv
     , emptyTypeEnv
+    , buildTypeEnv
     , Scheme(..)
       -- * Codegen
     , run

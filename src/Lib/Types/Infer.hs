@@ -1,3 +1,5 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Lib.Types.Infer where
 
 import Lib.Syntax.Symbol
@@ -31,23 +33,30 @@ import Control.Comonad.Cofree
 -- | The state we need to mutate during type inference
 data InferState = InferState
     { varCount :: Int -- ^ monotonically increasing type ID number
+    , typeEnv :: TypeEnv
     }
 
 initInferState :: InferState
-initInferState = InferState 0
+initInferState = InferState 0 mempty
 
-type Infer = RWST
-    TypeEnv            -- type environment
-    [Constraint]       -- produced constraints
-    InferState         -- mutable inference state
-    (Except PsiloError) -- inference errors
+newtype Infer a = Infer {
+    unInfer
+        :: RWST TypeEnv [Constraint] InferState (Except PsiloError) a
+    } deriving ( Functor
+               , Applicative
+               , Monad
+               , MonadState InferState
+               , MonadReader TypeEnv
+               , MonadWriter [Constraint]
+               , MonadError PsiloError
+               )
 
 runInfer
     :: TypeEnv
     -> InferState
     -> Infer  a
     -> Except PsiloError (a, InferState, [Constraint])
-runInfer te inferState m = runRWST m te inferState
+runInfer te inferState (Infer m) = runRWST m te (inferState { typeEnv = te })
 
 -- | helper to record an equality constraint
 (@=) :: Type -> Type -> Infer ()
@@ -58,17 +67,17 @@ tyInst [] = return ()
 tyInst ps = forM_ (ftv ps) $ \tv -> tell [TVar tv :~ ps]
 
 -- | temporarily extend the type environment for lambda abstraction
+
 withEnv :: [(Symbol, Scheme)] -> Infer a -> Infer a
+--withEnv xs m = local ((buildTypeEnv xs) <>) m
 withEnv xs m = do
-    let scope e = foldl
-                  (\e' (sym, scheme) ->
-                          (envRemove e' sym) `extendEnv` (sym, scheme))
-                  e
-                  xs
-    local scope m
+    modify $ \st -> st {
+        typeEnv = (buildTypeEnv xs) <> (typeEnv st)
+        }
+    m
 
 getEnv :: Infer TypeEnv
-getEnv = ask
+getEnv = gets typeEnv -- ask
 
 -- | Generate a fresh type variable with a specific 'Kind'
 fresh :: Kind -> Infer TyVar
@@ -129,7 +138,8 @@ infer (_ :< AppC op erands) = do
     op' <- infer op
     erands' <- mapM infer erands
     var <- fresh Star >>= return . TVar
-    op' @= (TFun $ erands' ++ [var])
+    --op' @= (TFun $ erands' ++ [var])
+    recordArgs op' (erands' ++ [var])
     return var
 
 -- | Assert that the condition expression is a boolean and that the two branches
@@ -141,3 +151,9 @@ infer (_ :< IfC c t e) = do
     cr @= typeBool
     tr @= er
     return tr
+
+recordArgs :: Type -> [Type] -> Infer ()
+recordArgs (TFun argtys) erands = forM_ (zip argtys erands) go
+    where go (argty, erand) = argty @= erand
+
+recordArgs ty erands = ty @= (TFun erands)

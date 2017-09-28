@@ -40,10 +40,6 @@ main = execParser opts >>= begin where
        <> header "psilo"
         )
 
-buildTypeEnv :: [(Symbol, Scheme)] -> TypeEnv
-buildTypeEnv = foldl go emptyTypeEnv
-    where go tyEnv sig = extendEnv tyEnv sig
-
 begin :: CmdLnOpts -> IO ()
 begin cmdLnOpts = case inputFile cmdLnOpts of
     Nothing -> return ()
@@ -64,8 +60,6 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
                     asm <- runCodegenT newCodegenContext newCodegenState $
                         codegen expr
                     putStrLn . show $ asm
-                    putStrLn "---"
-                    forM_ toplevels $ putStrLn . show
 
 process_file :: Text -> Except PsiloError [TopLevel]
 process_file file_contents = do
