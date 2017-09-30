@@ -87,10 +87,20 @@ gensym = do
     return gs
 
 codegen :: MonadIO m => AnnotatedExpr Scheme -> CodegenT m [Asm]
+codegen _ = return []
+{-
 codegen expr = go expr where
-    go (scheme :< (FloatC n)) = return [ Push $ fromInteger $ round n ]
-    go (scheme :< (IntC n)) = return [ Push $ fromInteger n ]
-    go (scheme :< (BoolC b)) = return [ Push $ if b then 0x1 else 0x0 ]
+    go (_ :< (FloatC n)) = return [ Push $ fromInteger $ round n ]
+    go (_ :< (IntC n)) = return [ Push $ fromInteger n ]
+    go (_ :< (BoolC b)) = return [ Push $ if b then 0x1 else 0x0 ]
+    go (_ :< (IfC c t e)) = do
+        c' <- go c
+        t' <- go t
+        e' <- go e
+        gs <- gensym
+        let if_label = "if_" ++ (show gs)
+        return $ c' ++ [ JumpIf if_label ] ++
+            e' ++ [ Ret,  Label if_label ] ++ t'
 
     go ((Forall _ (_ :=> ty)) :< (IdC s)) = do
         --liftIO . putStrLn $ s ++  " : " ++ (show ty)
@@ -124,14 +134,6 @@ codegen expr = go expr where
         -- for tail call elimination: is the last thing in body' a Call?
         return $ (concat args') ++ body' ++ [ Ret ]
 
-    go (scheme :< (IfC c t e)) = do
-        c' <- go c
-        t' <- go t
-        e' <- go e
-        gs <- gensym
-        let if_label = "if_" ++ (show gs)
-        return $ c' ++ [ JumpIf if_label ] ++
-            e' ++ [ Ret,  Label if_label ] ++ t'
 
     go _ = return []
 
@@ -144,3 +146,4 @@ codegen expr = go expr where
     store_args syms cc = cc { symbolEnv = se, heapBase = hb }
         where se = (envFrom syms) <> (symbolEnv cc)
               hb = (heapBase cc) + (length syms)
+-}

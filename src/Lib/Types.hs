@@ -117,28 +117,30 @@ defaultClassEnv =     addCoreClasses
 typecheck
     :: [(Symbol, CoreExpr ())]
     -> TypeEnv
-    -> Except PsiloError [(Symbol, AnnotatedExpr Scheme)]
+    -> Except PsiloError ([(Symbol, AnnotatedExpr Scheme)], TypeEnv)
 typecheck defns _te = do
     let te = defaultTypeEnv <> _te
     (syms, exprs) <- mapAndUnzipM (\(s,e) -> return (s, annotated e)) defns
-    (_, te') <- typecheck_pass (syms, exprs) te
-    (schemes, te'') <- typecheck_pass (syms, exprs) te'
-    return $ zip syms schemes
+    (_, te') <- typecheck_pass (syms, exprs) te True
+    (schemes, te'') <- typecheck_pass (syms, exprs) te' False
+    return (zip syms schemes, te'')
 
 typecheck_pass
     :: ([Symbol], [AnnotatedExpr ()])
     -> TypeEnv
+    -> Bool
     -> Except PsiloError ([AnnotatedExpr Scheme], TypeEnv)
-typecheck_pass (syms, exprs) te = do
-    (exprs', inferState, cs) <- runInfer te $
+typecheck_pass (syms, exprs) te au = do
+    (exprs', inferState, cs) <- runInfer te au $
         mapM (sequence . extend infer) exprs
     (frame, pm) <- solveConstraints cs
     let schemes = fmap (extend $ toScheme frame pm) exprs'
     let te' = buildTypeEnv $ zip syms (fmap extract schemes)
-    return $ (schemes, te' <> (typeEnv inferState))
+    return $ (schemes, substitute frame $ te' <> (typeEnv inferState))
 
 toScheme :: Frame -> PredMap -> AnnotatedExpr Type -> Scheme
 toScheme frame pm expr =
     let ty = extract expr
         ty' = substitute frame ty
-    in  closeOver frame ((lookupPreds ty') pm :=> ty')
+        pm' = substitute frame pm
+    in  closeOver frame ((lookupPreds ty') pm' :=> ty')

@@ -1,15 +1,14 @@
-;(def three 3.0)
-
-;(defun square (x) (* x x))
+(defun id (x) x)
+(def three 3.0)
+(defun square (x) (* x x))
 ;(: fact (=> ((Num a) (Ord a)) (-> a a)))
-;(defun fact (n)
-;    (if (< n 2)
-;        n
-;        (fact (* n (- n 1)))))
-;(defun compose (f g) (\ (x) (f (g x))))
-
-(defun wut (x f)
-    (f (times-2 x)))
+(defun fact (n)
+    (if (< n 2)
+        n
+        (fact (* n (- n 1)))))
+(defun compose (f g) (\ (x) (f (g x))))
 (defun times-2 ((: x (=> ((Num a)) a))) (* x 2))
-;(defun woah (x)
-;    (wut x times-2))
+(def square-and-times-2 (compose times-2 square))
+(def nine (square three))
+(: eighteen Float)
+(def eighteen (square-and-times-2 three))

@@ -35,10 +35,11 @@ import Control.Comonad.Cofree
 data InferState = InferState
     { varCount :: Int -- ^ monotonically increasing type ID number
     , typeEnv :: TypeEnv
+    , allowUnbound :: Bool
     }
 
 initInferState :: InferState
-initInferState = InferState 0 mempty
+initInferState = InferState 0 mempty True
 
 newtype Infer a =
     Infer (StateT InferState (WriterT [Constraint] (Except PsiloError)) a)
@@ -52,11 +53,12 @@ newtype Infer a =
 
 runInfer
     :: TypeEnv
+    -> Bool
     -> Infer  a
     -> Except PsiloError (a, InferState, [Constraint])
 
-runInfer te (Infer m) = do
-    let inferState = initInferState { typeEnv = te }
+runInfer te au (Infer m) = do
+    let inferState = initInferState { typeEnv = te, allowUnbound = au }
     ((a, inferState'), cs) <- runWriterT (runStateT m inferState)
     return (a, inferState', cs)
 
@@ -79,6 +81,13 @@ withEnv xs m = do
 
 getEnv :: Infer TypeEnv
 getEnv = gets typeEnv
+
+handleUnbound :: Symbol -> Type -> Infer Type
+handleUnbound sym ty = do
+    unboundAllowed <- gets allowUnbound
+    case unboundAllowed of
+        True -> return ty
+        False -> throwError $ UnboundVariable sym
 
 -- | Generate a fresh type variable with a specific 'Kind'
 fresh :: Kind -> Infer TyVar
@@ -106,14 +115,11 @@ infer (_ :< IntC _) = do
 infer (_ :< BoolC _) = return $ typeBool
 infer (_ :< FloatC _) = return $ typeFloat
 
--- Symbols are either not in the type environment, raising an exception, or they
--- map to a 'Scheme' which may be instantiated. In this way we allow
--- let-polymorphism for top-level definitions.
 infer (_ :< IdC sym) = do
     tEnv <- getEnv
     var <- fresh Star >>= return . TVar
     case envLookup tEnv sym of
-        Nothing -> return var
+        Nothing -> handleUnbound sym var
         Just scheme -> do
             qt@(ps :=> ty) <- instantiate scheme
             var @= ty
@@ -139,8 +145,7 @@ infer (_ :< AppC op erands) = do
     op' <- infer op
     erands' <- mapM infer erands
     var <- fresh Star >>= return . TVar
-    --op' @= (TFun $ erands' ++ [var])
-    recordArgs op' (erands' ++ [var])
+    op' @= (TFun $ erands' ++ [var])
     return var
 
 -- | Assert that the condition expression is a boolean and that the two branches
@@ -152,9 +157,3 @@ infer (_ :< IfC c t e) = do
     cr @= typeBool
     tr @= er
     return tr
-
-recordArgs :: Type -> [Type] -> Infer ()
-recordArgs (TFun argtys) erands = forM_ (zip argtys erands) go
-    where go (argty, erand) = argty @= erand
-
-recordArgs ty erands = ty @= (TFun erands)

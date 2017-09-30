@@ -83,10 +83,10 @@ solver = do
         (c:cs0) -> case c of
             (t1 := t2) -> do
                 su <- gets frame
-                (su1, cs1) <- unify t1 t2
+                (su1, cs1) <- unify (substitute su t1) (substitute su t2)
                 modify $ \st -> st {
                     frame = su1 `compose` su,
-                    constraints = nub $ cs1 ++ (substitute su1 cs0) }
+                    constraints = nub $ (substitute su1 cs1) ++ (substitute su1 cs0) }
                 solver
             (ty :~ ps) -> do
                 su <- gets frame
