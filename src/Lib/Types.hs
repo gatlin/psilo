@@ -121,17 +121,16 @@ typecheck
 typecheck defns _te = do
     let te = defaultTypeEnv <> _te
     (syms, exprs) <- mapAndUnzipM (\(s,e) -> return (s, annotated e)) defns
-    (_, te') <- typecheck_pass (syms, exprs) te True
-    (schemes, te'') <- typecheck_pass (syms, exprs) te' False
+    (_, te') <- typecheck_pass (syms, exprs) te
+    (schemes, te'') <- typecheck_pass (syms, exprs) te'
     return (zip syms schemes, te'')
 
 typecheck_pass
     :: ([Symbol], [AnnotatedExpr ()])
     -> TypeEnv
-    -> Bool
     -> Except PsiloError ([AnnotatedExpr Scheme], TypeEnv)
-typecheck_pass (syms, exprs) te au = do
-    (exprs', inferState, cs) <- runInfer te au $
+typecheck_pass (syms, exprs) te = do
+    (exprs', inferState, cs) <- runInfer te $
         mapM (sequence . extend infer) exprs
     (frame, pm) <- solveConstraints cs
     let schemes = fmap (extend $ toScheme frame pm) exprs'

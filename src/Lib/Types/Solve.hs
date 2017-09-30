@@ -92,7 +92,7 @@ solver = do
                 su <- gets frame
                 pm <- gets predMap
                 let pm' = updatePredMap ty ps pm
-                put $ SolveState su cs0 $ substitute su pm'
+                put $ SolveState su cs0 pm'
                 solver
 
 solveConstraints

@@ -35,11 +35,10 @@ import Control.Comonad.Cofree
 data InferState = InferState
     { varCount :: Int -- ^ monotonically increasing type ID number
     , typeEnv :: TypeEnv
-    , allowUnbound :: Bool
     }
 
 initInferState :: InferState
-initInferState = InferState 0 mempty True
+initInferState = InferState 0 mempty
 
 newtype Infer a =
     Infer (StateT InferState (WriterT [Constraint] (Except PsiloError)) a)
@@ -53,12 +52,11 @@ newtype Infer a =
 
 runInfer
     :: TypeEnv
-    -> Bool
     -> Infer  a
     -> Except PsiloError (a, InferState, [Constraint])
 
-runInfer te au (Infer m) = do
-    let inferState = initInferState { typeEnv = te, allowUnbound = au }
+runInfer te (Infer m) = do
+    let inferState = initInferState { typeEnv = te }
     ((a, inferState'), cs) <- runWriterT (runStateT m inferState)
     return (a, inferState', cs)
 
@@ -72,22 +70,13 @@ tyInst ps = forM_ (ftv ps) $ \tv -> tell [TVar tv :~ ps]
 
 -- | temporarily extend the type environment for lambda abstraction
 
-withEnv :: [(Symbol, Scheme)] -> Infer a -> Infer a
-withEnv xs m = do
-    modify $ \st -> st {
-        typeEnv = (buildTypeEnv xs) <> (typeEnv st)
-        }
-    m
+updateEnv :: [(Symbol, Scheme)] -> Infer ()
+updateEnv xs = modify $ \st -> st {
+    typeEnv = (buildTypeEnv xs) <> (typeEnv st)
+    }
 
 getEnv :: Infer TypeEnv
 getEnv = gets typeEnv
-
-handleUnbound :: Symbol -> Type -> Infer Type
-handleUnbound sym ty = do
-    unboundAllowed <- gets allowUnbound
-    case unboundAllowed of
-        True -> return ty
-        False -> throwError $ UnboundVariable sym
 
 -- | Generate a fresh type variable with a specific 'Kind'
 fresh :: Kind -> Infer TyVar
@@ -119,7 +108,7 @@ infer (_ :< IdC sym) = do
     tEnv <- getEnv
     var <- fresh Star >>= return . TVar
     case envLookup tEnv sym of
-        Nothing -> handleUnbound sym var
+        Nothing -> return var
         Just scheme -> do
             qt@(ps :=> ty) <- instantiate scheme
             var @= ty
@@ -133,7 +122,8 @@ infer (_ :< FunC args body) = do
     argVars <- forM args $ const (fresh Star >>= return . TVar)
     argScms <- forM argVars $ \v -> do
         return $ Forall [] ([] :=> v)
-    br <- withEnv (zip args argScms) $ infer body
+    updateEnv (zip args argScms)
+    br <- infer body
     let fun_ty = TFun $ argVars ++ [br]
     return fun_ty
 
