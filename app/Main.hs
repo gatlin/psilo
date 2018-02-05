@@ -46,7 +46,7 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
     Nothing -> return ()
     Just inFile -> do
         contents <- TextIO.readFile inFile
-        let result = runExcept $ do
+        let result = compile $ do
                 toplevels <- process_file contents
                 let (defns, sigs) = splitUp toplevels
                 let tyEnv = buildTypeEnv sigs
@@ -58,7 +58,7 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
                 forM_ tys $ \(sym, expr) -> do
                     putStrLn $ sym ++ " : " ++ (show $ extract expr)
 
-process_file :: Text -> Except PsiloError [TopLevel]
+process_file :: Text -> Compiler [TopLevel]
 process_file file_contents = do
     defns <- parse_multi $ removeComments file_contents
     preprocess $ do

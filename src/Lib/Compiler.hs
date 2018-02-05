@@ -1,13 +1,10 @@
 module Lib.Compiler
-    ( run
-    , codegen
-    , stackPeek
-    , newCodegenContext
-    , newCodegenState
-    , runCodegenT
-    , MachineT(..)
-    , MachineState(..)
-    )
 where
 
-import Lib.Compiler.StackVM
+import Lib.PsiloError
+import Control.Monad.Except
+
+type Compiler = Except PsiloError a
+
+compile :: Compiler a -> Either PsiloError a
+compile = runExcept

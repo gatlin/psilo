@@ -1,5 +1,7 @@
 module Lib
-    (
+    ( -- * Compiler
+      Compiler
+    , compile
       -- * Parsing & Syntax
       parse_expr
     , parse_multi
@@ -24,22 +26,13 @@ module Lib
     , emptyTypeEnv
     , buildTypeEnv
     , Scheme(..)
-      -- * Codegen
-    , run
-    , codegen
-    , stackPeek
-    , newCodegenContext
-    , newCodegenState
-    , runCodegenT
-    , MachineT(..)
-    , MachineState(..)
       -- * Errors
     , PsiloError(..)
     ) where
 
 import Lib.Parser
 import Lib.Syntax
-import Lib.Compiler.StackVM
+import Lib.Compiler
 import Lib.Preprocessor
 import Lib.Errors
 import Lib.Types

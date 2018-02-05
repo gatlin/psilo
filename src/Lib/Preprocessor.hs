@@ -13,6 +13,8 @@
 
 module Lib.Preprocessor where
 
+import Lib.Compiler
+
 import Lib.Syntax.Symbol
 import Lib.Syntax.Surface
 import Lib.Syntax.Core
@@ -21,7 +23,6 @@ import Lib.Syntax.TopLevel
 import Lib.Types.Scheme
 
 import Lib.Util
-
 import Lib.Errors
 
 import Control.Monad (forM, mapM, mapM_, when)
@@ -50,7 +51,7 @@ pState = PState 0
 -- | A monad for transforming parsed surface syntax into what the compiler needs
 newtype Preprocess a = Preprocess {
     runPreprocess
-        :: StateT PState (ReaderT SymbolMap (Except PsiloError)) a
+        :: StateT PState (ReaderT SymbolMap Compiler) a
     } deriving ( Functor
                , Applicative
                , Monad
@@ -61,7 +62,7 @@ newtype Preprocess a = Preprocess {
 
 preprocess
     :: Preprocess a
-    -> Except PsiloError a
+    -> Compiler a
 preprocess (Preprocess p) = runReaderT (evalStateT p pState ) M.empty
 
 -- | Generate unique symbols

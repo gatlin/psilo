@@ -11,6 +11,7 @@ import Data.Char (isDigit, isAlpha, ord)
 import Control.Monad (join)
 import Control.Monad.Free
 import Control.Monad.Except
+import Lib.Compiler
 import Lib.Syntax.Surface
 import Lib.Util
 import Lib.Errors
@@ -236,17 +237,13 @@ parse_expr' input = do
 
 parse_expr
     :: Text
-    -> Except PsiloError (SurfaceExpr ())
+    -> Compiler (SurfaceExpr ())
 parse_expr t = do
     result <- parse_expr' t
     case result of
         Left err -> throwError $ ParserError err
         Right result' -> return result'
 
-parse_multi'
-    :: Monad m
-    => Text
-    -> m (Either String [SurfaceExpr ()])
 parse_multi' inp = do
     let the_parser = module_parser
     let parse_result = parseOnly the_parser inp
@@ -254,7 +251,7 @@ parse_multi' inp = do
 
 parse_multi
     :: Text
-    -> Except PsiloError [SurfaceExpr ()]
+    -> Compiler [SurfaceExpr ()]
 parse_multi t = do
     result <- parse_multi' t
     case result of

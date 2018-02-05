@@ -65,6 +65,7 @@ import Lib.Types.TypeEnv
 import Lib.Types.Infer
 import Lib.Types.Solve
 
+import Lib.Compiler
 import Lib.Parser (parse_expr, parse_multi)
 import Lib.Errors
 
@@ -117,7 +118,7 @@ defaultClassEnv =     addCoreClasses
 typecheck
     :: [(Symbol, CoreExpr ())]
     -> TypeEnv
-    -> Except PsiloError ([(Symbol, AnnotatedExpr Scheme)], TypeEnv)
+    -> Compiler ([(Symbol, AnnotatedExpr Scheme)], TypeEnv)
 typecheck defns _te = do
     let te = defaultTypeEnv <> _te
     (syms, exprs) <- mapAndUnzipM (\(s,e) -> return (s, annotated e)) defns
@@ -128,7 +129,7 @@ typecheck defns _te = do
 typecheck_pass
     :: ([Symbol], [AnnotatedExpr ()])
     -> TypeEnv
-    -> Except PsiloError ([AnnotatedExpr Scheme], TypeEnv)
+    -> Compiler ([AnnotatedExpr Scheme], TypeEnv)
 typecheck_pass (syms, exprs) te = do
     (exprs', inferState, cs) <- runInfer te $
         mapM (sequence . extend infer) exprs
