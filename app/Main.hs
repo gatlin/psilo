@@ -12,6 +12,7 @@ import Data.Text (Text)
 import qualified Data.Text.IO as TextIO
 import Data.Map (Map)
 import qualified Data.Map as M
+import Data.List (sort)
 import Lib
 
 data CmdLnOpts = CmdLnOpts
