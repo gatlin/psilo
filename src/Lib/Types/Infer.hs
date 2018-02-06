@@ -14,6 +14,7 @@ import Lib.Types.Scheme
 import Lib.Types.TypeEnv
 import Lib.Types.Constraint
 
+import Lib.Compiler (Compiler, Log, logMsg)
 import Lib.Errors
 
 import Data.Map (Map)
@@ -40,8 +41,9 @@ data InferState = InferState
 initInferState :: InferState
 initInferState = InferState 0 mempty
 
+{-
 newtype Infer a =
-    Infer (StateT InferState (WriterT [Constraint] (Except PsiloError)) a)
+    Infer (StateT InferState (WriterT [Constraint] Compiler) a)
     deriving ( Functor
              , Applicative
              , Monad
@@ -49,13 +51,16 @@ newtype Infer a =
              , MonadWriter [Constraint]
              , MonadError PsiloError
              )
+-}
+
+type Infer = StateT InferState (WriterT [Constraint] Compiler)
 
 runInfer
     :: TypeEnv
     -> Infer  a
-    -> Except PsiloError (a, InferState, [Constraint])
+    -> Compiler (a, InferState, [Constraint])
 
-runInfer te (Infer m) = do
+runInfer te m = do
     let inferState = initInferState { typeEnv = te }
     ((a, inferState'), cs) <- runWriterT (runStateT m inferState)
     return (a, inferState', cs)
@@ -101,17 +106,22 @@ infer (_ :< IntC _) = do
     tyInst [IsIn "Num" ty]
     return ty
 
-infer (_ :< BoolC _) = return $ typeBool
-infer (_ :< FloatC _) = return $ typeFloat
+infer (_ :< BoolC _) = return typeBool
+infer (_ :< FloatC _) = return typeFloat
 
 infer (_ :< IdC sym) = do
     tEnv <- getEnv
+    lift $ lift $ logMsg $ "tEnv = " ++ (show tEnv)
     var <- fresh Star >>= return . TVar
     case envLookup tEnv sym of
-        Nothing -> return var
+        Nothing -> do
+            lift $ lift $ logMsg $ "Not found: " ++ sym ++ " : " ++ (show var)
+            return var
         Just scheme -> do
             qt@(ps :=> ty) <- instantiate scheme
             var @= ty
+            lift $ lift $
+                logMsg $ sym ++ " : " ++ (show var) ++ " @= " ++ (show ty)
             tyInst ps
             return var
 

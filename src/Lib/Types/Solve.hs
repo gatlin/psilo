@@ -13,12 +13,14 @@ import qualified Data.Map as M
 import Data.Set (Set)
 import qualified Data.Set as S
 
+import Control.Monad.Trans (lift)
 import Control.Monad.State
 import Control.Monad.Except
 import Control.Monad
 import Data.Either (either)
-import Data.List (nub)
+import Data.List (nub, sort)
 
+import Lib.Compiler (Compiler, compile)
 import Lib.Errors
 
 type Unifier = (Frame, [Constraint])
@@ -37,11 +39,11 @@ initSolveState = SolveState mempty mempty mempty
 
 -- | A monad for solving constraints. The state is a 'Unifier' being
 -- constructed. Execution may result in a raised 'TypeError'.
-type Solve = StateT SolveState (Except PsiloError)
+type Solve = StateT SolveState Compiler
 
 --runSolve :: Monad m => Solve m a -> SolveState -> m (Either PsiloError a)
 runSolve :: Solve a -> SolveState -> Either PsiloError a
-runSolve s st = runExcept (evalStateT s st)
+runSolve s st = compile $ evalStateT s st
 
 -- | Unification of two 'Type's
 unify :: Type -> Type -> Solve Unifier
@@ -78,7 +80,7 @@ occursCheck a t = a `S.member` (ftv t)
 solver :: Solve (Frame, PredMap)
 solver = do
     cs <- gets constraints
-    case cs of
+    case sort cs of
         [] -> get >>= \(SolveState f _ p) -> return (f, p)
         (c:cs0) -> case c of
             (t1 := t2) -> do
@@ -97,7 +99,7 @@ solver = do
 
 solveConstraints
     :: [Constraint]
-    -> Except PsiloError (Frame, PredMap)
+    -> Compiler (Frame, PredMap)
 solveConstraints cs = evalStateT solver $ initSolveState {
     constraints = cs
     }

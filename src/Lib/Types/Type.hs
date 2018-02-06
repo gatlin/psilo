@@ -27,7 +27,7 @@ instance Show TyVar where
 instance HasKind TyVar where
     kind (TyVar _ k) = k
 
--- | A type constant is a unique symbol along with a 'Kind'
+-- | A type constant is a concrete symbol along with a 'Kind'
 data TyCon = TyCon Symbol Kind deriving (Eq, Ord)
 
 instance Show TyCon where

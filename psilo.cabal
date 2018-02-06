@@ -18,9 +18,6 @@ library
   exposed-modules:     Lib, Lib.Parser, Lib.Syntax,
                        Lib.Util,
                        Lib.Compiler,
-                       Lib.Compiler.StackVM,
-                       Lib.Compiler.StackVM.Codegen,
-                       Lib.Compiler.StackVM.Machine,
                        Lib.Preprocessor
                        Lib.Syntax.Annotated,
                        Lib.Syntax.Core,
@@ -39,8 +36,7 @@ library
                        Lib.Types.Type,
                        Lib.Types.TypeEnv,
                        Lib.Types,
-                       Lib.Errors,
-                       Lib.Test
+                       Lib.Errors
   build-depends:       base >= 4.7 && < 5,
                        comonad,
                        mtl,

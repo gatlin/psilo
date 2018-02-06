@@ -1,10 +1,12 @@
 module Lib.Syntax.Annotated where
 
 import Lib.Compiler
+import Lib.Errors
 import Lib.Syntax.Symbol
 import Lib.Syntax.Core
 import Lib.Syntax.Surface (SurfaceExpr (), SurfaceAst)
 import Control.Monad.Free
+import Control.Monad.Except
 import Control.Comonad
 import Control.Comonad.Cofree
 import Data.Traversable
