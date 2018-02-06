@@ -13,14 +13,13 @@ import qualified Data.Map as M
 import Data.Set (Set)
 import qualified Data.Set as S
 
-import Control.Monad.Trans (lift)
 import Control.Monad.State
 import Control.Monad.Except
 import Control.Monad
 import Data.Either (either)
-import Data.List (nub, sort)
+import Data.List (nub)
 
-import Lib.Compiler (Compiler, compile)
+import Lib.Compiler
 import Lib.Errors
 
 type Unifier = (Frame, [Constraint])
@@ -43,7 +42,7 @@ type Solve = StateT SolveState Compiler
 
 --runSolve :: Monad m => Solve m a -> SolveState -> m (Either PsiloError a)
 runSolve :: Solve a -> SolveState -> Either PsiloError a
-runSolve s st = compile $ evalStateT s st
+runSolve s st = compile (evalStateT s st)
 
 -- | Unification of two 'Type's
 unify :: Type -> Type -> Solve Unifier
@@ -80,7 +79,7 @@ occursCheck a t = a `S.member` (ftv t)
 solver :: Solve (Frame, PredMap)
 solver = do
     cs <- gets constraints
-    case sort cs of
+    case cs of
         [] -> get >>= \(SolveState f _ p) -> return (f, p)
         (c:cs0) -> case c of
             (t1 := t2) -> do

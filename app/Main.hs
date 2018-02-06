@@ -49,19 +49,15 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
         let result = compileWithLogs $ do
                 toplevels <- process_file contents
                 let (defns, sigs) = splitUp toplevels
-                logMsg $ "sigs = " ++ (show sigs)
                 let tyEnv = buildTypeEnv sigs
-                logMsg $ "tyEnv = " ++ (show tyEnv)
                 typecheck defns tyEnv
         case result of
             Left err -> putStrLn . show $ err
-            Right ((tys, TypeEnv te), logs) -> do
+            Right (wut, logs) -> do
                 putStrLn "Logs\n-----"
                 forM_ logs putStrLn
                 putStrLn "-----"
-                forM_ (M.toList te) $ putStrLn . show
---                forM_ tys $ \(sym, expr) -> do
---                    putStrLn $ sym ++ " : " ++ (show $ extract expr)
+                forM_ wut $ putStrLn . show
 
 process_file :: Text -> Compiler [TopLevel]
 process_file file_contents = do

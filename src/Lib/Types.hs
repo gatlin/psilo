@@ -37,6 +37,7 @@ import Control.Monad
 import Control.Monad.Except
 import Control.Monad.Free
 import Control.Comonad (extend, extract, (=>>))
+import Control.Comonad.Cofree (Cofree(..))
 import Data.Maybe (isNothing, fromMaybe, fromJust, isJust)
 import Data.Monoid ((<>))
 
@@ -65,7 +66,7 @@ import Lib.Types.TypeEnv
 import Lib.Types.Infer
 import Lib.Types.Solve
 
-import Lib.Compiler (Compiler, Log, logMsg)
+import Lib.Compiler
 import Lib.Parser (parse_expr, parse_multi)
 import Lib.Errors
 
@@ -87,14 +88,14 @@ ord_binop = [IsIn "Ord" t_0] :=> (TFun [t_0, t_0, typeBool])
 defaultTypeEnv :: TypeEnv
 defaultTypeEnv = TypeEnv $ M.fromList
     [ ("*", generalize mempty num_binop)
---    , ("+", generalize mempty num_binop)
---    , ("-", generalize mempty num_binop)
---    , ("/", generalize mempty num_binop)
---    , ("=", generalize mempty eq_binop)
---    , ("<", generalize mempty ord_binop)
---    , (">", generalize mempty ord_binop)
---    , ("id", generalize mempty $ [] :=> (TFun [TVar (TyVar 0 Star),
---                                               TVar (TyVar 0 Star)]))
+    , ("+", generalize mempty num_binop)
+    , ("-", generalize mempty num_binop)
+    , ("/", generalize mempty num_binop)
+    , ("=", generalize mempty eq_binop)
+    , ("<", generalize mempty ord_binop)
+    , (">", generalize mempty ord_binop)
+    , ("id", generalize mempty $ [] :=> (TFun [TVar (TyVar 0 Star),
+                                               TVar (TyVar 0 Star)]))
     ]
 
 addCoreClasses :: EnvTransformer
@@ -118,36 +119,20 @@ defaultClassEnv =     addCoreClasses
 typecheck
     :: [(Symbol, CoreExpr ())]
     -> TypeEnv
-    -> Compiler ([(Symbol, AnnotatedExpr Scheme)], TypeEnv)
+    -> Compiler [()]
 typecheck defns _te = do
-    let te = defaultTypeEnv <> _te
-    logMsg $ "te: " ++ (show te)
-    (syms, exprs) <- mapAndUnzipM (\(s,e) -> return (s, annotated e)) defns
+    (syms, exprs) <- mapAndUnzipM
+        (\(s,e) -> return (s, annotated e)) defns
     exprs' <- sequence exprs
-    (schemes, te') <- typecheck_pass (syms, exprs') te
-    logMsg $ "te' [2]: " ++ (show te')
-    return (zip syms schemes, te')
---    (_, te') <- typecheck_pass (syms, exprs') te
---    (schemes, te'') <- typecheck_pass (syms, exprs') te'
---    return (zip syms schemes, te'')
-
-typecheck_pass
-    :: ([Symbol], [AnnotatedExpr ()])
-    -> TypeEnv
-    -> Compiler ([AnnotatedExpr Scheme], TypeEnv)
-typecheck_pass (syms, exprs) te = do
-    (exprs', inferState, cs) <- runInfer te $
-        mapM (sequence . extend infer) exprs
-    logMsg "Expressions"
-    forM_ (zip syms exprs') $ logMsg . show
-    (frame, pm) <- solveConstraints cs
+    (wut, inferState, cs) <- runInfer (defaultTypeEnv <> _te) $
+        mapM (sequence . extend infer) exprs'
+    forM_ (zip syms wut) $ logMsg . show
+    logMsg . show $ inferState
     logMsg "Constraints"
     forM_ cs $ logMsg . show
-    let schemes = fmap (extend $ toScheme frame pm) exprs'
-    let te' = buildTypeEnv $ zip syms (fmap extract schemes)
-    logMsg $ "te' [1]: " ++ (show te')
-    logMsg $ "(typeEnv inferState): " ++ (show $ typeEnv inferState)
-    return $ (schemes, substitute frame $  (typeEnv inferState) <> te')
+    (frame, pm) <- solveConstraints cs
+    logMsg $ "Frame = " ++ (show frame)
+    return [()]
 
 toScheme :: Frame -> PredMap -> AnnotatedExpr Type -> Scheme
 toScheme frame pm expr =

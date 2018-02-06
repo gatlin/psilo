@@ -1,10 +1,10 @@
 module Lib.Compiler
     ( Compiler
-    , compile
-    , compileWithLogs
     , Log
     , logMsg
-    , throwError -- re-export, it's a good name
+    , compile
+    , compileWithLogs
+    , throwError
     )
 where
 
@@ -16,11 +16,11 @@ type Log = [String]
 
 type Compiler = WriterT Log (Except PsiloError)
 
-compile :: Compiler a -> Either PsiloError a
-compile = fmap fst . compileWithLogs
-
 compileWithLogs :: Compiler a -> Either PsiloError (a, Log)
 compileWithLogs = runExcept . runWriterT
 
+compile :: Compiler a -> Either PsiloError a
+compile = fmap fst . compileWithLogs
+
 logMsg :: String -> Compiler ()
-logMsg = tell . return
+logMsg msg = tell [msg]

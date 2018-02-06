@@ -14,7 +14,7 @@ import Lib.Types.Scheme
 import Lib.Types.TypeEnv
 import Lib.Types.Constraint
 
-import Lib.Compiler (Compiler, Log, logMsg)
+import Lib.Compiler
 import Lib.Errors
 
 import Data.Map (Map)
@@ -36,14 +36,15 @@ import Control.Comonad.Cofree
 data InferState = InferState
     { varCount :: Int -- ^ monotonically increasing type ID number
     , typeEnv :: TypeEnv
-    }
+    , assumptions :: Map Symbol [Type]
+    } deriving (Show)
 
 initInferState :: InferState
-initInferState = InferState 0 mempty
+initInferState = InferState 0 mempty M.empty
 
 {-
 newtype Infer a =
-    Infer (StateT InferState (WriterT [Constraint] Compiler) a)
+    Infer (StateT InferState (WriterT [Constraint] (Except PsiloError)) a)
     deriving ( Functor
              , Applicative
              , Monad
@@ -97,6 +98,14 @@ instantiate (Forall vs t) = do
     let frame = M.fromList $ zip vs vs'
     return $ substitute frame t
 
+assume :: Symbol -> Type -> Infer ()
+assume sym ty = do
+    assms <- gets assumptions
+    let assms' = case M.lookup sym assms of
+                     Nothing -> M.insert sym [ty] assms
+                     Just tys -> M.insert sym (tys ++ [ty]) assms
+    modify $ \s -> s { assumptions = assms' }
+
 -- | Constraint generation and type generation
 infer :: AnnotatedExpr a -> Infer Type
 
@@ -106,22 +115,19 @@ infer (_ :< IntC _) = do
     tyInst [IsIn "Num" ty]
     return ty
 
-infer (_ :< BoolC _) = return typeBool
-infer (_ :< FloatC _) = return typeFloat
+infer (_ :< BoolC _) = return $ typeBool
+infer (_ :< FloatC _) = return $ typeFloat
 
 infer (_ :< IdC sym) = do
     tEnv <- getEnv
-    lift $ lift $ logMsg $ "tEnv = " ++ (show tEnv)
     var <- fresh Star >>= return . TVar
     case envLookup tEnv sym of
         Nothing -> do
-            lift $ lift $ logMsg $ "Not found: " ++ sym ++ " : " ++ (show var)
+            assume sym var
             return var
         Just scheme -> do
             qt@(ps :=> ty) <- instantiate scheme
             var @= ty
-            lift $ lift $
-                logMsg $ sym ++ " : " ++ (show var) ++ " @= " ++ (show ty)
             tyInst ps
             return var
 
@@ -129,10 +135,14 @@ infer (_ :< IdC sym) = do
 -- argument should generate a unique 'Scheme' and the 'TypeEnv' should be
 -- temporarily extended with them to evaluate the body.
 infer (_ :< FunC args body) = do
-    argVars <- forM args $ const (fresh Star >>= return . TVar)
-    argScms <- forM argVars $ \v -> do
-        return $ Forall [] ([] :=> v)
-    updateEnv (zip args argScms)
+--    argVars <- forM args $ const (fresh Star >>= return . TVar)
+    argVars <- forM args $ \arg -> do
+        assms <- gets assumptions
+        var <- fresh Star >>= return . TVar
+        let vars = maybe [] id (M.lookup arg assms)
+        mapM (var @=) vars
+        modify $ \s -> s { assumptions = M.empty }
+        return var
     br <- infer body
     let fun_ty = TFun $ argVars ++ [br]
     return fun_ty

@@ -2,9 +2,7 @@ module Lib
     ( -- * Compiler
       Compiler
     , compile
-    , Log
     , compileWithLogs
-    , logMsg
       -- * Parsing & Syntax
     , parse_expr
     , parse_multi
