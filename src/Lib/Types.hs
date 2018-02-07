@@ -73,6 +73,7 @@ import Lib.Errors
 -- * Defaults
 
 num_binop :: Qual Type
+--num_binop = [] :=> (TFun [typeFloat, typeFloat, typeFloat])
 num_binop = [IsIn "Num" t_0] :=> (TFun [t_0, t_0, t_0])
     where t_0 = TVar (TyVar 0 Star)
 
@@ -88,7 +89,7 @@ ord_binop = [IsIn "Ord" t_0] :=> (TFun [t_0, t_0, typeBool])
 defaultTypeEnv :: TypeEnv
 defaultTypeEnv = TypeEnv $ M.fromList
     [ ("*", generalize mempty num_binop)
-{-
+
     , ("+", generalize mempty num_binop)
     , ("-", generalize mempty num_binop)
     , ("/", generalize mempty num_binop)
@@ -97,7 +98,6 @@ defaultTypeEnv = TypeEnv $ M.fromList
     , (">", generalize mempty ord_binop)
     , ("id", generalize mempty $ [] :=> (TFun [TVar (TyVar 0 Star),
                                                TVar (TyVar 0 Star)]))
--}
     ]
 
 addCoreClasses :: EnvTransformer
@@ -126,20 +126,20 @@ typecheck defns _te = do
     let te = defaultTypeEnv <> _te
     (syms, exprs) <- mapAndUnzipM (\(s,e) -> return (s, annotated e)) defns
     exprs' <- sequence exprs
-    (_, te') <- typecheck_pass syms exprs' te
-    logMsg . show $ te'
+    (schemes, te') <- typecheck_pass syms exprs' te
+    (schemes', te'') <- typecheck_pass syms exprs' (te <> (buildTypeEnv (zip syms schemes)))
+    forM_ (zip syms schemes') $ logMsg . show
+--    logMsg . show $ te''
     return [()]
 
 typecheck_pass syms exprs te = do
     (sigs, inferState, cs) <- runInfer te $
         mapM (sequence . extend infer) exprs
-    forM_ cs $ logMsg . show
-    let assms = assumptions inferState
-    logMsg . show $ assms
+--    forM_ (zip syms sigs) $ logMsg . show
+--    forM_ cs $ logMsg . show
     (frame, pm) <- solveConstraints cs
-    let schemes = fmap (extend $ toScheme frame pm) sigs
-    let te' = buildTypeEnv $ zip syms (fmap extract schemes)
-    return (schemes, (typeEnv inferState) <> te')
+    let schemes = fmap extract $ fmap (extend $ toScheme frame pm) sigs
+    return (schemes, te)
 
 toScheme :: Frame -> PredMap -> AnnotatedExpr Type -> Scheme
 toScheme frame pm expr =

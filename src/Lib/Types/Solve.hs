@@ -79,7 +79,7 @@ occursCheck a t = a `S.member` (ftv t)
 solver :: Solve (Frame, PredMap)
 solver = do
     cs <- gets constraints
-    case (reverse $ sort cs) of
+    case cs of
         [] -> get >>= \(SolveState f _ p) -> return (f, p)
         (c:cs0) -> case c of
             (t1 := t2) -> do
@@ -89,12 +89,14 @@ solver = do
                     frame = su1 `compose` su,
                     constraints = nub $ (substitute su1 cs1) ++ (substitute su1 cs0) }
                 solver
+
             (ty :~ ps) -> do
                 su <- gets frame
                 pm <- gets predMap
                 let pm' = updatePredMap ty ps pm
                 put $ SolveState su cs0 pm'
                 solver
+
 
 solveConstraints
     :: [Constraint]

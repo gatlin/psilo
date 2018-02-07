@@ -26,6 +26,7 @@ import Control.Monad
 import Control.Monad.State
 import Control.Monad.Writer
 import Control.Monad.Except
+import Control.Monad.Reader
 import Data.Functor.Identity
 import Data.Either (either)
 
@@ -35,12 +36,10 @@ import Control.Comonad.Cofree
 -- | The state we need to mutate during type inference
 data InferState = InferState
     { varCount :: Int -- ^ monotonically increasing type ID number
-    , typeEnv :: TypeEnv
-    , assumptions :: Map Symbol [Type]
     } deriving (Show)
 
 initInferState :: InferState
-initInferState = InferState 0 mempty M.empty
+initInferState = InferState 0
 
 {-
 newtype Infer a =
@@ -54,7 +53,7 @@ newtype Infer a =
              )
 -}
 
-type Infer = StateT InferState (WriterT [Constraint] Compiler)
+type Infer = ReaderT TypeEnv (StateT InferState (WriterT [Constraint] Compiler))
 
 runInfer
     :: TypeEnv
@@ -62,8 +61,7 @@ runInfer
     -> Compiler (a, InferState, [Constraint])
 
 runInfer te m = do
-    let inferState = initInferState { typeEnv = te }
-    ((a, inferState'), cs) <- runWriterT (runStateT m inferState)
+    ((a, inferState'), cs) <- runWriterT (runStateT (runReaderT m te) initInferState)
     return (a, inferState', cs)
 
 -- | helper to record an equality constraint
@@ -74,21 +72,8 @@ tyInst :: [Pred] -> Infer ()
 tyInst [] = return ()
 tyInst ps = forM_ (ftv ps) $ \tv -> tell [TVar tv :~ ps]
 
-assume :: Symbol -> Type -> Infer ()
-assume sym ty = do
-    assms <- gets assumptions
-    let sym_assms = maybe [] id $ M.lookup sym assms
-    modify $ \s -> s { assumptions = M.insert sym (sym_assms ++ [ty]) assms }
-
 withEnv :: [(Symbol, Scheme)] -> Infer a -> Infer a
-withEnv xs m = do
-    modify $ \st -> st {
-        typeEnv = (buildTypeEnv xs) <> (typeEnv st)
-        }
-    m
-
-getEnv :: Infer TypeEnv
-getEnv = gets typeEnv
+withEnv ss m = local (<> (buildTypeEnv ss)) m
 
 -- | Generate a fresh type variable with a specific 'Kind'
 fresh :: Kind -> Infer TyVar
@@ -108,6 +93,7 @@ instantiate (Forall vs t) = do
 infer :: AnnotatedExpr a -> Infer Type
 
 -- constants are straightforward, except integers could be any @Num@ instance
+
 infer (_ :< IntC _) = do
     ty <- fresh Star >>= \tv -> return $ TVar tv
     tyInst [IsIn "Num" ty]
@@ -117,31 +103,26 @@ infer (_ :< BoolC _) = return $ typeBool
 infer (_ :< FloatC _) = return $ typeFloat
 
 infer (_ :< IdC sym) = do
-    tEnv <- getEnv
+    te <- ask
     var <- fresh Star >>= return . TVar
-    case envLookup tEnv sym of
-        Nothing -> do
-            assume sym var
-            return var
+    case envLookup te sym of
+        Nothing -> return var
         Just scheme -> do
             qt@(ps :=> ty) <- instantiate scheme
-            var @= ty
             tyInst ps
-            return var
+            ty @= var
+            return ty
 
 -- | A lambda abstraction is a list of symbols and an 'AnnotatedExpr' body. Each
 -- argument should generate a unique 'Scheme' and the 'TypeEnv' should be
 -- temporarily extended with them to evaluate the body.
 infer (_ :< FunC args body) = do
-    br <- infer body
     argVars <- forM args $ \arg -> do
         var <- fresh Star >>= return . TVar
-        assms <- gets assumptions
-        case M.lookup arg assms of
-            Nothing -> return var
-            Just arg_assms -> do
-                mapM_ (var @=) arg_assms
-                return var
+        return var
+    argScms <- forM argVars $ \v -> do
+        return $ Forall [] ([] :=> v)
+    br <- withEnv (zip args argScms) $ infer body
     let fun_ty = TFun $ argVars ++ [br]
     return fun_ty
 
