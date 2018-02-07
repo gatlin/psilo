@@ -133,6 +133,7 @@ typecheck defns _te = do
 typecheck_pass syms exprs te = do
     (sigs, inferState, cs) <- runInfer te $
         mapM (sequence . extend infer) exprs
+    forM_ cs $ logMsg . show
     let assms = assumptions inferState
     logMsg . show $ assms
     (frame, pm) <- solveConstraints cs

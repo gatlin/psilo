@@ -150,7 +150,7 @@ infer (_ :< FunC args body) = do
 -- athat the operator is equivalent to a function consuming the operands and
 -- producing the return value.
 infer (_ :< AppC op erands) = do
-    op' <- infer op'
+    op' <- infer op
     erands' <- mapM infer erands
     var <- fresh Star >>= return . TVar
     op' @= (TFun $ erands' ++ [var])
