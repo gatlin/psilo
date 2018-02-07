@@ -1,13 +1,6 @@
-; (defun id (x) x)
-;(: three Float)
-(def three 3.0)
 (defun square (x) (* x x))
-(defun times-2 (x) (* x 2))
-
-;(def six (times-2 three))
-;(: nine Float)
+(def three 3.0)
 (def nine (square three))
-
 (def eighty-one (square nine))
 
 ;(def eighteen-1 (times-2 nine)) ; Num a => a

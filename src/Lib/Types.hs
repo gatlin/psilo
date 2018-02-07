@@ -88,6 +88,7 @@ ord_binop = [IsIn "Ord" t_0] :=> (TFun [t_0, t_0, typeBool])
 defaultTypeEnv :: TypeEnv
 defaultTypeEnv = TypeEnv $ M.fromList
     [ ("*", generalize mempty num_binop)
+{-
     , ("+", generalize mempty num_binop)
     , ("-", generalize mempty num_binop)
     , ("/", generalize mempty num_binop)
@@ -96,6 +97,7 @@ defaultTypeEnv = TypeEnv $ M.fromList
     , (">", generalize mempty ord_binop)
     , ("id", generalize mempty $ [] :=> (TFun [TVar (TyVar 0 Star),
                                                TVar (TyVar 0 Star)]))
+-}
     ]
 
 addCoreClasses :: EnvTransformer
@@ -121,18 +123,22 @@ typecheck
     -> TypeEnv
     -> Compiler [()]
 typecheck defns _te = do
-    (syms, exprs) <- mapAndUnzipM
-        (\(s,e) -> return (s, annotated e)) defns
+    let te = defaultTypeEnv <> _te
+    (syms, exprs) <- mapAndUnzipM (\(s,e) -> return (s, annotated e)) defns
     exprs' <- sequence exprs
-    (wut, inferState, cs) <- runInfer (defaultTypeEnv <> _te) $
-        mapM (sequence . extend infer) exprs'
-    forM_ (zip syms wut) $ logMsg . show
-    logMsg . show $ inferState
-    logMsg "Constraints"
-    forM_ cs $ logMsg . show
-    (frame, pm) <- solveConstraints cs
-    logMsg $ "Frame = " ++ (show frame)
+    (_, te') <- typecheck_pass syms exprs' te
+    logMsg . show $ te'
     return [()]
+
+typecheck_pass syms exprs te = do
+    (sigs, inferState, cs) <- runInfer te $
+        mapM (sequence . extend infer) exprs
+    let assms = assumptions inferState
+    logMsg . show $ assms
+    (frame, pm) <- solveConstraints cs
+    let schemes = fmap (extend $ toScheme frame pm) sigs
+    let te' = buildTypeEnv $ zip syms (fmap extract schemes)
+    return (schemes, (typeEnv inferState) <> te')
 
 toScheme :: Frame -> PredMap -> AnnotatedExpr Type -> Scheme
 toScheme frame pm expr =

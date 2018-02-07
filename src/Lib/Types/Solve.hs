@@ -17,7 +17,7 @@ import Control.Monad.State
 import Control.Monad.Except
 import Control.Monad
 import Data.Either (either)
-import Data.List (nub)
+import Data.List (nub, sort)
 
 import Lib.Compiler
 import Lib.Errors
@@ -79,7 +79,7 @@ occursCheck a t = a `S.member` (ftv t)
 solver :: Solve (Frame, PredMap)
 solver = do
     cs <- gets constraints
-    case cs of
+    case (reverse $ sort cs) of
         [] -> get >>= \(SolveState f _ p) -> return (f, p)
         (c:cs0) -> case c of
             (t1 := t2) -> do

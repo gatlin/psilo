@@ -74,12 +74,18 @@ tyInst :: [Pred] -> Infer ()
 tyInst [] = return ()
 tyInst ps = forM_ (ftv ps) $ \tv -> tell [TVar tv :~ ps]
 
--- | temporarily extend the type environment for lambda abstraction
+assume :: Symbol -> Type -> Infer ()
+assume sym ty = do
+    assms <- gets assumptions
+    let sym_assms = maybe [] id $ M.lookup sym assms
+    modify $ \s -> s { assumptions = M.insert sym (sym_assms ++ [ty]) assms }
 
-updateEnv :: [(Symbol, Scheme)] -> Infer ()
-updateEnv xs = modify $ \st -> st {
-    typeEnv = (buildTypeEnv xs) <> (typeEnv st)
-    }
+withEnv :: [(Symbol, Scheme)] -> Infer a -> Infer a
+withEnv xs m = do
+    modify $ \st -> st {
+        typeEnv = (buildTypeEnv xs) <> (typeEnv st)
+        }
+    m
 
 getEnv :: Infer TypeEnv
 getEnv = gets typeEnv
@@ -97,14 +103,6 @@ instantiate (Forall vs t) = do
     vs' <- mapM (const $ fresh Star) vs >>= mapM (return . TVar)
     let frame = M.fromList $ zip vs vs'
     return $ substitute frame t
-
-assume :: Symbol -> Type -> Infer ()
-assume sym ty = do
-    assms <- gets assumptions
-    let assms' = case M.lookup sym assms of
-                     Nothing -> M.insert sym [ty] assms
-                     Just tys -> M.insert sym (tys ++ [ty]) assms
-    modify $ \s -> s { assumptions = assms' }
 
 -- | Constraint generation and type generation
 infer :: AnnotatedExpr a -> Infer Type
@@ -135,15 +133,15 @@ infer (_ :< IdC sym) = do
 -- argument should generate a unique 'Scheme' and the 'TypeEnv' should be
 -- temporarily extended with them to evaluate the body.
 infer (_ :< FunC args body) = do
---    argVars <- forM args $ const (fresh Star >>= return . TVar)
-    argVars <- forM args $ \arg -> do
-        assms <- gets assumptions
-        var <- fresh Star >>= return . TVar
-        let vars = maybe [] id (M.lookup arg assms)
-        mapM (var @=) vars
-        modify $ \s -> s { assumptions = M.empty }
-        return var
     br <- infer body
+    argVars <- forM args $ \arg -> do
+        var <- fresh Star >>= return . TVar
+        assms <- gets assumptions
+        case M.lookup arg assms of
+            Nothing -> return var
+            Just arg_assms -> do
+                mapM_ (var @=) arg_assms
+                return var
     let fun_ty = TFun $ argVars ++ [br]
     return fun_ty
 
@@ -152,7 +150,7 @@ infer (_ :< FunC args body) = do
 -- athat the operator is equivalent to a function consuming the operands and
 -- producing the return value.
 infer (_ :< AppC op erands) = do
-    op' <- infer op
+    op' <- infer op'
     erands' <- mapM infer erands
     var <- fresh Star >>= return . TVar
     op' @= (TFun $ erands' ++ [var])
