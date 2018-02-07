@@ -127,7 +127,7 @@ typecheck defns _te = do
     (syms, exprs) <- mapAndUnzipM (\(s,e) -> return (s, annotated e)) defns
     exprs' <- sequence exprs
     (schemes, te') <- typecheck_pass syms exprs' te
-    (schemes', te'') <- typecheck_pass syms exprs' (te <> (buildTypeEnv (zip syms schemes)))
+    (schemes', te'') <- typecheck_pass syms exprs' te'
     forM_ (zip syms schemes') $ logMsg . show
 --    logMsg . show $ te''
     return [()]
@@ -135,11 +135,11 @@ typecheck defns _te = do
 typecheck_pass syms exprs te = do
     (sigs, inferState, cs) <- runInfer te $
         mapM (sequence . extend infer) exprs
---    forM_ (zip syms sigs) $ logMsg . show
---    forM_ cs $ logMsg . show
     (frame, pm) <- solveConstraints cs
+    logMsg $ "Pred Map = " ++ (show pm)
     let schemes = fmap extract $ fmap (extend $ toScheme frame pm) sigs
-    return (schemes, te)
+    let te' = te <> (buildTypeEnv $ zip syms schemes)
+    return (schemes, te')
 
 toScheme :: Frame -> PredMap -> AnnotatedExpr Type -> Scheme
 toScheme frame pm expr =

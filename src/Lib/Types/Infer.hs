@@ -106,11 +106,10 @@ infer (_ :< IdC sym) = do
     te <- ask
     var <- fresh Star >>= return . TVar
     case envLookup te sym of
-        Nothing -> return var
+        Nothing -> fresh Star >>= return . TVar
         Just scheme -> do
             qt@(ps :=> ty) <- instantiate scheme
             tyInst ps
-            ty @= var
             return ty
 
 -- | A lambda abstraction is a list of symbols and an 'AnnotatedExpr' body. Each

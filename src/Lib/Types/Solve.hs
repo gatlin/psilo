@@ -97,7 +97,6 @@ solver = do
                 put $ SolveState su cs0 pm'
                 solver
 
-
 solveConstraints
     :: [Constraint]
     -> Compiler (Frame, PredMap)
