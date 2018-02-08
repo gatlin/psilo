@@ -73,7 +73,6 @@ import Lib.Errors
 -- * Defaults
 
 num_binop :: Qual Type
---num_binop = [] :=> (TFun [typeFloat, typeFloat, typeFloat])
 num_binop = [IsIn "Num" t_0] :=> (TFun [t_0, t_0, t_0])
     where t_0 = TVar (TyVar 0 Star)
 
@@ -129,14 +128,12 @@ typecheck defns _te = do
     (schemes, te') <- typecheck_pass syms exprs' te
     (schemes', te'') <- typecheck_pass syms exprs' te'
     forM_ (zip syms schemes') $ logMsg . show
---    logMsg . show $ te''
     return [()]
 
 typecheck_pass syms exprs te = do
     (sigs, inferState, cs) <- runInfer te $
         mapM (sequence . extend infer) exprs
     (frame, pm) <- solveConstraints cs
-    logMsg $ "Pred Map = " ++ (show pm)
     let schemes = fmap extract $ fmap (extend $ toScheme frame pm) sigs
     let te' = te <> (buildTypeEnv $ zip syms schemes)
     return (schemes, te')

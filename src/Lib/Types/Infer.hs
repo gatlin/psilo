@@ -36,10 +36,11 @@ import Control.Comonad.Cofree
 -- | The state we need to mutate during type inference
 data InferState = InferState
     { varCount :: Int -- ^ monotonically increasing type ID number
+    , memo :: Map (AnnotatedExpr ()) Scheme
     } deriving (Show)
 
 initInferState :: InferState
-initInferState = InferState 0
+initInferState = InferState 0 M.empty
 
 {-
 newtype Infer a =
@@ -64,6 +65,10 @@ runInfer te m = do
     ((a, inferState'), cs) <- runWriterT (runStateT (runReaderT m te) initInferState)
     return (a, inferState', cs)
 
+-- I know it isn't pretty
+logInfer :: String -> Infer ()
+logInfer = lift . lift . lift . logMsg
+
 -- | helper to record an equality constraint
 (@=) :: Type -> Type -> Infer ()
 t1 @= t2 = tell [t1 := t2]
@@ -74,6 +79,9 @@ tyInst ps = forM_ (ftv ps) $ \tv -> tell [TVar tv :~ ps]
 
 withEnv :: [(Symbol, Scheme)] -> Infer a -> Infer a
 withEnv ss m = local (<> (buildTypeEnv ss)) m
+
+getEnv :: Infer TypeEnv
+getEnv = ask
 
 -- | Generate a fresh type variable with a specific 'Kind'
 fresh :: Kind -> Infer TyVar
@@ -89,8 +97,22 @@ instantiate (Forall vs t) = do
     let frame = M.fromList $ zip vs vs'
     return $ substitute frame t
 
+memoizedInfer :: AnnotatedExpr () -> Infer Type
+memoizedInfer expr = gets memo >>= maybe memoize retrieve . M.lookup expr where
+    memoize = do
+        te <- ask
+        ty <- infer expr
+        modify $ \s -> s {
+            memo = M.insert expr (generalize te ([] :=> ty)) $ memo s
+            }
+        return ty
+
+    retrieve scm = do
+        (_ :=> ty) <- instantiate scm
+        return ty
+
 -- | Constraint generation and type generation
-infer :: AnnotatedExpr a -> Infer Type
+infer :: AnnotatedExpr () -> Infer Type
 
 -- constants are straightforward, except integers could be any @Num@ instance
 
@@ -103,7 +125,7 @@ infer (_ :< BoolC _) = return $ typeBool
 infer (_ :< FloatC _) = return $ typeFloat
 
 infer (_ :< IdC sym) = do
-    te <- ask
+    te <- getEnv
     var <- fresh Star >>= return . TVar
     case envLookup te sym of
         Nothing -> fresh Star >>= return . TVar
@@ -116,12 +138,10 @@ infer (_ :< IdC sym) = do
 -- argument should generate a unique 'Scheme' and the 'TypeEnv' should be
 -- temporarily extended with them to evaluate the body.
 infer (_ :< FunC args body) = do
-    argVars <- forM args $ \arg -> do
+    (argVars, argScms) <- mapAndUnzipM (\arg -> do
         var <- fresh Star >>= return . TVar
-        return var
-    argScms <- forM argVars $ \v -> do
-        return $ Forall [] ([] :=> v)
-    br <- withEnv (zip args argScms) $ infer body
+        return (var, Forall [] ([] :=> var))) args
+    br <- withEnv (zip args argScms) $ memoizedInfer body
     let fun_ty = TFun $ argVars ++ [br]
     return fun_ty
 
@@ -130,8 +150,8 @@ infer (_ :< FunC args body) = do
 -- athat the operator is equivalent to a function consuming the operands and
 -- producing the return value.
 infer (_ :< AppC op erands) = do
-    op' <- infer op
-    erands' <- mapM infer erands
+    op' <- memoizedInfer op
+    erands' <- mapM memoizedInfer erands
     var <- fresh Star >>= return . TVar
     op' @= (TFun $ erands' ++ [var])
     return var
