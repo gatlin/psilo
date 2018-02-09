@@ -87,19 +87,24 @@ solver = do
                 (su1, cs1) <- unify (substitute su t1) (substitute su t2)
                 modify $ \st -> st {
                     frame = su1 `compose` su,
-                    constraints = nub $ (substitute su1 cs1) ++ (substitute su1 cs0) }
+                    constraints = nub $ (substitute su1 cs1) ++ (substitute su1 cs0),
+                    predMap = substitute su1 $ predMap st
+                    }
                 solver
-
+{-
             (ty :~ ps) -> do
                 su <- gets frame
                 pm <- gets predMap
                 let pm' = updatePredMap ty ps pm
                 put $ SolveState su cs0 pm'
                 solver
+-}
 
 solveConstraints
     :: [Constraint]
+    -> PredMap
     -> Compiler (Frame, PredMap)
-solveConstraints cs = evalStateT solver $ initSolveState {
-    constraints = cs
+solveConstraints cs pm = evalStateT solver $ initSolveState {
+    constraints = cs,
+    predMap = pm
     }

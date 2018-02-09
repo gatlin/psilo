@@ -13,6 +13,7 @@ import Lib.Types.Frame
 import Lib.Types.Scheme
 import Lib.Types.TypeEnv
 import Lib.Types.Constraint
+import Lib.Types.PredMap
 
 import Lib.Compiler
 import Lib.Errors
@@ -36,11 +37,11 @@ import Control.Comonad.Cofree
 -- | The state we need to mutate during type inference
 data InferState = InferState
     { varCount :: Int -- ^ monotonically increasing type ID number
-    , memo :: Map (AnnotatedExpr ()) Scheme
+    , predMap :: PredMap
     } deriving (Show)
 
 initInferState :: InferState
-initInferState = InferState 0 M.empty
+initInferState = InferState 0 mempty
 
 {-
 newtype Infer a =
@@ -75,7 +76,9 @@ t1 @= t2 = tell [t1 := t2]
 
 tyInst :: [Pred] -> Infer ()
 tyInst [] = return ()
-tyInst ps = forM_ (ftv ps) $ \tv -> tell [TVar tv :~ ps]
+tyInst ps = forM_ (ftv ps) $ \tv -> do
+    modify $ \s -> s { predMap = updatePredMap (TVar tv) ps $ predMap s }
+    --forM_ (ftv ps) $ \tv -> tell [TVar tv :~ ps]
 
 withEnv :: [(Symbol, Scheme)] -> Infer a -> Infer a
 withEnv ss m = local (<> (buildTypeEnv ss)) m
@@ -96,20 +99,6 @@ instantiate (Forall vs t) = do
     vs' <- mapM (const $ fresh Star) vs >>= mapM (return . TVar)
     let frame = M.fromList $ zip vs vs'
     return $ substitute frame t
-
-memoizedInfer :: AnnotatedExpr () -> Infer Type
-memoizedInfer expr = gets memo >>= maybe memoize retrieve . M.lookup expr where
-    memoize = do
-        te <- ask
-        ty <- infer expr
-        modify $ \s -> s {
-            memo = M.insert expr (generalize te ([] :=> ty)) $ memo s
-            }
-        return ty
-
-    retrieve scm = do
-        (_ :=> ty) <- instantiate scm
-        return ty
 
 -- | Constraint generation and type generation
 infer :: AnnotatedExpr () -> Infer Type
@@ -141,7 +130,7 @@ infer (_ :< FunC args body) = do
     (argVars, argScms) <- mapAndUnzipM (\arg -> do
         var <- fresh Star >>= return . TVar
         return (var, Forall [] ([] :=> var))) args
-    br <- withEnv (zip args argScms) $ memoizedInfer body
+    br <- withEnv (zip args argScms) $ infer body
     let fun_ty = TFun $ argVars ++ [br]
     return fun_ty
 
@@ -150,8 +139,8 @@ infer (_ :< FunC args body) = do
 -- athat the operator is equivalent to a function consuming the operands and
 -- producing the return value.
 infer (_ :< AppC op erands) = do
-    op' <- memoizedInfer op
-    erands' <- mapM memoizedInfer erands
+    op' <- infer op
+    erands' <- mapM infer erands
     var <- fresh Star >>= return . TVar
     op' @= (TFun $ erands' ++ [var])
     return var

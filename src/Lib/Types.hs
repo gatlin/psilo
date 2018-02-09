@@ -64,7 +64,7 @@ import Lib.Types.PredMap
 import Lib.Types.Scheme
 import Lib.Types.TypeEnv
 import Lib.Types.Infer
-import Lib.Types.Solve
+import Lib.Types.Solve hiding (predMap)
 
 import Lib.Compiler
 import Lib.Parser (parse_expr, parse_multi)
@@ -88,7 +88,7 @@ ord_binop = [IsIn "Ord" t_0] :=> (TFun [t_0, t_0, typeBool])
 defaultTypeEnv :: TypeEnv
 defaultTypeEnv = TypeEnv $ M.fromList
     [ ("*", generalize mempty num_binop)
-
+{-
     , ("+", generalize mempty num_binop)
     , ("-", generalize mempty num_binop)
     , ("/", generalize mempty num_binop)
@@ -97,6 +97,7 @@ defaultTypeEnv = TypeEnv $ M.fromList
     , (">", generalize mempty ord_binop)
     , ("id", generalize mempty $ [] :=> (TFun [TVar (TyVar 0 Star),
                                                TVar (TyVar 0 Star)]))
+-}
     ]
 
 addCoreClasses :: EnvTransformer
@@ -125,18 +126,31 @@ typecheck defns _te = do
     let te = defaultTypeEnv <> _te
     (syms, exprs) <- mapAndUnzipM (\(s,e) -> return (s, annotated e)) defns
     exprs' <- sequence exprs
+
     (schemes, te') <- typecheck_pass syms exprs' te
+    logMsg "Schemes [1]"
+    forM_ (zip syms schemes) $ logMsg . show
+    logMsg $ "Type Env [1] = " ++ (show te')
+
     (schemes', te'') <- typecheck_pass syms exprs' te'
+    logMsg "Schemes [2]"
     forM_ (zip syms schemes') $ logMsg . show
+    logMsg $ "Type Env [2] = " ++ (show te'')
+
+    (schemes'', te''') <- typecheck_pass syms exprs' te''
+    logMsg "Schemes [3]"
+    forM_ (zip syms schemes'') $ logMsg . show
+    logMsg $ "Type Env [3]" ++ (show te''')
+
     return [()]
 
 typecheck_pass syms exprs te = do
     (sigs, inferState, cs) <- runInfer te $
         mapM (sequence . extend infer) exprs
-    (frame, pm) <- solveConstraints cs
+    (frame, pm) <- solveConstraints cs $ predMap inferState
     let schemes = fmap extract $ fmap (extend $ toScheme frame pm) sigs
-    let te' = te <> (buildTypeEnv $ zip syms schemes)
-    return (schemes, te')
+    let te' = substitute frame $ buildTypeEnv $ zip syms schemes
+    return (schemes, te' <> te)
 
 toScheme :: Frame -> PredMap -> AnnotatedExpr Type -> Scheme
 toScheme frame pm expr =
