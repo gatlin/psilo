@@ -91,14 +91,15 @@ solver = do
                     predMap = substitute su1 $ predMap st
                     }
                 solver
-{-
-            (ty :~ ps) -> do
+
+--            (ty :~ ps) -> do
+            _ -> do
                 su <- gets frame
                 pm <- gets predMap
-                let pm' = updatePredMap ty ps pm
-                put $ SolveState su cs0 pm'
+--                let pm' = updatePredMap ty ps pm
+                put $ SolveState su cs0 pm
                 solver
--}
+
 
 solveConstraints
     :: [Constraint]

@@ -14,6 +14,6 @@ import Lib.Syntax.Annotated
 --   Type aliases
 --   New data types
 data TopLevel
-    = Define Symbol (CoreExpr ()) -- ^ A value definition
+    = Define Symbol (AnnotatedExpr ()) -- ^ A value definition
     | Signature Symbol Scheme -- ^ A top level type scheme
     deriving (Show, Eq)

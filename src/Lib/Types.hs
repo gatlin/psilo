@@ -41,8 +41,16 @@ import Control.Comonad.Cofree (Cofree(..))
 import Data.Maybe (isNothing, fromMaybe, fromJust, isJust)
 import Data.Monoid ((<>))
 
+import Data.Map (Map)
 import qualified Data.Map.Lazy as M
+
+import Data.Graph (Graph, Vertex)
+import Data.Tree (flatten)
+import qualified Data.Graph as G
 import qualified Data.Text as T
+
+import Data.List (sort, sortBy)
+import Data.Ord (Ordering(..))
 
 import Lib.Syntax ( Symbol
                   , CoreExpr
@@ -119,38 +127,29 @@ defaultClassEnv =     addCoreClasses
 
 -- | This is a two-pass situation.
 typecheck
-    :: [(Symbol, CoreExpr ())]
+    :: [(Symbol, AnnotatedExpr ())]
     -> TypeEnv
     -> Compiler [()]
 typecheck defns _te = do
     let te = defaultTypeEnv <> _te
-    (syms, exprs) <- mapAndUnzipM (\(s,e) -> return (s, annotated e)) defns
-    exprs' <- sequence exprs
-
-    (schemes, te') <- typecheck_pass syms exprs' te
-    logMsg "Schemes [1]"
-    forM_ (zip syms schemes) $ logMsg . show
-    logMsg $ "Type Env [1] = " ++ (show te')
-
-    (schemes', te'') <- typecheck_pass syms exprs' te'
-    logMsg "Schemes [2]"
-    forM_ (zip syms schemes') $ logMsg . show
-    logMsg $ "Type Env [2] = " ++ (show te'')
-
-    (schemes'', te''') <- typecheck_pass syms exprs' te''
-    logMsg "Schemes [3]"
-    forM_ (zip syms schemes'') $ logMsg . show
-    logMsg $ "Type Env [3]" ++ (show te''')
-
+    let dependency_graph = make_dep_graph defns
+    let defns' = reverse $ topo' dependency_graph
+    te' <- foldM typecheck_pass te defns'
+    logMsg $ "Type Env = " ++ (show te')
     return [()]
 
-typecheck_pass syms exprs te = do
-    (sigs, inferState, cs) <- runInfer te $
-        mapM (sequence . extend infer) exprs
+typecheck_pass
+    :: TypeEnv
+    -> (Symbol, AnnotatedExpr ())
+    -> Compiler TypeEnv
+typecheck_pass te (sym, expr) = do
+    (sig, inferState, cs) <- runInfer te $
+        sequence . extend infer $ expr
     (frame, pm) <- solveConstraints cs $ predMap inferState
-    let schemes = fmap extract $ fmap (extend $ toScheme frame pm) sigs
-    let te' = substitute frame $ buildTypeEnv $ zip syms schemes
-    return (schemes, te' <> te)
+    -- build the new type environment
+    let scheme = extract $ (extend $ toScheme frame pm) sig
+    let te' = substitute frame $ buildTypeEnv $ [(sym, scheme)]
+    return (te' <> te)
 
 toScheme :: Frame -> PredMap -> AnnotatedExpr Type -> Scheme
 toScheme frame pm expr =
@@ -158,3 +157,37 @@ toScheme frame pm expr =
         ty' = substitute frame ty
         pm' = substitute frame pm
     in  closeOver frame ((lookupPreds ty') pm' :=> ty')
+
+
+deps :: [(Symbol, AnnotatedExpr ())] -> AnnotatedExpr () -> [Symbol]
+deps xs expr = go expr where
+    go (() :< (IdC sym)) = case lookup sym xs of
+        Nothing -> []
+        Just _ -> [sym]
+
+    go (() :< (AppC op erands)) = (go op) ++ (concatMap go erands)
+    go (() :< (FunC _ body)) = go body
+    go _ = []
+
+data Grph node key = Grph
+  { _graph :: Graph
+  , _vertices :: Vertex -> (node, key, [key])
+  }
+
+type DepGraph = Grph (Symbol, AnnotatedExpr ()) Symbol
+
+fromList :: Ord key => [(node, key, [key])] -> Grph node key
+fromList = uncurry Grph . G.graphFromEdges'
+
+vertexLabels :: Functor f => Grph b t -> (f Vertex) -> f b
+vertexLabels g = fmap (vertexLabel g)
+
+vertexLabel :: Grph b t -> Vertex -> b
+vertexLabel g = (\(vi, _, _) -> vi) . (_vertices g)
+
+-- Topologically sort graph
+topo' :: Grph node key -> [node]
+topo' g = vertexLabels g $ G.topSort (_graph g)
+
+make_dep_graph defns = fromList $ fmap dep_list defns where
+    dep_list (sym, expr) = ((sym, expr), sym, extract ( extend (deps defns) expr))

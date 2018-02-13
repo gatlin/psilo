@@ -22,11 +22,14 @@ normalize :: Scheme -> Scheme
 normalize (Forall _ (ps :=> t)) = Forall (map snd ord) (ps' :=> (normtype t))
     where
         ord = zip (nub $ fv t) (map (\n -> TyVar n Star) [0..])
-        ps' = map (\(IsIn sym (TVar t)) -> maybe
-                                           (error "non-existent type variable")
-                                           (\x -> (IsIn sym (TVar x)))
-                                           (Prelude.lookup t ord))
-              ps
+
+        find_pred (IsIn sym (TVar t)) = maybe
+                                        (error "non-existent type variable")
+                                        (\x -> (IsIn sym (TVar x)))
+                                        (Prelude.lookup t ord)
+
+        find_pred pred = pred
+        ps' = map find_pred ps
         fv = reverse . S.toList . ftv
 
         normtype (TFun ts) = TFun $ map normtype ts
@@ -34,6 +37,7 @@ normalize (Forall _ (ps :=> t)) = Forall (map snd ord) (ps' :=> (normtype t))
         normtype (TVar tv ) = case Prelude.lookup tv ord of
             Just x -> TVar x
             Nothing -> error "type variable not in signature"
+
 
 instance Show Scheme where
     show (Forall vars t) = prefix ++ (show t)

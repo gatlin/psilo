@@ -136,7 +136,9 @@ surfaceToTopLevel
 surfaceToTopLevel (Free (DefS sym val)) = do
     uval <- uniqueIds val
     val' <- surfaceToCore uval
-    return $ Define sym val'
+    case compile (annotated val') of
+        Left _ -> throwError $ PreprocessError "wut"
+        Right ann -> return $ Define sym ann
 
 surfaceToTopLevel (Free (SigS sym scheme)) = return $
     Signature sym $ normalize scheme
@@ -184,24 +186,24 @@ boundVarCheck toplevels = withBoundVars bvs $ mapM_ go toplevels
         go (Define s core) = check core
         go whatever = return ()
 
-        check :: CoreExpr () -> Preprocess ()
-        check (Free (FunC args body)) = do
+        check :: AnnotatedExpr () -> Preprocess ()
+        check (() :< (FunC args body)) = do
             let argSyms = fmap (\x -> (x, x)) args
             b' <- withBoundVars (M.fromList argSyms) $ check body
             return ()
 
-        check (Free (IdC s)) = do
+        check (() :< (IdC s)) = do
             boundVars <- readBoundVars
             when (M.notMember s boundVars) $
                 throwError $ UnboundVariable s
             return ()
 
-        check (Free (AppC op erands)) = do
+        check (() :< (AppC op erands)) = do
             op' <- check op
             erands' <- mapM check erands
             return ()
 
-        check (Free (IfC c t e)) = do
+        check (() :< (IfC c t e)) = do
             c' <- check c
             t' <- check t
             e' <- check e
