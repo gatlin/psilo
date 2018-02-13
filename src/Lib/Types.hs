@@ -169,6 +169,9 @@ deps xs expr = go expr where
     go (() :< (FunC _ body)) = go body
     go _ = []
 
+-- oh what do you know I\'m stealing more from Stephen Diehl:
+-- http://dev.stephendiehl.com/hask/#graphs
+
 data Grph node key = Grph
   { _graph :: Graph
   , _vertices :: Vertex -> (node, key, [key])
