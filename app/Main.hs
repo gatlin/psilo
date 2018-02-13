@@ -53,11 +53,11 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
                 typecheck defns tyEnv
         case result of
             Left err -> putStrLn . show $ err
-            Right (wut, logs) -> do
+            Right (typeEnv, logs) -> do
                 putStrLn "Logs\n-----"
                 forM_ logs putStrLn
                 putStrLn "-----"
-                forM_ wut $ putStrLn . show
+                putStrLn . show $ typeEnv
 
 process_file :: Text -> Compiler [TopLevel]
 process_file file_contents = do

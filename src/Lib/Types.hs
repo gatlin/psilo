@@ -96,7 +96,6 @@ ord_binop = [IsIn "Ord" t_0] :=> (TFun [t_0, t_0, typeBool])
 defaultTypeEnv :: TypeEnv
 defaultTypeEnv = TypeEnv $ M.fromList
     [ ("*", generalize mempty num_binop)
-{-
     , ("+", generalize mempty num_binop)
     , ("-", generalize mempty num_binop)
     , ("/", generalize mempty num_binop)
@@ -105,7 +104,6 @@ defaultTypeEnv = TypeEnv $ M.fromList
     , (">", generalize mempty ord_binop)
     , ("id", generalize mempty $ [] :=> (TFun [TVar (TyVar 0 Star),
                                                TVar (TyVar 0 Star)]))
--}
     ]
 
 addCoreClasses :: EnvTransformer
@@ -125,18 +123,19 @@ defaultClassEnv =     addCoreClasses
                   <:> addInst [] (IsIn "Floating" typeFloat)
                   <:> addInst [] (IsIn "Eq" typeBool)
 
--- | This is a two-pass situation.
+-- | We build a dependency graph of different definitions and topologically sort
+-- them. Then typechecking, as crude as it may be, is simply folding the initial
+-- type environment with the 'typecheck_pass' function over the sorted list.
 typecheck
     :: [(Symbol, AnnotatedExpr ())]
     -> TypeEnv
-    -> Compiler [()]
+    -> Compiler TypeEnv
 typecheck defns _te = do
     let te = defaultTypeEnv <> _te
     let dependency_graph = make_dep_graph defns
     let defns' = reverse $ topo' dependency_graph
     te' <- foldM typecheck_pass te defns'
-    logMsg $ "Type Env = " ++ (show te')
-    return [()]
+    return te'
 
 typecheck_pass
     :: TypeEnv
