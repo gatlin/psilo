@@ -8,5 +8,4 @@
 ;(def eighty-one (square nine))
 ;(def thirty-six (times-2-and-square three))
 
-(def bad-1 (square 5)) ; does work right now, which is wrong
-;(def bad-2 (* 3.0 #t)) ; doesn't work, which is expected
+;(def bad (* 3.0 #t)) ; doesn't work, which is expected
