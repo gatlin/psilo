@@ -16,7 +16,7 @@ data PsiloError
     -- type classes
     | ClassAlreadyDefined Symbol
     | SuperclassNotDefined Symbol
-    | NoClassForInstance Symbol
+    | NoClassForInstance Symbol Symbol
     | OverlappingInstance Symbol
     -- parsing
     | ParserError String

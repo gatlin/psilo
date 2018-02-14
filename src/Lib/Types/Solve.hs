@@ -81,25 +81,15 @@ solver = do
     cs <- gets constraints
     case cs of
         [] -> get >>= \(SolveState f _ p) -> return (f, p)
-        (c:cs0) -> case c of
-            (t1 := t2) -> do
-                su <- gets frame
-                (su1, cs1) <- unify (substitute su t1) (substitute su t2)
-                modify $ \st -> st {
-                    frame = su1 `compose` su,
-                    constraints = nub $ (substitute su1 cs1) ++ (substitute su1 cs0),
-                    predMap = substitute su1 $ predMap st
-                    }
-                solver
-
---            (ty :~ ps) -> do
-            _ -> do
-                su <- gets frame
-                pm <- gets predMap
---                let pm' = updatePredMap ty ps pm
-                put $ SolveState su cs0 pm
-                solver
-
+        ((t1 := t2):cs0) -> do
+            su <- gets frame
+            (su1, cs1) <- unify (substitute su t1) (substitute su t2)
+            modify $ \st -> st {
+                frame = su1 `compose` su,
+                constraints = nub $ (substitute su1 cs1) ++ (substitute su1 cs0),
+                predMap = substitute su1 $ predMap st
+                }
+            solver
 
 solveConstraints
     :: [Constraint]

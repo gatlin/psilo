@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Lib.Types.Class where
 
@@ -15,13 +16,14 @@ import Data.Maybe
 
 import Data.Functor.Identity
 
+import Lib.Compiler
 import Lib.Errors
 
 -- | A typeclass instance is a qualified predicate
 type Inst = Qual Pred
 
 -- | A typeclass carries information about its superclasses and instances
-type Class = ([Symbol], [Qual Pred])
+type Class = ([Symbol], [Inst])
 
 -- | Organizes information about the typeclass environment
 newtype ClassEnv = ClassEnv (Map Symbol Class)
@@ -48,7 +50,7 @@ defined = isJust
 
 -- | Represents a 'ClassEnv' transformation
 newtype EnvTransformer = EnvT {
-    transformCE :: ClassEnv -> Either PsiloError ClassEnv }
+    transformCE :: ClassEnv -> Compiler ClassEnv }
 
 -- | Combine 'EnvTransformer's
 (<:>) :: EnvTransformer -> EnvTransformer -> EnvTransformer
@@ -59,24 +61,24 @@ infixr 5 <:>
 
 -- | I have no idea if this is useful
 instance Monoid EnvTransformer where
-    mempty = EnvT Right
+    mempty = EnvT return
     mappend = (<:>)
 
 -- | Adds a new typeclass to a 'ClassEnv', ensuring the name is not already
 -- taken and that the superclasses are already defined.
 addClass :: Symbol -> [Symbol] -> EnvTransformer
 addClass sym is = EnvT go where
-    go ce | defined (classes ce sym) = Left $ ClassAlreadyDefined sym
+    go ce | defined (classes ce sym) = throwError $ ClassAlreadyDefined sym
           | any (not . defined . classes ce) is =
-                Left $ SuperclassNotDefined sym
+                throwError $ SuperclassNotDefined sym
           | otherwise = return (modifyCE ce sym (is, []))
 
 -- | Adds an instance to a class, ensuring it does not overlap with others and
 -- that the class exists.
 addInst :: [Pred] -> Pred -> EnvTransformer
-addInst ps p@(IsIn sym _) = EnvT go where
-    go ce | not (defined (classes ce sym)) = Left $ NoClassForInstance sym
-          | any (overlap p) qs = Left $ OverlappingInstance sym
+addInst ps p@(IsIn sym t) = EnvT go where
+    go ce | not (defined (classes ce sym)) = throwError $ NoClassForInstance sym (show t)
+          | any (overlap p) qs = throwError $ OverlappingInstance sym
           | otherwise = return $ modifyCE ce sym c
           where its = insts ce sym
                 qs = [ q | (_ :=> q) <- its ]

@@ -29,7 +29,6 @@ import Control.Monad.Writer
 import Control.Monad.Except
 import Control.Monad.Reader
 import Data.Functor.Identity
-import Data.Either (either)
 
 import Control.Comonad
 import Control.Comonad.Cofree
@@ -74,14 +73,11 @@ logInfer = lift . lift . lift . logMsg
 (@=) :: Type -> Type -> Infer ()
 t1 @= t2 = tell [t1 := t2]
 
-($=) :: Type -> Symbol -> Infer ()
-ty $= sym = tell [ ty :$ sym ]
-
 tyInst :: [Pred] -> Infer ()
 tyInst [] = return ()
 tyInst ps = forM_ (ftv ps) $ \tv -> do
     modify $ \s -> s { predMap = updatePredMap (TVar tv) ps $ predMap s }
---    forM_ (ftv ps) $ \tv -> tell [TVar tv :~ ps]
+
 
 withEnv :: [(Symbol, Scheme)] -> Infer a -> Infer a
 withEnv ss m = local (<> (buildTypeEnv ss)) m
@@ -119,10 +115,7 @@ infer (_ :< FloatC _) = return $ typeFloat
 infer (_ :< IdC sym) = do
     te <- getEnv
     case envLookup te sym of
-        Nothing -> do
-            var <- fresh Star >>= return . TVar
-            var $= sym
-            return var
+        Nothing -> fresh Star >>= return . TVar
         Just scheme -> do
             qt@(ps :=> ty) <- instantiate scheme
             tyInst ps

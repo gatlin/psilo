@@ -33,6 +33,7 @@ import Control.Monad
     , zipWithM
     , mapAndUnzipM
     , guard
+    , unless
     )
 import Control.Monad.Except
 import Control.Monad.Free
@@ -122,6 +123,14 @@ defaultClassEnv =     addCoreClasses
                   <:> addInst [] (IsIn "Integral" typeInt)
                   <:> addInst [] (IsIn "Floating" typeFloat)
                   <:> addInst [] (IsIn "Eq" typeBool)
+                  <:> addInst [] (IsIn "Real" typeFloat)
+                  <:> addInst [] (IsIn "Real" typeInt)
+                  <:> addInst [] (IsIn "Num" typeFloat)
+                  <:> addInst [] (IsIn "Num" typeInt)
+                  <:> addInst [] (IsIn "Ord" typeFloat)
+                  <:> addInst [] (IsIn "Ord" typeInt)
+                  <:> addInst [] (IsIn "Eq" typeFloat)
+                  <:> addInst [] (IsIn "Eq" typeInt)
 
 -- | We build a dependency graph of different definitions and topologically sort
 -- them. Then typechecking, as crude as it may be, is simply folding the initial
@@ -132,23 +141,37 @@ typecheck
     -> Compiler TypeEnv
 typecheck defns _te = do
     let te = defaultTypeEnv <> _te
+    classEnv <- transformCE defaultClassEnv mempty
+    logMsg $ "Class Env = " ++ (show classEnv)
     let dependency_graph = make_dep_graph defns
     let defns' = reverse $ topo' dependency_graph
-    te' <- foldM typecheck_pass te defns'
+    te' <- foldM (typecheck_pass classEnv) te defns'
     return te'
 
 typecheck_pass
-    :: TypeEnv
+    :: ClassEnv
+    -> TypeEnv
     -> (Symbol, AnnotatedExpr ())
     -> Compiler TypeEnv
-typecheck_pass te (sym, expr) = do
+typecheck_pass ce te (sym, expr) = do
     (sig, inferState, cs) <- runInfer te $
         sequence . extend infer $ expr
     (frame, pm) <- solveConstraints cs $ predMap inferState
+    verifyPredMap pm ce
     -- build the new type environment
     let scheme = extract $ (extend $ toScheme frame pm) sig
     let te' = substitute frame $ buildTypeEnv $ [(sym, scheme)]
     return (te' <> te)
+
+verifyPredMap :: PredMap -> ClassEnv -> Compiler ()
+verifyPredMap (PMap pm) ce = forM_ (M.toList pm) $ \(ty, preds) ->
+    case ty of
+        (TSym _) -> forM_ preds $ \(IsIn c t) -> do
+            let instances = fmap (\(_ :=> (IsIn _ x)) -> x) (insts ce c)
+            unless (elem ty instances) $ throwError $
+                NoClassForInstance c (show ty)
+            return ()
+        _ -> return ()
 
 toScheme :: Frame -> PredMap -> AnnotatedExpr Type -> Scheme
 toScheme frame pm expr =
@@ -156,7 +179,6 @@ toScheme frame pm expr =
         ty' = substitute frame ty
         pm' = substitute frame pm
     in  closeOver frame ((lookupPreds ty') pm' :=> ty')
-
 
 deps :: [(Symbol, AnnotatedExpr ())] -> AnnotatedExpr () -> [Symbol]
 deps xs expr = go expr where
