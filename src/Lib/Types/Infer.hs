@@ -75,9 +75,12 @@ t1 @= t2 = tell [t1 := t2]
 
 tyInst :: [Pred] -> Infer ()
 tyInst [] = return ()
-tyInst ps = forM_ (ftv ps) $ \tv -> do
-    modify $ \s -> s { predMap = updatePredMap (TVar tv) ps $ predMap s }
-
+tyInst ps = forM_ ps $ \pred -> do
+    let tvs = S.toList . ftv $ pred
+    forM_ tvs $ \tv -> do
+        modify $ \s -> s {
+            predMap = updatePredMap (TVar tv) [pred] $ predMap s
+            }
 
 withEnv :: [(Symbol, Scheme)] -> Infer a -> Infer a
 withEnv ss m = local (<> (buildTypeEnv ss)) m

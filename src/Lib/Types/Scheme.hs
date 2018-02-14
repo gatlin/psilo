@@ -24,7 +24,7 @@ normalize (Forall _ (ps :=> t)) = Forall (map snd ord) (ps' :=> (normtype t))
         ord = zip (nub $ fv t) (map (\n -> TyVar n Star) [0..])
 
         find_pred (IsIn sym (TVar t)) = maybe
-                                        (error "non-existent type variable")
+                                        (error $ "non-existent type variable: " ++ (show t))
                                         (\x -> (IsIn sym (TVar x)))
                                         (Prelude.lookup t ord)
 
