@@ -122,6 +122,7 @@ defaultClassEnv :: EnvTransformer
 defaultClassEnv =     addCoreClasses
                   <:> addInst [] (IsIn "Integral" typeInt)
                   <:> addInst [] (IsIn "Floating" typeFloat)
+                  <:> addInst [] (IsIn "Fractional" typeFloat)
                   <:> addInst [] (IsIn "Eq" typeBool)
                   <:> addInst [] (IsIn "Real" typeFloat)
                   <:> addInst [] (IsIn "Real" typeInt)
