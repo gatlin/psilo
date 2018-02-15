@@ -105,12 +105,6 @@ defaultTypeEnv = TypeEnv $ M.fromList
     , (">", generalize mempty ord_binop)
     , ("id", generalize mempty $ [] :=> (TFun [tyFun, TVar (TyVar 0 Star),
                                                TVar (TyVar 0 Star)]))
-    , ("map", generalize mempty $
-          [IsIn "Functor" (TSym (TyCon "f" Star))] :=>
-          TFun [ tyFun
-               , TFun [ tyFun, TSym (TyCon "a" Star), TSym (TyCon "b" Star) ]
-               , TFun [ TSym (TyCon "f" Star), TSym (TyCon "a" Star) ]
-               , TFun [ TSym (TyCon "f" Star), TSym (TyCon "b" Star) ] ] )
     ]
 
 addCoreClasses :: EnvTransformer
@@ -149,7 +143,6 @@ typecheck
 typecheck defns _te = do
     let te = defaultTypeEnv <> _te
     classEnv <- transformCE defaultClassEnv mempty
-    logMsg $ "Class Env = " ++ (show classEnv)
     let dependency_graph = make_dep_graph defns
     let defns' = reverse $ topo' dependency_graph
     te' <- foldM (typecheck_pass classEnv) te defns'
@@ -187,6 +180,7 @@ toScheme frame pm expr =
         pm' = substitute frame pm
     in  closeOver frame ((lookupPreds ty') pm' :=> ty')
 
+-- | Compute dependencies for a given expression and return as a list of Symbols
 deps :: [(Symbol, AnnotatedExpr ())] -> AnnotatedExpr () -> [Symbol]
 deps xs expr = go expr where
     go (() :< (IdC sym)) = case lookup sym xs of
@@ -216,9 +210,10 @@ vertexLabels g = fmap (vertexLabel g)
 vertexLabel :: Grph b t -> Vertex -> b
 vertexLabel g = (\(vi, _, _) -> vi) . (_vertices g)
 
--- Topologically sort graph
+-- Topologically sort a graph
 topo' :: Grph node key -> [node]
 topo' g = vertexLabels g $ G.topSort (_graph g)
 
+-- | Traverse an expression tree and create a dependency graph
 make_dep_graph defns = fromList $ fmap dep_list defns where
     dep_list (sym, expr) = ((sym, expr), sym, extract ( extend (deps defns) expr))
