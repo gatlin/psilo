@@ -82,15 +82,15 @@ import Lib.Errors
 -- * Defaults
 
 num_binop :: Qual Type
-num_binop = [IsIn "Num" t_0] :=> (TFun [t_0, t_0, t_0])
+num_binop = [IsIn "Num" t_0] :=> (TFun [tyFun, t_0, t_0, t_0])
     where t_0 = TVar (TyVar 0 Star)
 
 eq_binop :: Qual Type
-eq_binop = [IsIn "Eq" t_0] :=> (TFun [t_0, t_0, typeBool])
+eq_binop = [IsIn "Eq" t_0] :=> (TFun [tyFun, t_0, t_0, typeBool])
     where t_0 = TVar (TyVar 0 Star)
 
 ord_binop :: Qual Type
-ord_binop = [IsIn "Ord" t_0] :=> (TFun [t_0, t_0, typeBool])
+ord_binop = [IsIn "Ord" t_0] :=> (TFun [tyFun, t_0, t_0, typeBool])
     where t_0 = TVar (TyVar 0 Star)
 
 -- | Builtin operators and functions with explicit type schemes
@@ -103,8 +103,14 @@ defaultTypeEnv = TypeEnv $ M.fromList
     , ("=", generalize mempty eq_binop)
     , ("<", generalize mempty ord_binop)
     , (">", generalize mempty ord_binop)
-    , ("id", generalize mempty $ [] :=> (TFun [TVar (TyVar 0 Star),
+    , ("id", generalize mempty $ [] :=> (TFun [tyFun, TVar (TyVar 0 Star),
                                                TVar (TyVar 0 Star)]))
+    , ("map", generalize mempty $
+          [IsIn "Functor" (TSym (TyCon "f" Star))] :=>
+          TFun [ tyFun
+               , TFun [ tyFun, TSym (TyCon "a" Star), TSym (TyCon "b" Star) ]
+               , TFun [ TSym (TyCon "f" Star), TSym (TyCon "a" Star) ]
+               , TFun [ TSym (TyCon "f" Star), TSym (TyCon "b" Star) ] ] )
     ]
 
 addCoreClasses :: EnvTransformer

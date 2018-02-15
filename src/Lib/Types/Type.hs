@@ -43,12 +43,18 @@ data Type
     | TFun [Type]
     deriving (Ord, Eq)
 
+parensShow :: Type -> String
+parensShow ty@(TFun ts) = "(" ++ (show ty) ++ ")"
+parensShow ty = show ty
+
 instance Show Type where
     show (TVar n) = show n
     show (TSym sym) = show sym
-    show (TFun ts) = parens ts' where
-        parens inside = "(" ++ inside ++ ")"
-        ts' = intercalate " -> " $ map show ts
+    show (TFun ts) = go ts where
+        go [] = ""
+        go ((TSym (TyCon "->" Star)):ts') = intercalate " -> " $
+            map parensShow ts'
+        go ts' = intercalate " " $ map parensShow ts'
 
 instance HasKind Type where
     kind (TSym tc) = kind tc
@@ -59,3 +65,6 @@ typeInt, typeBool, typeFloat :: Type
 typeInt = TSym (TyCon "Int" Star)
 typeBool = TSym (TyCon "Boolean" Star)
 typeFloat = TSym (TyCon "Float" Star)
+
+tyFun :: Type
+tyFun = TSym $ TyCon "->" Star

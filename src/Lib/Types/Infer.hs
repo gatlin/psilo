@@ -132,7 +132,7 @@ infer (_ :< FunC args body) = do
         var <- fresh Star >>= return . TVar
         return (var, Forall [] ([] :=> var))) args
     br <- withEnv (zip args argScms) $ infer body
-    let fun_ty = TFun $ argVars ++ [br]
+    let fun_ty = TFun $ tyFun : (argVars ++ [br])
     return fun_ty
 
 -- | Lambda application is straightforward: infer types for the operator and the
@@ -143,7 +143,7 @@ infer (_ :< AppC op erands) = do
     op' <- infer op
     erands' <- mapM infer erands
     var <- fresh Star >>= return . TVar
-    op' @= (TFun $ erands' ++ [var])
+    op' @= (TFun $ tyFun : (erands' ++ [var]))
     return var
 
 -- | Assert that the condition expression is a boolean and that the two branches
