@@ -1,5 +1,5 @@
 (defun k (x y) y)
-(defun f1 (f) (f 1 2))
+(defun f1 (f) (+ 3.0 (f 1.0 2.0)))
 
 (def wut (f1 k))
 

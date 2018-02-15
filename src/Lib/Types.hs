@@ -161,7 +161,6 @@ typecheck_pass ce te (sym, expr) = do
     verifyPredMap pm ce
     -- build the new type environment
     let scheme = extract $ (extend $ toScheme frame pm) sig
-    forM_ cs $ logMsg . show
     let te' = substitute frame $ buildTypeEnv $ [(sym, scheme)]
     return (te' <> te)
 
