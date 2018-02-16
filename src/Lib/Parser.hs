@@ -136,11 +136,11 @@ def_parser = do
 
 defun_parser :: Parser (SurfaceExpr a)
 defun_parser = do
-    string "defun"
-    skipSpace
-    name <- sym
+    string "def"
     skipSpace
     char '('
+    name <- sym
+    skipSpace
     args <- typed_sym `sepBy` (many space)
     skipSpace
     char ')'
