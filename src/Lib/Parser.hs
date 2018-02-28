@@ -36,7 +36,7 @@ num_parser = do
         _ -> return $ aInt (read whole_part)
 
 symchars :: String
-symchars = "=<>.!@#$%^&*{}[]+-/\\"
+symchars = "=<>.?!@#$%^&*{}[]+-/\\"
 
 symchar :: Parser Char
 symchar = satisfy $ \c -> elem c symchars
@@ -127,7 +127,7 @@ expr_parser = (parens fun_parser)
 
 def_parser :: Parser (SurfaceExpr a)
 def_parser = do
-    string "def"
+    string "="
     skipSpace
     sym <- sym
     skipSpace
@@ -136,7 +136,7 @@ def_parser = do
 
 defun_parser :: Parser (SurfaceExpr a)
 defun_parser = do
-    string "def"
+    string "="
     skipSpace
     char '('
     name <- sym

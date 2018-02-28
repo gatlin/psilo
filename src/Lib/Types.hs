@@ -100,7 +100,7 @@ defaultTypeEnv = TypeEnv $ M.fromList
     , ("+", generalize mempty num_binop)
     , ("-", generalize mempty num_binop)
     , ("/", generalize mempty num_binop)
-    , ("=", generalize mempty eq_binop)
+    , ("=?", generalize mempty eq_binop)
     , ("<", generalize mempty ord_binop)
     , (">", generalize mempty ord_binop)
     , ("id", generalize mempty $ [] :=> (TFun [tyFun, TVar (TyVar 0 Star),

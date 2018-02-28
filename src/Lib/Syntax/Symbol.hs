@@ -7,4 +7,4 @@ type Symbol = String
 
 builtin_syms :: Set Symbol
 builtin_syms = S.fromList
-    [ "+", "*", "-", "/", "=", "<", ">" ]
+    [ "+", "*", "-", "/", "=?", "<", ">" ]

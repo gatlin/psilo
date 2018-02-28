@@ -1,16 +1,21 @@
-(def (square x) (* x x))
-(def (times-2 x) (* x 2))
-(def (times-2-and-square x) (square (times-2 x)))
+(= (square x) (* x x))
+(= (times-2 x) (* 2 x))
 
-(def (whoa) 5)
+(= three 3.0)
+(= six (times-2 three))
+(= nine (square three))
 
-(def eight (+ whoa three))
+(= eighteen (times-2 nine))
 
-(def three 3.0)
-;(def six (times-2 three))
-;(def nine (square three))
-;(def eighty-one (square nine))
-;(def thirty-six (times-2-and-square three))
+(= (compose f g)
+  (\ (x) (f (g x))))
 
+(= times-2-then-square (compose square times-2))
 
-;(def bad (* 3.0 #t)) ; doesn't work, which is expected
+(= thirty-six (times-2-then-square three))
+
+(= (fact n) (fact-helper n 1))
+(= (fact-helper n a)
+  (if (=? n 0)
+    a
+    (fact-helper (- n 1) (* n a))))
