@@ -1,7 +1,7 @@
 module Lib.Types.Solve where
 
 import Lib.Syntax.Symbol
-import Lib.Types.Kind (Kind(..), HasKind)
+import Lib.Types.Kind (Kind(..), HasKind, kind)
 import Lib.Types.Type (TyVar(..), TyCon(..), Type(..))
 import Lib.Types.Qual
 import Lib.Types.Frame
@@ -61,6 +61,23 @@ unifyMany (t1 : ts1) (t2 : ts2) = do
     return (su2 `compose` su1, nub $ cs1 ++ cs2)
 unifyMany t1 t2 = throwError $ UnificationMismatch t1 t2
 
+-- | Determine if two types match. Similar to unification.
+match :: Type -> Type -> Solve Unifier
+match t1 t2 | t1 == t2 = return emptyUnifier
+match (TVar v) t | (kind v) == (kind t) = return (v |-> t, [])
+match (TFun as) (TFun bs) = matchMany as bs
+match t1 t2 = throwError $ OtherTypeError "Error matching types"
+
+matchMany :: [Type] -> [Type] -> Solve Unifier
+matchMany [] [] = return emptyUnifier
+matchMany (t1 : ts1) (t2 : ts2) = do
+    (su1, cs1) <- match t1 t2
+    (su2, cs2) <- matchMany ts1 ts2
+    case merge su1 su2 of
+        Nothing -> do
+            throwError $ OtherTypeError $ "Frame 1: " ++ (show su1) ++ "  Frame 2: " ++ (show su2)
+        Just su -> return (su, nub $ cs1 ++ cs2)
+
 -- | Bind a 'TyVar' to a 'Type' in the 'Frame', unless the result would be an
 -- infinite type.
 bind :: TyVar -> Type -> Solve Unifier
@@ -99,3 +116,11 @@ solveConstraints cs pm = evalStateT solver $ initSolveState {
     constraints = cs,
     predMap = pm
     }
+
+matchTypes
+    :: Type
+    -> Type
+    -> Compiler ()
+matchTypes t1 t2 = do
+    evalStateT (match t1 t2) initSolveState
+    return ()

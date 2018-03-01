@@ -19,6 +19,7 @@ import Lib.Types.Scheme
 import Lib.Types.Qual
 import Lib.Types.Type
 import Lib.Types.Kind
+import Lib.Types.Type (tyFun)
 
 -- String hashing, for getting a unique Int from type variables
 string_hash :: String -> Int
@@ -195,7 +196,7 @@ type_parser = do
             skipSpace
             ts <- type_parser `sepBy` (many space)
             skipSpace
-            return $ TFun ts
+            return $ TFun $ tyFun : ts
 
 ty_sym :: Parser Type
 ty_sym = do

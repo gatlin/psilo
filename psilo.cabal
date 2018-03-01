@@ -48,7 +48,8 @@ library
                        text,
                        bytestring,
                        vector,
-                       ghc-prim
+                       ghc-prim,
+                       unicode-show
   default-language:    Haskell2010
 
 executable psilo-exe

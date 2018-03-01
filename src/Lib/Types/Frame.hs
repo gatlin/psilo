@@ -1,4 +1,9 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 module Lib.Types.Frame where
+
+import Control.Monad.Except
+import Lib.Errors
 
 import Lib.Syntax.Symbol
 import Lib.Types.Type (TyVar(..), Type(..))
@@ -9,6 +14,8 @@ import qualified Data.Map.Lazy as M
 
 import Data.Set (Set)
 import qualified Data.Set as S
+
+import Data.List (intersect)
 
 -- * Frames and Substitutions
 
@@ -22,6 +29,14 @@ u |-> t = M.fromList $ [(u, t)]
 
 compose :: Frame -> Frame -> Frame
 f1 `compose` f2 = M.map (substitute f1) f2 `M.union` f1
+
+merge :: Frame -> Frame -> Maybe Frame
+f1 `merge` f2
+    | agree = Just $ f1 `M.union` f2
+    | otherwise = Nothing
+    where
+        agree = all (\v -> substitute f1 (TVar v) == substitute f2 (TVar v))
+                (fmap fst $ M.toList $ f1 `M.union` f2)
 
 -- | This name is not optimal: entities which contain 'Type' information that
 -- can be updated with a 'Frame' and which potentially bind 'TyVar's in them.

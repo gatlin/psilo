@@ -142,6 +142,8 @@ typecheck
     -> Compiler TypeEnv
 typecheck defns _te = do
     let te = defaultTypeEnv <> _te
+    logMsg "Initial type environment"
+    logMsg . show $ te
     classEnv <- transformCE defaultClassEnv mempty
     let dependency_graph = make_dep_graph defns
     let defns' = reverse $ topo' dependency_graph
@@ -158,10 +160,23 @@ typecheck_pass ce te (sym, expr) = do
         sequence . extend infer $ expr
     (frame, pm) <- solveConstraints cs $ predMap inferState
     verifyPredMap pm ce
-    -- build the new type environment
     let scheme = extract $ (extend $ toScheme frame pm) sig
+    -- if the symbol was already in the type environment, verify that they match
+    checkTypeEnv sym scheme te
+    -- build the new type environment
     let te' = substitute frame $ buildTypeEnv $ [(sym, scheme)]
     return (te' <> te)
+
+checkTypeEnv :: Symbol -> Scheme -> TypeEnv -> Compiler ()
+checkTypeEnv sym s1@(Forall _ (_ :=> t1)) tyEnv = case envLookup tyEnv sym of
+    Nothing -> return ()
+    Just s2@(Forall _ (_ :=> t2)) ->
+        (matchTypes t1 t2) `catchError` (errHandler s2)
+
+    where errHandler :: Scheme -> PsiloError -> Compiler ()
+          errHandler s2 _ = throwError $ OtherTypeError $
+              "Type given for " ++ sym ++ " is " ++ (show s1) ++
+              ", but the inferred type is " ++ (show s2) ++ "."
 
 verifyPredMap :: PredMap -> ClassEnv -> Compiler ()
 verifyPredMap (PMap pm) ce = forM_ (M.toList pm) $ \(ty, preds) ->

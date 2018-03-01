@@ -56,7 +56,7 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
                 typeEnv <- typecheck defns tyEnv
                 return (typeEnv, defns)
         case result of
-            Left err -> putStrLn . show $ err
+            Left err -> putStrLn . ushow $ err
             Right ((typeEnv, defns), logs) -> do
                 putStrLn "Logs\n-----"
                 forM_ logs putStrLn
