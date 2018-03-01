@@ -171,12 +171,12 @@ checkTypeEnv :: Symbol -> Scheme -> TypeEnv -> Compiler ()
 checkTypeEnv sym s1@(Forall _ (_ :=> t1)) tyEnv = case envLookup tyEnv sym of
     Nothing -> return ()
     Just s2@(Forall _ (_ :=> t2)) ->
-        (matchTypes t1 t2) `catchError` (errHandler s2)
+        (matchTypes t2 t1) `catchError` (errHandler s2)
 
     where errHandler :: Scheme -> PsiloError -> Compiler ()
           errHandler s2 _ = throwError $ OtherTypeError $
-              "Type given for " ++ sym ++ " is " ++ (show s1) ++
-              ", but the inferred type is " ++ (show s2) ++ "."
+              "Type given for " ++ sym ++ " is " ++ (show s2) ++
+              ", but the inferred type is " ++ (show s1) ++ "."
 
 verifyPredMap :: PredMap -> ClassEnv -> Compiler ()
 verifyPredMap (PMap pm) ce = forM_ (M.toList pm) $ \(ty, preds) ->

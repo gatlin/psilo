@@ -1,7 +1,8 @@
-(: square (=> ((Num n)) (-> n n)))
+(: square (-> Float Float))
 (= (square x) (* x x))
 (= (times-2 x) (* 2 x))
 
+(: three (=> ((Num n)) n))
 (= three 3.0)
 (= six (times-2 three))
 (= nine (square three))
