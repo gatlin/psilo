@@ -17,5 +17,5 @@ type AnnotatedExpr = Cofree CoreAst
 
 -- | Converts a 'CoreExpr' fresh out of the parser into an 'AnnotatedExpr'.
 annotated :: Traversable f => Free f () -> Compiler (Cofree f ())
-annotated (Pure _) = throwError $ PreprocessError "honestly idk"
+annotated (Pure _) = throwError $ PreprocessError "Error annotating syntax tree"
 annotated (Free m) = fmap (() :<) $ traverse annotated m

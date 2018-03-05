@@ -27,6 +27,12 @@ module Lib
     , emptyTypeEnv
     , buildTypeEnv
     , Scheme(..)
+      -- * Lifted Expressions
+    , LiftedExpr(..)
+    , liftExpr
+      -- * Codegen
+    , codegen
+    , emptyModule
       -- * Errors
     , PsiloError(..)
     ) where
@@ -38,3 +44,4 @@ import Lib.Preprocessor
 import Lib.Errors
 import Lib.Types
 import Lib.Util
+import Lib.Codegen

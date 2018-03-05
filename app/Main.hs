@@ -7,7 +7,7 @@ import Options.Applicative.Common
 import Data.Monoid ((<>))
 import Data.Maybe (isJust, fromJust)
 import Control.Monad.Except
-import Control.Monad (forM_, mapM, foldM, when)
+import Control.Monad (forM_, mapM, mapM_, foldM, when)
 import Control.Comonad
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -61,11 +61,13 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
                 putStrLn "Logs\n-----"
                 forM_ logs putStrLn
                 putStrLn "-----"
-                forM_ defns $ \(symbol, _) -> do
+                forM_ defns $ \(symbol, huh) -> do
                     let mScheme = envLookup typeEnv symbol
                     when (isJust mScheme) $ do
                         let scheme = fromJust mScheme
                         putStrLn $ symbol ++ " : " ++ (ushow scheme)
+                        codegen (emptyModule "my cool jit") $ liftExpr symbol huh
+                        return ()
 
 process_file :: Text -> Compiler [TopLevel]
 process_file file_contents = do

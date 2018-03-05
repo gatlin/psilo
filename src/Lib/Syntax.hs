@@ -18,6 +18,8 @@ module Lib.Syntax
     , annotated
     , TypeLit(..)
     , fromTypeLit
+    , LiftedExpr(..)
+    , liftExpr
     )
 where
 
@@ -26,6 +28,7 @@ import Lib.Syntax.Core
 import Lib.Syntax.Surface
 import Lib.Syntax.Annotated
 import Lib.Syntax.TopLevel
+import Lib.Syntax.Lifted
 
 import Lib.Types.Scheme
 import Lib.Types.Qual

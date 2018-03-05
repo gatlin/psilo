@@ -1,23 +1,25 @@
-(: square (-> Float Float))
-(= (square x) (* x x))
-(= (times-2 x) (* 2 x))
+;(: square (=> ((Num n)) (-> n n )))
+;(= (square x) (* x x))
+;(= (times-2 x) (* 2 x))
 
-(: three (=> ((Num n)) n))
-(= three 3.0)
-(= six (times-2 three))
-(= nine (square three))
+(= (whoa x) ((\ (y) (* 2 y)) x))
 
-(= eighteen (times-2 nine))
+;(: three (=> ((Num n)) n))
+;(= three 3.0)
+;(= six (times-2 three))
+;(= nine (square three))
 
-(= (compose f g)
-  (\ (x) (f (g x))))
+;(= eighteen (times-2 nine))
 
-(= times-2-then-square (compose square times-2))
+;(= (compose f g)
+;  (\ (x) (f (g x))))
 
-(= thirty-six (times-2-then-square three))
+;(= (times-2-and-square x) (square (times-2 x)))
 
-(= (fact n) (fact-helper n 1))
-(= (fact-helper n a)
+;(= thirty-six (times-2-then-square three))
+
+;(= (fact n) (fact-helper n 1))
+;(= (fact-helper n a)
   (if (=? n 0)
     a
     (fact-helper (- n 1) (* n a))))
