@@ -20,6 +20,8 @@ module Lib.Syntax
     , fromTypeLit
     , LiftedExpr(..)
     , liftExpr
+    , mangle
+--    , convertClosure
     )
 where
 

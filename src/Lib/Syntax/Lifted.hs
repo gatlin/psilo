@@ -1,18 +1,28 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
+
+-- |
+-- Module     : Lib.Syntax.Lifted
+-- Description: Lambda-lifted syntax tree for code generation.
+--
+-- After type checking and other static analysis expressions are converted into
+-- a lambda-lifted form. This module defines that grammar and the lambda lifting
+-- operation(s).
 
 module Lib.Syntax.Lifted
-    ( LiftedExpr(..)
-    , liftExpr
-    )
 where
 
-import Lib.Syntax.Symbol (Symbol)
+import Lib.Syntax.Symbol (Symbol, mangle)
 import Lib.Syntax.Annotated (AnnotatedExpr(..))
 import Lib.Syntax.Core (CoreAst(..))
 import Control.Comonad.Cofree
 import Control.Monad
 import Control.Monad.State
+import Control.Monad.Free
+import Data.ByteString.Short
 
+-- | Lambda-lifted expression grammar
 data LiftedExpr
     = FloatL Double
     | IdL Symbol
@@ -20,6 +30,7 @@ data LiftedExpr
     | FunL Symbol [Symbol] LiftedExpr
     deriving (Show, Eq)
 
+-- | The state we manage while constructing a set of lifted expressions.
 data LiftState = LiftState
     { uniqueId :: Int
     , exprs :: [LiftedExpr]
@@ -30,25 +41,51 @@ defaultLiftState = LiftState 0 []
 
 type Lift = State LiftState
 
-gensym :: Lift Int
+-- | Generate a unique symbol using sophisticated mathematics
+gensym :: Lift Symbol
 gensym = do
     n <- gets uniqueId
     modify $ \s -> s { uniqueId = n + 1 }
-    return n
+    return $ "#" ++ (show n)
 
+-- | Gin up a fresh name for newly-anointed anonymous functions
 freshName :: Symbol -> Lift Symbol
 freshName sym = do
-    n <- gensym
-    return $ sym ++ "#" ++ (show n)
+    sym' <- gensym
+    return $ sym ++ sym'
 
-liftExpr ::  Symbol -> AnnotatedExpr a -> [LiftedExpr]
+{-
+without :: Eq a => [a] -> [a] -> [a]
+without = foldr (filter . (/=)) -- Like \\ but remove all occurrences
+
+freeVars :: AnnotatedExpr a -> [Symbol]
+freeVars (_ :< IdC s) = [s]
+freeVars (_ :< AppC op erands) = (freeVars op) ++ (concatMap freeVars erands)
+freeVars (_ :< FunC args body) = (freeVars body) `without` args
+freeVars _ = []
+
+applyTo :: AnnotatedExpr () -> [Symbol] -> AnnotatedExpr ()
+applyTo e (s : ss) = applyTo (() :< (AppC e [(() :< IdC s)])) ss
+applyTo e [] = e
+
+convertClosure :: [Symbol] -> AnnotatedExpr () -> AnnotatedExpr ()
+convertClosure globals expr = go expr where
+
+    go (() :< FunC args body) =
+        let vars = freeVars body `without` (globals ++ args)
+        in  (() :< FunC (vars ++ args) body) `applyTo` vars
+
+    go expr = expr
+-}
+
+liftExpr ::  Symbol -> AnnotatedExpr () -> [LiftedExpr]
 liftExpr sym =
-    exprs . ((flip execState) defaultLiftState) . go (Just sym) where
+    exprs . ((flip execState) defaultLiftState) . go (Just $ mangle sym) where
 
     go _ (_ :< FloatC n) = return $ FloatL n
     go _ (_ :< IntC n) = return $ FloatL $ fromIntegral n
     go _ (_ :< BoolC b) = return $ FloatL $ if b then 1.0 else 0.0
-    go _ (_ :< IdC s) = return $ IdL s
+    go _ (_ :< IdC s) = return $ IdL $ mangle s
     go _ (_ :< AppC op erands) = do
         op' <- handleOperator op
         erands' <- forM erands (go Nothing)
@@ -65,7 +102,7 @@ liftExpr sym =
             }
         return funL
 
-    handleOperator :: AnnotatedExpr a -> Lift Symbol
+    handleOperator :: AnnotatedExpr () -> Lift Symbol
     handleOperator (_ :< IdC s) = return s
     handleOperator f@(_ :< FunC _ _) = do
         (FunL name args body) <- go Nothing f

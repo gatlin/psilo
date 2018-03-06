@@ -3,6 +3,5 @@ extra-package-dbs: []
 packages:
 - .
 extra-deps:
-- llvm-hs-4.2.0
-- llvm-hs-pure-4.1.0.0
-resolver: lts-7.15
+- llvm-hs-4.0.1.0
+resolver: lts-8.13

@@ -1,6 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
+{-| Keeping with the theme that I'm just ripping off Stephen Diehl, this is a
+nascent attempt at an LLVM code generator.
+-}
+
 module Lib.Codegen where
 
 import Data.Semigroup ((<>))
@@ -15,6 +19,7 @@ import Control.Monad.State
 import Control.Monad.Except
 import Control.Monad.IO.Class
 import Control.Applicative
+import Control.Monad.Free
 
 import Control.Comonad.Cofree
 
@@ -32,7 +37,8 @@ import qualified LLVM.AST.FloatingPointPredicate as FP
 import qualified LLVM.AST.Type as T
 import qualified LLVM.AST.Float as F
 
-import Data.ByteString.Short (ShortByteString)
+import Data.ByteString.Short
+import qualified Data.ByteString.Char8 as C8
 
 import Lib.Syntax ( Symbol
                   , AnnotatedExpr(..)
@@ -41,10 +47,12 @@ import Lib.Syntax ( Symbol
                   , LiftedExpr(..)
                   , liftExpr)
 
+-- | For now, our only data type (lol)
 double :: Type
-double = FloatingPointType DoubleFP
+double = FloatingPointType 64 IEEE
 
-type SymbolTable = [(ShortByteString, Operand)]
+-- | Symbol table for LLVM IR generation
+type SymbolTable = [(String, Operand)]
 
 data CodegenState = CodegenState
     { currentBlock :: Name
@@ -61,6 +69,7 @@ data BlockState = BlockState
     , term :: Maybe (Named Terminator)
     } deriving ( Show )
 
+-- | The code generation monad.
 newtype Codegen a = Codegen {
     runCodegen :: State CodegenState a
     } deriving ( Functor
@@ -69,6 +78,7 @@ newtype Codegen a = Codegen {
                , MonadState CodegenState
                )
 
+-- | The LLVM monad.
 newtype LLVM a = LLVM (State AST.Module a)
     deriving ( Functor
              , Applicative
@@ -82,13 +92,13 @@ emptyCodegen = CodegenState (Name entryBlockName) Map.empty [] 1 0 Map.empty
 execCodegen :: Codegen a -> CodegenState
 execCodegen m = execState (runCodegen m) emptyCodegen
 
-entryBlockName :: ShortByteString
+entryBlockName :: String
 entryBlockName = "entry"
 
 runLLVM :: AST.Module -> LLVM a -> AST.Module
 runLLVM mod (LLVM m) = execState m mod
 
-emptyModule :: ShortByteString -> AST.Module
+emptyModule :: String -> AST.Module
 emptyModule label = defaultModule { moduleName = label }
 
 addDefn :: Definition -> LLVM ()
@@ -96,7 +106,12 @@ addDefn d = do
     defs <- gets moduleDefinitions
     modify $ \s -> s { moduleDefinitions = defs ++ [d] }
 
-define :: T.Type -> ShortByteString -> [(T.Type, Name)] -> [BasicBlock] -> LLVM ()
+define
+    :: T.Type
+    -> String
+    -> [(T.Type, Name)]
+    -> [BasicBlock]
+    -> LLVM ()
 define retty label argtys body = addDefn $
     GlobalDefinition $ functionDefaults
     { name = Name label
@@ -105,7 +120,7 @@ define retty label argtys body = addDefn $
     , basicBlocks = body
     }
 
-external :: T.Type -> ShortByteString -> [(T.Type, Name)] -> LLVM ()
+external :: T.Type -> String -> [(T.Type, Name)] -> LLVM ()
 external retty label argtys = addDefn $
     GlobalDefinition $ functionDefaults
     { name        = Name label
@@ -118,7 +133,7 @@ external retty label argtys = addDefn $
 entry :: Codegen Name
 entry = gets currentBlock
 
-addBlock :: ShortByteString -> Codegen Name
+addBlock :: String -> Codegen Name
 addBlock bname = do
     bls <- gets blocks
     ix <- gets blockCount
@@ -173,16 +188,16 @@ current = do
 fresh :: Codegen Word
 fresh = do
     i <- gets count
-    modify $ \s -> s { count = 1 + 1 }
+    modify $ \s -> s { count = i + 1 }
     return $ i + 1
 
-type Names = Map.Map ShortByteString Int
+type Names = Map.Map String Int
 
-uniqueName :: ShortByteString -> Names -> (ShortByteString, Names)
+uniqueName :: String -> Names -> (String, Names)
 uniqueName nm ns =
     case Map.lookup nm ns of
         Nothing -> (nm, Map.insert nm 1 ns)
-        Just ix -> (nm <> (fromString $ show ix), Map.insert nm (ix + 1) ns)
+        Just ix -> (nm <> (show ix), Map.insert nm (ix + 1) ns)
 
 local :: Name -> Operand
 local = LocalReference double
@@ -190,12 +205,12 @@ local = LocalReference double
 externf :: Name -> Operand
 externf = ConstantOperand . C.GlobalReference double
 
-assign :: ShortByteString -> Operand -> Codegen ()
+assign :: String -> Operand -> Codegen ()
 assign var x = do
     lcls <- gets symtab
     modify $ \s -> s { symtab = [(var, x)] ++ lcls }
 
-getvar :: ShortByteString -> Codegen Operand
+getvar :: String -> Codegen Operand
 getvar var = do
     syms <- gets symtab
     case lookup var syms of
@@ -217,6 +232,7 @@ terminator trm = do
     modifyBlock (blk { term = Just trm })
     return trm
 
+-- ** Built-in operators and instructions
 fadd :: Operand -> Operand -> Codegen Operand
 fadd a b = instr $ FAdd NoFastMathFlags a b []
 
@@ -256,20 +272,23 @@ cons = ConstantOperand
 toArgs :: [Operand] -> [(Operand, [A.ParameterAttribute])]
 toArgs = map (\x -> (x, []))
 
+-- ** Code generation
+
 liftError :: ExceptT String IO a -> IO a
 liftError = runExceptT >=> either fail return
 
+-- | Construct LLVM IR for top-level module definitions.
 codegenTop :: LiftedExpr -> LLVM ()
-codegenTop (FunL name args body) = define double (fromString name) fnargs bls
+codegenTop (FunL name args body) = define double name fnargs bls
     where
         fnargs = toSig args
         bls = createBlocks $ execCodegen $ do
             entry <- addBlock entryBlockName
             setBlock entry
-            forM args $ \a -> do
+            forM_ args $ \a -> do
                 var <- alloca double
-                store var (local (AST.Name (fromString a)))
-                assign (fromString a) var
+                store var (local (AST.Name a))
+                assign a var
             cgen body >>= ret
 
 codegenTop exp = define double "main" [] blks
@@ -280,7 +299,7 @@ codegenTop exp = define double "main" [] blks
             cgen exp >>= ret
 
 toSig :: [Symbol] -> [(AST.Type, AST.Name)]
-toSig = fmap (\x -> (double, AST.Name (fromString x)))
+toSig = map (\x -> (double, AST.Name x))
 
 binops = Map.fromList
     [ ("+", fadd)
@@ -289,27 +308,28 @@ binops = Map.fromList
     , ("/", fdiv)
     ]
 
-cgen :: LiftedExpr -> Codegen AST.Operand
+-- | Helper function to actually generate code for various expressions.
+cgen :: LiftedExpr -> Codegen Operand
 cgen (FloatL n) = return $ cons $ C.Float (F.Double n)
-cgen (IdL s) = getvar (fromString s) >>= load
+cgen (IdL s) = getvar s >>= load
 cgen (AppL op erands) = do
     largs <- mapM cgen erands
     case Map.lookup op binops of
-        Nothing ->
-            call (externf (AST.Name (fromString op))) largs
+        Nothing -> do
+            call (externf (AST.Name op)) largs
         Just binop -> do
             binop (largs !! 0) (largs !! 1)
 
 cgen _ = error "You goofed"
 
+-- | Compile lifted expressions into a module.
 codegen :: AST.Module -> [LiftedExpr] -> IO AST.Module
 codegen mod fns = do
     withContext $ \context -> do
-        withModuleFromAST context newast $ \m -> do
+        liftError $ withModuleFromAST context newast $ \m -> do
             llstr <- moduleLLVMAssembly m
-            putStrLn . show $ llstr
+            putStrLn llstr
             return newast
-
     where
         modn = mapM codegenTop fns
         newast = runLLVM mod modn

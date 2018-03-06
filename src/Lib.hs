@@ -8,9 +8,11 @@ module Lib
     , parse_multi
     , removeComments
     , AnnotatedExpr
+    , CoreAst(..)
     , annotated
     , TopLevel(..)
     , Symbol
+    , builtin_syms
       -- * Preprocessing
     , Preprocess(..)
     , preprocess
@@ -30,6 +32,7 @@ module Lib
       -- * Lifted Expressions
     , LiftedExpr(..)
     , liftExpr
+--    , convertClosure
       -- * Codegen
     , codegen
     , emptyModule

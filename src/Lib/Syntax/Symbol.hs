@@ -8,3 +8,8 @@ type Symbol = String
 builtin_syms :: Set Symbol
 builtin_syms = S.fromList
     [ "+", "*", "-", "/", "=?", "<", ">" ]
+
+mangle :: Symbol -> Symbol
+mangle sym
+    | sym == "-" = "-"
+    | otherwise = concatMap (\c -> if c == '-' then "__" else [c]) sym
