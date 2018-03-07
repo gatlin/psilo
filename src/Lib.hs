@@ -32,7 +32,7 @@ module Lib
       -- * Lifted Expressions
     , LiftedExpr(..)
     , liftExpr
---    , convertClosure
+    , convertClosure
       -- * Codegen
     , codegen
     , emptyModule

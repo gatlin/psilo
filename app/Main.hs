@@ -66,10 +66,12 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
                         let scheme = fromJust mScheme
                         putStrLn $ symbol ++ " : " ++ (ushow scheme)
                     let lExprs = liftExpr symbol expr
-                    forM_ lExprs $ putStrLn . show
+                    putStrLn . show $ convertClosure globals expr
                     return lExprs
                 codegen (emptyModule "hey") $ concat exprs
                 return ()
+
+globals = S.toList builtin_syms
 
 process_file :: Text -> Compiler [TopLevel]
 process_file file_contents = do

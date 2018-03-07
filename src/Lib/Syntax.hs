@@ -21,6 +21,7 @@ module Lib.Syntax
     , LiftedExpr(..)
     , liftExpr
     , mangle
+    , convertClosure
 --    , convertClosure
     )
 where

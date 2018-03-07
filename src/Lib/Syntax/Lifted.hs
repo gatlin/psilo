@@ -13,7 +13,7 @@
 module Lib.Syntax.Lifted
 where
 
-import Lib.Syntax.Symbol (Symbol, mangle)
+import Lib.Syntax.Symbol (Symbol, mangle, builtin_syms)
 import Lib.Syntax.Annotated (AnnotatedExpr(..))
 import Lib.Syntax.Core (CoreAst(..))
 import Control.Comonad.Cofree
@@ -21,6 +21,7 @@ import Control.Monad
 import Control.Monad.State
 import Control.Monad.Free
 import Data.ByteString.Short
+import qualified Data.Set as S
 
 -- | Lambda-lifted expression grammar
 data LiftedExpr
@@ -54,7 +55,6 @@ freshName sym = do
     sym' <- gensym
     return $ sym ++ sym'
 
-{-
 without :: Eq a => [a] -> [a] -> [a]
 without = foldr (filter . (/=)) -- Like \\ but remove all occurrences
 
@@ -70,18 +70,19 @@ applyTo e [] = e
 
 convertClosure :: [Symbol] -> AnnotatedExpr () -> AnnotatedExpr ()
 convertClosure globals expr = go expr where
-
     go (() :< FunC args body) =
         let vars = freeVars body `without` (globals ++ args)
         in  (() :< FunC (vars ++ args) body) `applyTo` vars
 
     go expr = expr
--}
+
+globals = S.toList builtin_syms
 
 liftExpr ::  Symbol -> AnnotatedExpr () -> [LiftedExpr]
 liftExpr sym =
-    exprs . ((flip execState) defaultLiftState) . go (Just $ mangle sym) where
+    exprs . ((flip execState) defaultLiftState) . go' (Just $ mangle sym) where
 
+    go' mSym e = go mSym $ convertClosure globals e
     go _ (_ :< FloatC n) = return $ FloatL n
     go _ (_ :< IntC n) = return $ FloatL $ fromIntegral n
     go _ (_ :< BoolC b) = return $ FloatL $ if b then 1.0 else 0.0
@@ -98,13 +99,15 @@ liftExpr sym =
         let funL = FunL name args body'
         exprs' <- gets exprs
         modify $ \s -> s {
-            exprs = exprs' ++ [funL]
+            exprs = funL : exprs'
             }
         return funL
 
     handleOperator :: AnnotatedExpr () -> Lift Symbol
     handleOperator (_ :< IdC s) = return s
     handleOperator f@(_ :< FunC _ _) = do
-        (FunL name args body) <- go Nothing f
+        funL@(FunL name args body) <- go Nothing f
+        exprs' <- gets exprs
+        modify $ \s -> s { exprs = funL : exprs' }
         return name
     handleOperator _ = error "You goofed"
