@@ -2,24 +2,24 @@
 
 module Main where
 
-import Options.Applicative
-import Options.Applicative.Common
-import Data.Monoid ((<>))
-import Data.Maybe (isJust, fromJust)
-import Control.Monad.Except
-import Control.Monad (forM_, mapM, mapM_, foldM, when)
-import Control.Comonad.Cofree
-import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Text.IO as TextIO
-import qualified Data.Set as S
-import Text.Show.Unicode
-import Lib
+import           Control.Comonad.Cofree
+import           Control.Monad              (foldM, forM_, mapM, mapM_, when)
+import           Control.Monad.Except
+import           Data.Maybe                 (fromJust, isJust)
+import           Data.Monoid                ((<>))
+import qualified Data.Set                   as S
+import           Data.Text                  (Text)
+import qualified Data.Text                  as T
+import qualified Data.Text.IO               as TextIO
+import           Lib
+import           Options.Applicative
+import           Options.Applicative.Common
+import           Text.Show.Unicode
 
 data CmdLnOpts = CmdLnOpts
     { inputFile :: Maybe String
 --    , debugOut :: Bool
-    , asmDump :: Bool
+    , asmDump   :: Bool
 --    , execRepl  :: Bool
     } deriving (Show)
 

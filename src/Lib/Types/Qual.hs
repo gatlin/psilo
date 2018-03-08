@@ -1,13 +1,13 @@
 module Lib.Types.Qual where
 
-import Lib.Syntax.Symbol
-import Lib.Types.Kind
-import Lib.Types.Type
-import Lib.Types.Frame
+import           Lib.Syntax.Symbol
+import           Lib.Types.Frame
+import           Lib.Types.Kind
+import           Lib.Types.Type
 
-import Data.List (intercalate)
-import Data.Set (Set)
-import qualified Data.Set as S
+import           Data.List         (intercalate)
+import           Data.Set          (Set)
+import qualified Data.Set          as S
 
 -- | A predicate is an assertion about a type
 data Pred = IsIn Symbol Type deriving (Eq, Ord)

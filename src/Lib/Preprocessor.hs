@@ -13,32 +13,32 @@
 
 module Lib.Preprocessor where
 
-import Lib.Compiler
+import           Lib.Compiler
 
-import Lib.Syntax.Symbol
-import Lib.Syntax.Surface
-import Lib.Syntax.Core
-import Lib.Syntax.Annotated
-import Lib.Syntax.TopLevel
-import Lib.Types.Scheme
+import           Lib.Syntax.Annotated
+import           Lib.Syntax.Core
+import           Lib.Syntax.Surface
+import           Lib.Syntax.Symbol
+import           Lib.Syntax.TopLevel
+import           Lib.Types.Scheme
 
-import Lib.Util
-import Lib.Errors
+import           Lib.Errors
+import           Lib.Util
 
-import Control.Monad (forM, mapM, mapM_, when)
-import Control.Monad.Free
-import Control.Comonad.Cofree
+import           Control.Comonad.Cofree
+import           Control.Monad          (forM, mapM, mapM_, when)
+import           Control.Monad.Free
 
-import Control.Monad.Trans
-import Control.Monad.State
-import Control.Monad.Reader
-import Control.Monad.Except
+import           Control.Monad.Except
+import           Control.Monad.Reader
+import           Control.Monad.State
+import           Control.Monad.Trans
 
-import Data.Map (Map)
-import qualified Data.Map as M
+import           Data.Map               (Map)
+import qualified Data.Map               as M
 
-import Data.Set (Set)
-import qualified Data.Set as S
+import           Data.Set               (Set)
+import qualified Data.Set               as S
 
 type SymbolMap = Map Symbol Symbol
 data PState = PState
@@ -137,7 +137,7 @@ surfaceToTopLevel (Free (DefS sym val)) = do
     uval <- uniqueIds val
     val' <- surfaceToCore uval
     case compile (annotated val') of
-        Left _ -> throwError $ PreprocessError "wut"
+        Left _    -> throwError $ PreprocessError "wut"
         Right ann -> return $ Define sym ann
 
 surfaceToTopLevel (Free (SigS sym scheme)) = return $
@@ -184,7 +184,7 @@ boundVarCheck toplevels = withBoundVars bvs $ mapM_ go toplevels
 
         go :: TopLevel -> Preprocess ()
         go (Define s core) = check core
-        go whatever = return ()
+        go whatever        = return ()
 
         check :: AnnotatedExpr () -> Preprocess ()
         check (() :< (FunC args body)) = do

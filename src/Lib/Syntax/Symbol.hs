@@ -1,6 +1,6 @@
 module Lib.Syntax.Symbol where
 
-import Data.Set (Set)
+import           Data.Set (Set)
 import qualified Data.Set as S
 
 type Symbol = String

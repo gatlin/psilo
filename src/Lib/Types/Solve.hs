@@ -1,26 +1,26 @@
 module Lib.Types.Solve where
 
-import Lib.Syntax.Symbol
-import Lib.Types.Kind (Kind(..), HasKind, kind)
-import Lib.Types.Type (TyVar(..), TyCon(..), Type(..))
-import Lib.Types.Qual
-import Lib.Types.Frame
-import Lib.Types.PredMap
-import Lib.Types.Constraint
+import           Lib.Syntax.Symbol
+import           Lib.Types.Constraint
+import           Lib.Types.Frame
+import           Lib.Types.Kind       (HasKind, Kind (..), kind)
+import           Lib.Types.PredMap
+import           Lib.Types.Qual
+import           Lib.Types.Type       (TyCon (..), TyVar (..), Type (..))
 
-import Data.Map (Map)
-import qualified Data.Map as M
-import Data.Set (Set)
-import qualified Data.Set as S
+import           Data.Map             (Map)
+import qualified Data.Map             as M
+import           Data.Set             (Set)
+import qualified Data.Set             as S
 
-import Control.Monad.State
-import Control.Monad.Except
-import Control.Monad
-import Data.Either (either)
-import Data.List (nub, sort)
+import           Control.Monad
+import           Control.Monad.Except
+import           Control.Monad.State
+import           Data.Either          (either)
+import           Data.List            (nub, sort)
 
-import Lib.Compiler
-import Lib.Errors
+import           Lib.Compiler
+import           Lib.Errors
 
 type Unifier = (Frame, [Constraint])
 
@@ -28,9 +28,9 @@ emptyUnifier :: Unifier
 emptyUnifier = (mempty, [])
 
 data SolveState = SolveState
-    { frame :: Frame
+    { frame       :: Frame
     , constraints :: [Constraint]
-    , predMap :: PredMap
+    , predMap     :: PredMap
     }
 
 initSolveState :: SolveState
@@ -46,11 +46,11 @@ runSolve s st = compile (evalStateT s st)
 
 -- | Unification of two 'Type's
 unify :: Type -> Type -> Solve Unifier
-unify t1 t2 | t1 == t2 = return emptyUnifier
-unify (TVar v) t = v `bind` t
-unify t (TVar v) = v `bind` t
+unify t1 t2               | t1 == t2 = return emptyUnifier
+unify (TVar v) t          = v `bind` t
+unify t (TVar v)          = v `bind` t
 unify (TFun as) (TFun bs) = unifyMany as bs
-unify t1 t2 = throwError $ UnificationFail t1 t2
+unify t1 t2               = throwError $ UnificationFail t1 t2
 
 -- | Unification of a list of 'Type's.
 unifyMany :: [Type] -> [Type] -> Solve Unifier
@@ -63,10 +63,10 @@ unifyMany t1 t2 = throwError $ UnificationMismatch t1 t2
 
 -- | Determine if two types match. Similar to unification.
 match :: Type -> Type -> Solve Unifier
-match t1 t2 | t1 == t2 = return emptyUnifier
-match (TVar v) t | (kind v) == (kind t) = return (v |-> t, [])
+match t1 t2               | t1 == t2 = return emptyUnifier
+match (TVar v) t          | (kind v) == (kind t) = return (v |-> t, [])
 match (TFun as) (TFun bs) = matchMany as bs
-match t1 t2 = throwError $ OtherTypeError "Error matching types"
+match t1 t2               = throwError $ OtherTypeError "Error matching types"
 
 matchMany :: [Type] -> [Type] -> Solve Unifier
 matchMany [] [] = return emptyUnifier

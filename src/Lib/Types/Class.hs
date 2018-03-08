@@ -1,23 +1,24 @@
+{-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 module Lib.Types.Class where
 
-import Lib.Syntax.Symbol
-import Lib.Types.Kind (Kind(..), HasKind)
-import Lib.Types.Type (TyVar(..), TyCon(..), Type(..))
-import Lib.Types.Qual (Pred(..), Qual(..))
-import Lib.Types.Solve (Solve, initSolveState, runSolve, unify, Unifier)
+import           Lib.Syntax.Symbol
+import           Lib.Types.Kind        (HasKind, Kind (..))
+import           Lib.Types.Qual        (Pred (..), Qual (..))
+import           Lib.Types.Solve       (Solve, Unifier, initSolveState,
+                                        runSolve, unify)
+import           Lib.Types.Type        (TyCon (..), TyVar (..), Type (..))
 
-import Data.Map (Map)
-import qualified Data.Map as M
-import Data.Monoid
-import Data.Maybe
+import           Data.Map              (Map)
+import qualified Data.Map              as M
+import           Data.Maybe
+import           Data.Monoid
 
-import Data.Functor.Identity
+import           Data.Functor.Identity
 
-import Lib.Compiler
-import Lib.Errors
+import           Lib.Compiler
+import           Lib.Errors
 
 -- | A typeclass instance is a qualified predicate
 type Inst = Qual Pred
@@ -87,7 +88,7 @@ addInst ps p@(IsIn sym t) = EnvT go where
 -- | Make sure two predicates do not overlap
 overlap :: Pred -> Pred -> Bool
 overlap (IsIn _ t1) (IsIn _ t2) = case runSolve u st of
-    Left _ -> False
+    Left _  -> False
     Right _ -> True
     where st = initSolveState
           u :: Solve Unifier

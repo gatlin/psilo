@@ -2,16 +2,16 @@
 
 module Lib.Types.PredMap where
 
-import Lib.Syntax.Symbol
-import Lib.Types.Type (TyVar(..), Type(..))
-import Lib.Types.Qual
-import Lib.Types.Frame
+import           Lib.Syntax.Symbol
+import           Lib.Types.Frame
+import           Lib.Types.Qual
+import           Lib.Types.Type    (TyVar (..), Type (..))
 
-import Data.List (nub)
-import Data.Map (Map)
-import qualified Data.Map as M
-import Data.Set (Set)
-import qualified Data.Set as S
+import           Data.List         (nub)
+import           Data.Map          (Map)
+import qualified Data.Map          as M
+import           Data.Set          (Set)
+import qualified Data.Set          as S
 
 newtype PredMap = PMap (Map Type [Pred])
     deriving (Monoid, Show)
@@ -34,7 +34,7 @@ instance TypeLike PredMap where
 -- | Insert (or merge) a list of predicates into a `PredMap`
 updatePredMap :: Type -> [Pred] -> PredMap -> PredMap
 updatePredMap ty ps (PMap m) = PMap $ case M.lookup ty m of
-    Nothing -> M.insert ty ps m
+    Nothing  -> M.insert ty ps m
     Just ps' -> M.insert ty (nub $ (ps ++ ps')) m
 
 -- | Lookup the list of predicates associated with a type

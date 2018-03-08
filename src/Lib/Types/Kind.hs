@@ -6,7 +6,7 @@ data Kind
     deriving (Eq, Ord)
 
 instance Show Kind where
-    show (Star) = "*"
+    show (Star)    = "*"
     show (a :-> b) = (show a) ++ " -> " ++ (show b)
 
 -- | Any thing which is assigned a 'Kind'

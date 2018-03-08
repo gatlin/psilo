@@ -40,11 +40,11 @@ module Lib
     , PsiloError(..)
     ) where
 
-import Lib.Parser
-import Lib.Syntax
-import Lib.Compiler
-import Lib.Preprocessor
-import Lib.Errors
-import Lib.Types
-import Lib.Util
-import Lib.Codegen
+import           Lib.Codegen
+import           Lib.Compiler
+import           Lib.Errors
+import           Lib.Parser
+import           Lib.Preprocessor
+import           Lib.Syntax
+import           Lib.Types
+import           Lib.Util

@@ -1,6 +1,6 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFunctor    #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies     #-}
 
 -- |
 -- Module     : Lib.Syntax.Lifted
@@ -13,15 +13,15 @@
 module Lib.Syntax.Lifted
 where
 
-import Lib.Syntax.Symbol (Symbol, mangle, builtin_syms)
-import Lib.Syntax.Annotated (AnnotatedExpr(..))
-import Lib.Syntax.Core (CoreAst(..))
-import Control.Comonad.Cofree
-import Control.Monad
-import Control.Monad.State
-import Control.Monad.Free
-import Data.ByteString.Short
-import qualified Data.Set as S
+import           Control.Comonad.Cofree
+import           Control.Monad
+import           Control.Monad.Free
+import           Control.Monad.State
+import           Data.ByteString.Short
+import qualified Data.Set               as S
+import           Lib.Syntax.Annotated   (AnnotatedExpr (..))
+import           Lib.Syntax.Core        (CoreAst (..))
+import           Lib.Syntax.Symbol      (Symbol, builtin_syms, mangle)
 
 -- | Lambda-lifted expression grammar
 data LiftedExpr
@@ -34,7 +34,7 @@ data LiftedExpr
 -- | The state we manage while constructing a set of lifted expressions.
 data LiftState = LiftState
     { uniqueId :: Int
-    , exprs :: [LiftedExpr]
+    , exprs    :: [LiftedExpr]
     }
 
 defaultLiftState :: LiftState
@@ -59,14 +59,14 @@ without :: Eq a => [a] -> [a] -> [a]
 without = foldr (filter . (/=)) -- Like \\ but remove all occurrences
 
 freeVars :: AnnotatedExpr a -> [Symbol]
-freeVars (_ :< IdC s) = [s]
+freeVars (_ :< IdC s)          = [s]
 freeVars (_ :< AppC op erands) = (freeVars op) ++ (concatMap freeVars erands)
 freeVars (_ :< FunC args body) = (freeVars body) `without` args
-freeVars _ = []
+freeVars _                     = []
 
 applyTo :: AnnotatedExpr () -> [Symbol] -> AnnotatedExpr ()
 applyTo e (s : ss) = applyTo (() :< (AppC e [(() :< IdC s)])) ss
-applyTo e [] = e
+applyTo e []       = e
 
 convertClosure :: [Symbol] -> AnnotatedExpr () -> AnnotatedExpr ()
 convertClosure globals expr = go expr where
@@ -94,7 +94,7 @@ liftExpr sym =
     go mSym (_ :< FunC args body) = do
         name <- case mSym of
             Just sym' -> return sym'
-            Nothing -> freshName sym
+            Nothing   -> freshName sym
         body' <- go Nothing body
         let funL = FunL name args body'
         exprs' <- gets exprs

@@ -26,25 +26,25 @@ module Lib.Syntax
     )
 where
 
-import Lib.Syntax.Symbol
-import Lib.Syntax.Core
-import Lib.Syntax.Surface
-import Lib.Syntax.Annotated
-import Lib.Syntax.TopLevel
-import Lib.Syntax.Lifted
+import           Lib.Syntax.Annotated
+import           Lib.Syntax.Core
+import           Lib.Syntax.Lifted
+import           Lib.Syntax.Surface
+import           Lib.Syntax.Symbol
+import           Lib.Syntax.TopLevel
 
-import Lib.Types.Scheme
-import Lib.Types.Qual
-import Lib.Types.Type
-import Lib.Types.Kind
-import Lib.Types.TypeEnv (TypeEnv(..), generalize)
+import           Lib.Types.Kind
+import           Lib.Types.Qual
+import           Lib.Types.Scheme
+import           Lib.Types.Type
+import           Lib.Types.TypeEnv      (TypeEnv (..), generalize)
 
-import Control.Monad (join)
-import Control.Monad.Free
-import Control.Monad.State
-import Control.Comonad.Cofree
-import Data.Map (Map)
-import qualified Data.Map as M
+import           Control.Comonad.Cofree
+import           Control.Monad          (join)
+import           Control.Monad.Free
+import           Control.Monad.State
+import           Data.Map               (Map)
+import qualified Data.Map               as M
 
 -- | ROADMAP
 -- 1. Convert each bound symbol into a unique symbol in expressions.

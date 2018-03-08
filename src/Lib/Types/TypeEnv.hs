@@ -2,19 +2,19 @@
 
 module Lib.Types.TypeEnv where
 
-import Lib.Syntax.Symbol
-import Lib.Types.Kind
-import Lib.Types.Type
-import Lib.Types.Qual
-import Lib.Types.Frame
-import Lib.Types.Scheme
+import           Lib.Syntax.Symbol
+import           Lib.Types.Frame
+import           Lib.Types.Kind
+import           Lib.Types.Qual
+import           Lib.Types.Scheme
+import           Lib.Types.Type
 
-import Data.List (sort)
+import           Data.List         (sort)
 
-import Data.Map (Map)
-import qualified Data.Map as M
-import Data.Set (Set)
-import qualified Data.Set as S
+import           Data.Map          (Map)
+import qualified Data.Map          as M
+import           Data.Set          (Set)
+import qualified Data.Set          as S
 
 newtype TypeEnv = TypeEnv (Map Symbol Scheme) deriving (Show)
 

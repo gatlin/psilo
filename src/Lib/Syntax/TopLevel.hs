@@ -1,9 +1,9 @@
 module Lib.Syntax.TopLevel where
 
-import Lib.Syntax.Symbol
-import Lib.Types.Scheme
-import Lib.Syntax.Core
-import Lib.Syntax.Annotated
+import           Lib.Syntax.Annotated
+import           Lib.Syntax.Core
+import           Lib.Syntax.Symbol
+import           Lib.Types.Scheme
 
 -- | Top level syntax forms
 -- Eventually we want to support the following:

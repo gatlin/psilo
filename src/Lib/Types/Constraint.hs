@@ -1,12 +1,12 @@
 module Lib.Types.Constraint where
 
-import Lib.Syntax (Symbol)
-import Lib.Types.Type
-import Lib.Types.Qual
-import Lib.Types.Frame
+import           Lib.Syntax      (Symbol)
+import           Lib.Types.Frame
+import           Lib.Types.Qual
+import           Lib.Types.Type
 
-import Data.Set (Set)
-import qualified Data.Set as S
+import           Data.Set        (Set)
+import qualified Data.Set        as S
 
 -- | An equality constraint for two types for type inference.
 data Constraint

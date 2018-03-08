@@ -1,14 +1,14 @@
 module Lib.Syntax.Annotated where
 
-import Lib.Compiler
-import Lib.Errors
-import Lib.Syntax.Symbol
-import Lib.Syntax.Core
-import Lib.Syntax.Surface (SurfaceExpr (), SurfaceAst)
-import Control.Monad.Free
-import Control.Comonad
-import Control.Comonad.Cofree
-import Data.Traversable
+import           Control.Comonad
+import           Control.Comonad.Cofree
+import           Control.Monad.Free
+import           Data.Traversable
+import           Lib.Compiler
+import           Lib.Errors
+import           Lib.Syntax.Core
+import           Lib.Syntax.Surface     (SurfaceAst, SurfaceExpr ())
+import           Lib.Syntax.Symbol
 
 -- | Annotated Expressions
 -- An annotated expression is a 'CoreExpr' inverted, with every branch

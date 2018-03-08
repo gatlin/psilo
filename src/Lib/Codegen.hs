@@ -1,5 +1,5 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings          #-}
 
 {-| Keeping with the theme that I'm just ripping off Stephen Diehl, this is a
 nascent attempt at an LLVM code generator.
@@ -7,45 +7,43 @@ nascent attempt at an LLVM code generator.
 
 module Lib.Codegen where
 
-import Data.Semigroup ((<>))
+import           Data.Semigroup                  ((<>))
 
-import Data.Word
-import Data.String
-import Data.List
-import Data.Function
-import qualified Data.Map as Map
+import           Data.Function
+import           Data.List
+import qualified Data.Map                        as Map
+import           Data.String
+import           Data.Word
 
-import Control.Monad.State
-import Control.Monad.Except
-import Control.Monad.IO.Class
-import Control.Applicative
-import Control.Monad.Free
+import           Control.Applicative
+import           Control.Monad.Except
+import           Control.Monad.Free
+import           Control.Monad.IO.Class
+import           Control.Monad.State
 
-import Control.Comonad.Cofree
+import           Control.Comonad.Cofree
 
-import LLVM.Module
-import LLVM.Context
-import LLVM.AST
-import LLVM.AST.Global
-import qualified LLVM.AST as AST
+import           LLVM.AST
+import qualified LLVM.AST                        as AST
+import           LLVM.AST.Global
+import           LLVM.Context
+import           LLVM.Module
 
-import qualified LLVM.AST.Linkage as L
-import qualified LLVM.AST.Constant as C
-import qualified LLVM.AST.Attribute as A
-import qualified LLVM.AST.CallingConvention as CC
+import qualified LLVM.AST.Attribute              as A
+import qualified LLVM.AST.CallingConvention      as CC
+import qualified LLVM.AST.Constant               as C
+import qualified LLVM.AST.Float                  as F
 import qualified LLVM.AST.FloatingPointPredicate as FP
-import qualified LLVM.AST.Type as T
-import qualified LLVM.AST.Float as F
+import qualified LLVM.AST.Linkage                as L
+import qualified LLVM.AST.Type                   as T
 
-import Data.ByteString.Short
-import qualified Data.ByteString.Char8 as C8
+import qualified Data.ByteString.Char8           as C8
+import           Data.ByteString.Short
 
-import Lib.Syntax ( Symbol
-                  , AnnotatedExpr(..)
-                  , TopLevel(..)
-                  , CoreAst(..)
-                  , LiftedExpr(..)
-                  , liftExpr)
+import           Lib.Syntax                      (AnnotatedExpr (..),
+                                                  CoreAst (..), LiftedExpr (..),
+                                                  Symbol, TopLevel (..),
+                                                  liftExpr)
 
 -- | For now, our only data type (lol)
 double :: Type
@@ -56,17 +54,17 @@ type SymbolTable = [(String, Operand)]
 
 data CodegenState = CodegenState
     { currentBlock :: Name
-    , blocks :: Map.Map Name BlockState
-    , symtab :: SymbolTable
-    , blockCount :: Int
-    , count :: Word
-    , names :: Names
+    , blocks       :: Map.Map Name BlockState
+    , symtab       :: SymbolTable
+    , blockCount   :: Int
+    , count        :: Word
+    , names        :: Names
     } deriving ( Show )
 
 data BlockState = BlockState
-    { idx :: Int
+    { idx   :: Int
     , stack :: [ Named Instruction ]
-    , term :: Maybe (Named Terminator)
+    , term  :: Maybe (Named Terminator)
     } deriving ( Show )
 
 -- | The code generation monad.
@@ -167,7 +165,7 @@ makeBlock :: (Name, BlockState) -> BasicBlock
 makeBlock (l, (BlockState _ s t)) = BasicBlock l (reverse s) (maketerm t)
   where
     maketerm (Just x) = x
-    maketerm Nothing = error $ "Block has no terminator: " ++ (show l)
+    maketerm Nothing  = error $ "Block has no terminator: " ++ (show l)
 
 sortBlocks :: [(Name, BlockState)] -> [(Name, BlockState)]
 sortBlocks = sortBy (compare `on` (idx . snd))
@@ -182,7 +180,7 @@ current = do
     c <- gets currentBlock
     blks <- gets blocks
     case Map.lookup c blks of
-        Just x -> return x
+        Just x  -> return x
         Nothing -> error $ "No such block: " ++ (show c)
 
 fresh :: Codegen Word
@@ -214,7 +212,7 @@ getvar :: String -> Codegen Operand
 getvar var = do
     syms <- gets symtab
     case lookup var syms of
-        Just x -> return x
+        Just x  -> return x
         Nothing -> error $ "Local variable not in scope: " ++ (show var)
 
 instr :: Instruction -> Codegen (Operand)

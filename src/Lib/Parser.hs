@@ -2,24 +2,24 @@
 
 module Lib.Parser where
 
-import Prelude hiding (takeWhile)
-import Data.Text (Text)
-import qualified Data.Text as Text
-import Data.Attoparsec.Text
-import Control.Applicative
-import Data.Char (isDigit, isAlpha, ord)
-import Control.Monad (join)
-import Control.Monad.Free
-import Control.Monad.Except
-import Lib.Compiler
-import Lib.Syntax.Surface
-import Lib.Util
-import Lib.Errors
-import Lib.Types.Scheme
-import Lib.Types.Qual
-import Lib.Types.Type
-import Lib.Types.Kind
-import Lib.Types.Type (tyFun)
+import           Control.Applicative
+import           Control.Monad        (join)
+import           Control.Monad.Except
+import           Control.Monad.Free
+import           Data.Attoparsec.Text
+import           Data.Char            (isAlpha, isDigit, ord)
+import           Data.Text            (Text)
+import qualified Data.Text            as Text
+import           Lib.Compiler
+import           Lib.Errors
+import           Lib.Syntax.Surface
+import           Lib.Types.Kind
+import           Lib.Types.Qual
+import           Lib.Types.Scheme
+import           Lib.Types.Type
+import           Lib.Types.Type       (tyFun)
+import           Lib.Util
+import           Prelude              hiding (takeWhile)
 
 -- String hashing, for getting a unique Int from type variables
 string_hash :: String -> Int
@@ -242,7 +242,7 @@ parse_expr
 parse_expr t = do
     result <- parse_expr' t
     case result of
-        Left err -> throwError $ ParserError err
+        Left err      -> throwError $ ParserError err
         Right result' -> return result'
 
 parse_multi' inp = do
@@ -256,7 +256,7 @@ parse_multi
 parse_multi t = do
     result <- parse_multi' t
     case result of
-        Left err -> throwError $ ParserError err
+        Left err      -> throwError $ ParserError err
         Right result' -> return result'
 
 -- | Remove ";" comments from source code

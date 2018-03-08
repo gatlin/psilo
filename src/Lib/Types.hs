@@ -25,59 +25,45 @@ where
 -- It has been modified for a slightly different type and more flexible type
 -- grammar.
 
-import Control.Monad
-    ( forM_
-    , forM
-    , foldM
-    , liftM2
-    , zipWithM
-    , mapAndUnzipM
-    , guard
-    , unless
-    )
-import Control.Monad.Except
-import Control.Monad.Free
-import Control.Comonad (extend, extract, (=>>))
-import Control.Comonad.Cofree (Cofree(..))
-import Data.Maybe (isNothing, fromMaybe, fromJust, isJust)
-import Data.Monoid ((<>))
+import           Control.Comonad        (extend, extract, (=>>))
+import           Control.Comonad.Cofree (Cofree (..))
+import           Control.Monad          (foldM, forM, forM_, guard, liftM2,
+                                         mapAndUnzipM, unless, zipWithM)
+import           Control.Monad.Except
+import           Control.Monad.Free
+import           Data.Maybe             (fromJust, fromMaybe, isJust, isNothing)
+import           Data.Monoid            ((<>))
 
-import Data.Map (Map)
-import qualified Data.Map.Lazy as M
+import           Data.Map               (Map)
+import qualified Data.Map.Lazy          as M
 
-import Data.Graph (Graph, Vertex)
-import Data.Tree (flatten)
-import qualified Data.Graph as G
-import qualified Data.Text as T
+import           Data.Graph             (Graph, Vertex)
+import qualified Data.Graph             as G
+import qualified Data.Text              as T
+import           Data.Tree              (flatten)
 
-import Data.List (sort, sortBy)
-import Data.Ord (Ordering(..))
+import           Data.List              (sort, sortBy)
+import           Data.Ord               (Ordering (..))
 
-import Lib.Syntax ( Symbol
-                  , CoreExpr
-                  , CoreAst(..)
-                  , TopLevel(..)
-                  , SurfaceExpr
-                  , SurfaceAst(..)
-                  , AnnotatedExpr
-                  , annotated
-                  )
+import           Lib.Syntax             (AnnotatedExpr, CoreAst (..), CoreExpr,
+                                         SurfaceAst (..), SurfaceExpr, Symbol,
+                                         TopLevel (..), annotated)
 
-import Lib.Types.Kind
-import Lib.Types.Type
-import Lib.Types.Class
-import Lib.Types.Frame
-import Lib.Types.Qual
-import Lib.Types.Constraint
-import Lib.Types.PredMap
-import Lib.Types.Scheme
-import Lib.Types.TypeEnv
-import Lib.Types.Infer
-import Lib.Types.Solve hiding (predMap)
+import           Lib.Types.Class
+import           Lib.Types.Constraint
+import           Lib.Types.Frame
+import           Lib.Types.Infer
+import           Lib.Types.Kind
+import           Lib.Types.PredMap
+import           Lib.Types.Qual
+import           Lib.Types.Scheme
+import           Lib.Types.Solve        hiding (predMap)
+import           Lib.Types.Type
+import           Lib.Types.TypeEnv
 
-import Lib.Compiler
-import Lib.Parser (parse_expr, parse_multi)
-import Lib.Errors
+import           Lib.Compiler
+import           Lib.Errors
+import           Lib.Parser             (parse_expr, parse_multi)
 
 -- * Defaults
 
@@ -200,7 +186,7 @@ deps :: [(Symbol, AnnotatedExpr ())] -> AnnotatedExpr () -> [Symbol]
 deps xs expr = go expr where
     go (() :< (IdC sym)) = case lookup sym xs of
         Nothing -> []
-        Just _ -> [sym]
+        Just _  -> [sym]
 
     go (() :< (AppC op erands)) = (go op) ++ (concatMap go erands)
     go (() :< (FunC _ body)) = go body
@@ -210,7 +196,7 @@ deps xs expr = go expr where
 -- http://dev.stephendiehl.com/hask/#graphs
 
 data Grph node key = Grph
-  { _graph :: Graph
+  { _graph    :: Graph
   , _vertices :: Vertex -> (node, key, [key])
   }
 

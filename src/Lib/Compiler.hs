@@ -8,9 +8,9 @@ module Lib.Compiler
     )
 where
 
-import Lib.Errors
-import Control.Monad.Except
-import Control.Monad.Writer
+import           Control.Monad.Except
+import           Control.Monad.Writer
+import           Lib.Errors
 
 type Log = [String]
 

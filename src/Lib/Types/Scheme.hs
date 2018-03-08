@@ -1,18 +1,18 @@
 module Lib.Types.Scheme where
 
-import Prelude hiding (lookup)
-import qualified Prelude as Prelude
-import Lib.Syntax.Symbol
-import Lib.Types.Kind
-import Lib.Types.Type (TyVar(..), Type(..))
-import Lib.Types.Qual
-import Lib.Types.Frame
+import           Lib.Syntax.Symbol
+import           Lib.Types.Frame
+import           Lib.Types.Kind
+import           Lib.Types.Qual
+import           Lib.Types.Type    (TyVar (..), Type (..))
+import           Prelude           hiding (lookup)
+import qualified Prelude           as Prelude
 
-import Data.List (nub, lookup, intercalate)
-import Data.Set (Set)
-import qualified Data.Set as S
-import Data.Map (Map)
-import qualified Data.Map as M
+import           Data.List         (intercalate, lookup, nub)
+import           Data.Map          (Map)
+import qualified Data.Map          as M
+import           Data.Set          (Set)
+import qualified Data.Set          as S
 
 -- | A polymorphic, universally quantified type at the top-level scope
 data Scheme = Forall [TyVar] (Qual Type) deriving (Eq, Ord)
@@ -35,7 +35,7 @@ normalize (Forall _ (ps :=> t)) = Forall (map snd ord) (ps' :=> (normtype t))
         normtype (TFun ts) = TFun $ map normtype ts
         normtype (TSym sym) = TSym sym
         normtype (TVar tv ) = case Prelude.lookup tv ord of
-            Just x -> TVar x
+            Just x  -> TVar x
             Nothing -> error "type variable not in signature"
 
 

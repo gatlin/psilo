@@ -2,41 +2,41 @@
 
 module Lib.Types.Infer where
 
-import Lib.Syntax.Symbol
-import Lib.Syntax.Annotated
-import Lib.Syntax.Core
+import           Lib.Syntax.Annotated
+import           Lib.Syntax.Core
+import           Lib.Syntax.Symbol
 
-import Lib.Types.Kind
-import Lib.Types.Type
-import Lib.Types.Qual
-import Lib.Types.Frame
-import Lib.Types.Scheme
-import Lib.Types.TypeEnv
-import Lib.Types.Constraint
-import Lib.Types.PredMap
+import           Lib.Types.Constraint
+import           Lib.Types.Frame
+import           Lib.Types.Kind
+import           Lib.Types.PredMap
+import           Lib.Types.Qual
+import           Lib.Types.Scheme
+import           Lib.Types.Type
+import           Lib.Types.TypeEnv
 
-import Lib.Compiler
-import Lib.Errors
+import           Lib.Compiler
+import           Lib.Errors
 
-import Data.Map (Map)
-import qualified Data.Map as M
-import Data.Set (Set)
-import qualified Data.Set as S
+import           Data.Map               (Map)
+import qualified Data.Map               as M
+import           Data.Set               (Set)
+import qualified Data.Set               as S
 
-import Control.Monad
-import Control.Monad.State
-import Control.Monad.Writer
-import Control.Monad.Except
-import Control.Monad.Reader
-import Data.Functor.Identity
+import           Control.Monad
+import           Control.Monad.Except
+import           Control.Monad.Reader
+import           Control.Monad.State
+import           Control.Monad.Writer
+import           Data.Functor.Identity
 
-import Control.Comonad
-import Control.Comonad.Cofree
+import           Control.Comonad
+import           Control.Comonad.Cofree
 
 -- | The state we need to mutate during type inference
 data InferState = InferState
     { varCount :: Int -- ^ monotonically increasing type ID number
-    , predMap :: PredMap
+    , predMap  :: PredMap
     } deriving (Show)
 
 initInferState :: InferState

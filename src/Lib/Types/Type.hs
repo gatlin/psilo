@@ -1,12 +1,12 @@
 module Lib.Types.Type where
 
-import Lib.Syntax.Symbol
-import Lib.Types.Kind
-import Data.List (intercalate)
-import Data.Map (Map)
-import qualified Data.Map as M
-import Data.Set (Set)
-import qualified Data.Set as S
+import           Data.List         (intercalate)
+import           Data.Map          (Map)
+import qualified Data.Map          as M
+import           Data.Set          (Set)
+import qualified Data.Set          as S
+import           Lib.Syntax.Symbol
+import           Lib.Types.Kind
 
 -- | A type variable is a unique identifier of some sort and a 'Kind'
 data TyVar = TyVar Int Kind deriving (Eq, Ord)
@@ -45,7 +45,7 @@ data Type
 
 parensShow :: Type -> String
 parensShow ty@(TFun ts) = "(" ++ (show ty) ++ ")"
-parensShow ty = show ty
+parensShow ty           = show ty
 
 instance Show Type where
     show (TVar n) = show n
@@ -57,8 +57,8 @@ instance Show Type where
         go ts' = intercalate " " $ map parensShow ts'
 
 instance HasKind Type where
-    kind (TSym tc) = kind tc
-    kind (TVar tv) = kind tv
+    kind (TSym tc)     = kind tc
+    kind (TVar tv)     = kind tv
     kind (TFun (t:ts)) = Star -- FIXME NOT ALWAYS
 
 typeInt, typeBool, typeFloat :: Type
