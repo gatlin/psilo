@@ -97,10 +97,11 @@ fresh k = do
 
 -- | Instantiate a type scheme into a qualified type
 instantiate :: Scheme -> Infer (Qual Type)
-instantiate (Forall vs t) = do
+instantiate (Scheme (ps :=> (TForall vs t))) = do
     vs' <- mapM (const $ fresh Star) vs >>= mapM (return . TVar)
     let frame = M.fromList $ zip vs vs'
-    return $ substitute frame t
+    return $ substitute frame (ps :=> t)
+instantiate (Scheme qt) = return qt
 
 -- | Constraint generation and type generation
 infer :: AnnotatedExpr () -> Infer Type
@@ -130,7 +131,7 @@ infer (_ :< IdC sym) = do
 infer (_ :< FunC args body) = do
     (argVars, argScms) <- mapAndUnzipM (\arg -> do
         var <- fresh Star >>= return . TVar
-        return (var, Forall [] ([] :=> var))) args
+        return (var, Scheme ([] :=> (TForall [] var)))) args
     br <- withEnv (zip args argScms) $ infer body
     let fun_ty = TFun $ tyFun : (argVars ++ [br])
     return fun_ty

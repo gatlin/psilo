@@ -68,7 +68,7 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
                     let lExprs = liftExpr symbol expr
                     putStrLn . show $ convertClosure globals expr
                     return lExprs
-                codegen (emptyModule "hey") $ concat exprs
+                --codegen (emptyModule "hey") $ concat exprs
                 return ()
 
 globals = S.toList builtin_syms

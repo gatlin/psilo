@@ -15,38 +15,36 @@ import           Data.Set          (Set)
 import qualified Data.Set          as S
 
 -- | A polymorphic, universally quantified type at the top-level scope
-data Scheme = Forall [TyVar] (Qual Type) deriving (Eq, Ord)
+data Scheme = Scheme (Qual Type) deriving (Eq, Ord)
 
--- | Substitute type variables in a 'Scheme' with variables starting at 0
 normalize :: Scheme -> Scheme
-normalize (Forall _ (ps :=> t)) = Forall (map snd ord) (ps' :=> (normtype t))
+normalize (Scheme (ps :=> (TForall vs t))) =
+    Scheme (ps' :=> (TForall (map snd ord) (normtype t)))
     where
         ord = zip (nub $ fv t) (map (\n -> TyVar n Star) [0..])
-
-        find_pred (IsIn sym (TVar t)) = maybe
-                                        (error $ "non-existent type variable: " ++ (show t))
-                                        (\x -> (IsIn sym (TVar x)))
-                                        (Prelude.lookup t ord)
+        find_pred (IsIn sym (TVar t)) =
+            maybe (error $ "non-existent type variable: " ++ (show t))
+            (\x -> (IsIn sym (TVar x)))
+            (Prelude.lookup t ord)
 
         find_pred pred = pred
         ps' = map find_pred ps
         fv = reverse . S.toList . ftv
 
+        normtype (TForall _ t') = normtype t'
         normtype (TFun ts) = TFun $ map normtype ts
         normtype (TSym sym) = TSym sym
         normtype (TVar tv ) = case Prelude.lookup tv ord of
             Just x  -> TVar x
             Nothing -> error "type variable not in signature"
 
+normalize scm = scm
 
 instance Show Scheme where
-    show (Forall vars t) = prefix ++ (show t)
-        where vars' = intercalate " " $ map show vars
-              prefix = if (length vars) > 0 then "∀ " ++ vars' ++ ". "
-                                            else ""
+    show (Scheme t) = show t
 
 instance TypeLike Scheme where
-    ftv (Forall vars t) = (ftv t) `S.difference` (S.fromList vars)
+    ftv (Scheme t) = (ftv t)
 
-    substitute frame (Forall vars t) = Forall vars $
-        substitute (foldr M.delete frame vars) t
+    substitute frame (Scheme t) = Scheme $
+        substitute frame t

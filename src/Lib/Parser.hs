@@ -162,7 +162,7 @@ scheme_parser = (parens pred_type) <|> bare_type where
         skipSpace
         t <- type_parser
         skipSpace
-        return $ Forall [] (preds :=> t)
+        return $ Scheme (preds :=> (TForall [] t))
 
     pred :: Parser Pred
     pred = parens $ do
@@ -176,7 +176,7 @@ scheme_parser = (parens pred_type) <|> bare_type where
     bare_type :: Parser Scheme
     bare_type = do
         t <- type_parser
-        return $ Forall [] ([] :=> t)
+        return $ Scheme ([] :=> (TForall [] t))
 
 type_parser :: Parser Type
 type_parser = do

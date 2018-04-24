@@ -49,10 +49,13 @@ instance TypeLike a => TypeLike [a] where
     substitute = map . substitute
 
 instance TypeLike Type where
-    ftv (TVar n)  = S.singleton n
-    ftv (TFun ts) = foldl (<>) mempty $ fmap ftv ts
-    ftv _         = mempty
+    ftv (TForall vs t) = (ftv t) `S.difference` (S.fromList vs)
+    ftv (TVar n)       = S.singleton n
+    ftv (TFun ts)      = foldl (<>) mempty $ fmap ftv ts
+    ftv _              = mempty
 
+    substitute frame (TForall vs t) = TForall vs $
+        substitute (foldr M.delete frame vs) t
     substitute frame (TVar u) = case M.lookup u frame of
         Just t  -> t
         Nothing -> TVar u

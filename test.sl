@@ -1,4 +1,6 @@
-(= (five-1) 5)
-(= five-2 5)
-(= five-3 (five-1))
-(= five-4 (five-2))
+(= (square x) (* x x))
+(= three 3)
+(= nine (square three))
+
+(= (compose f g)
+  (\ (x) (f (g x))))

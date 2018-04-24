@@ -154,9 +154,9 @@ typecheck_pass ce te (sym, expr) = do
     return (te' <> te)
 
 checkTypeEnv :: Symbol -> Scheme -> TypeEnv -> Compiler ()
-checkTypeEnv sym s1@(Forall _ (_ :=> t1)) tyEnv = case envLookup tyEnv sym of
+checkTypeEnv sym s1@(Scheme (_ :=> t1)) tyEnv = case envLookup tyEnv sym of
     Nothing -> return ()
-    Just s2@(Forall _ (_ :=> t2)) ->
+    Just s2@(Scheme (_ :=> t2)) ->
         (matchTypes t2 t1) `catchError` (errHandler s2)
 
     where errHandler :: Scheme -> PsiloError -> Compiler ()

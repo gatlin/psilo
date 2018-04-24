@@ -47,9 +47,9 @@ envLookup (TypeEnv env) sym = M.lookup sym env
 
 -- | Generalize a qualified type inta a type scheme in a given context
 generalize :: TypeEnv -> Qual Type -> Scheme
-generalize te (ps :=> t) = Forall as ((sort ps) :=> t)
+generalize te (ps :=> t) = Scheme ((sort ps) :=> (TForall as t))
     where as = S.toList $ ftv t `S.difference` ftv te
 
 -- | Neatly lift qualified types up into type scheme
 closeOver :: Frame -> Qual Type -> Scheme
-closeOver f qt = normalize $ generalize mempty (substitute f qt)
+closeOver f qt = generalize mempty (substitute f qt)

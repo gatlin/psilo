@@ -41,6 +41,7 @@ data Type
     = TVar TyVar
     | TSym TyCon
     | TFun [Type]
+    | TForall [TyVar] Type
     deriving (Ord, Eq)
 
 parensShow :: Type -> String
@@ -48,6 +49,10 @@ parensShow ty@(TFun ts) = "(" ++ (show ty) ++ ")"
 parensShow ty           = show ty
 
 instance Show Type where
+    show (TForall vs t) = prefix ++ (show t)
+        where vs' = intercalate " " $ map show vs
+              prefix = if (length vs) > 0 then "∀" ++ vs' ++ ". "
+                       else ""
     show (TVar n) = show n
     show (TSym sym) = show sym
     show (TFun ts) = go ts where
@@ -57,9 +62,10 @@ instance Show Type where
         go ts' = intercalate " " $ map parensShow ts'
 
 instance HasKind Type where
-    kind (TSym tc)     = kind tc
-    kind (TVar tv)     = kind tv
-    kind (TFun (t:ts)) = Star -- FIXME NOT ALWAYS
+    kind (TForall vs t) = kind t
+    kind (TSym tc)      = kind tc
+    kind (TVar tv)      = kind tv
+    kind (TFun (t:ts))  = Star -- FIXME NOT ALWAYS
 
 typeInt, typeBool, typeFloat :: Type
 typeInt = TSym (TyCon "Int" Star)
