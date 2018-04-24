@@ -14,32 +14,23 @@ import qualified Data.Map          as M
 import           Data.Set          (Set)
 import qualified Data.Set          as S
 
--- | A polymorphic, universally quantified type at the top-level scope
+-- | A polymorphic, universally quantified type at the top-level scope.
+-- The main use for a Scheme at this point is the normalization process, which
+-- isn\'t even working correctly right now.
+-- In theory the benefit of a Scheme is that, when normalized, two Schemes which
+-- use different type variables but are isomorphic can be compared.
 data Scheme = Scheme (Qual Type) deriving (Eq, Ord)
 
-normalize_type (TForall vs t) = (ord, normtype t)
-    where ord = zip vs (map (\n -> TyVar n Star) [0..])
-          normtype (TFun ts) = TFun $ map normtype ts
-          normtype (TSym sym) = TSym sym
-          normtype (TVar tv) = case Prelude.lookup tv ord of
-              Just x  -> TVar x
-              Nothing -> error "type variable not in signature"
-          normtype (TForall _ t') = normtype t'
---          fv = reverse . S.toList . ftv
-
--- | This function is vestigial and should probably just go. As it stands it\'s
--- not quite right but since it\'s only used for pretty-printing it is not in
--- the way, either.
 normalize :: Scheme -> Scheme
-normalize (Scheme (ps :=> ty)) = Scheme $ ps' :=> ty'
+normalize (Scheme (ps :=> (TForall vs t))) = Scheme (ps' :=> (TForall vs' t'))
     where
-        (ord, ty') = normalize_type ty
-        find_pred (IsIn sym (TVar t)) =
-            maybe (error $ "non-existent type variable: " ++ (show t))
-            (\x -> (IsIn sym (TVar x)))
-            (Prelude.lookup t ord)
-        find_pred pred = pred
-        ps' = map find_pred ps
+        len_vs = (length vs) - 1
+        vs' = map (\n -> TyVar n Star) [0..len_vs]
+        frame = M.fromList $ zip vs (map TVar vs')
+        ps' = substitute frame ps
+        t' = substitute frame t
+
+-- this will *probably* bite me in the ass later
 
 instance Show Scheme where
     show (Scheme t) = show t

@@ -9,6 +9,7 @@ module Lib.Types
     , emptyTypeEnv
     , buildTypeEnv
     , Scheme(..)
+    , normalize
     )
 where
 
@@ -150,8 +151,7 @@ typecheck_pass ce te (sym, expr) = do
     -- if the symbol was already in the type environment, verify that they match
     checkTypeEnv sym scheme te
     -- build the new type environment
-    let te' = substitute frame $ buildTypeEnv $ [(sym, scheme)]
-    return (te' <> te)
+    return $ extendEnv te (sym, scheme)
 
 checkTypeEnv :: Symbol -> Scheme -> TypeEnv -> Compiler ()
 checkTypeEnv sym s1@(Scheme (_ :=> t1)) tyEnv = case envLookup tyEnv sym of

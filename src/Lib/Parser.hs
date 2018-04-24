@@ -8,11 +8,13 @@ import           Control.Monad.Except
 import           Control.Monad.Free
 import           Data.Attoparsec.Text
 import           Data.Char            (isAlpha, isDigit, ord)
+import qualified Data.Set             as S
 import           Data.Text            (Text)
 import qualified Data.Text            as Text
 import           Lib.Compiler
 import           Lib.Errors
 import           Lib.Syntax.Surface
+import           Lib.Types.Frame
 import           Lib.Types.Kind
 import           Lib.Types.Qual
 import           Lib.Types.Scheme
@@ -162,7 +164,7 @@ scheme_parser = (parens pred_type) <|> bare_type where
         skipSpace
         t <- type_parser
         skipSpace
-        return $ Scheme (preds :=> (TForall [] t))
+        return $ Scheme (preds :=> (TForall (S.toList $ ftv t) t))
 
     pred :: Parser Pred
     pred = parens $ do
@@ -176,7 +178,7 @@ scheme_parser = (parens pred_type) <|> bare_type where
     bare_type :: Parser Scheme
     bare_type = do
         t <- type_parser
-        return $ Scheme ([] :=> (TForall [] t))
+        return $ Scheme ([] :=> (TForall (S.toList $ ftv t) t))
 
 type_parser :: Parser Type
 type_parser = do

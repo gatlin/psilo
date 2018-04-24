@@ -1,6 +1,10 @@
-(= (square x) (* x x))
+(: three (=> ((Num x)) x))
 (= three 3)
-(= nine (square three))
 
-(= (compose f g)
-  (\ (x) (f (g x))))
+(: six (=> ((Num d)) d))
+(= six (* 2 three))
+
+(: square (=> ((Num n)) (-> n n)))
+(= (square x) (* x x))
+
+(= nine (square three))
