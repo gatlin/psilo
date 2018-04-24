@@ -230,8 +230,8 @@ parse_expr'
     => Text
     -> m (Either String (SurfaceExpr ()))
 parse_expr' input = do
-    let parse_result = parseOnly ((parens def_parser)
-                                  <|> (parens defun_parser)
+    let parse_result = parseOnly ((parens defun_parser)
+                                  <|> (parens def_parser)
                                   <|> (parens sig_parser)
                                   <|> expr_parser) input
     return parse_result
