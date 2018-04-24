@@ -17,28 +17,29 @@ import qualified Data.Set          as S
 -- | A polymorphic, universally quantified type at the top-level scope
 data Scheme = Scheme (Qual Type) deriving (Eq, Ord)
 
+normalize_type (TForall vs t) = (ord, normtype t)
+    where ord = zip vs (map (\n -> TyVar n Star) [0..])
+          normtype (TFun ts) = TFun $ map normtype ts
+          normtype (TSym sym) = TSym sym
+          normtype (TVar tv) = case Prelude.lookup tv ord of
+              Just x  -> TVar x
+              Nothing -> error "type variable not in signature"
+          normtype (TForall _ t') = normtype t'
+--          fv = reverse . S.toList . ftv
+
+-- | This function is vestigial and should probably just go. As it stands it\'s
+-- not quite right but since it\'s only used for pretty-printing it is not in
+-- the way, either.
 normalize :: Scheme -> Scheme
-normalize (Scheme (ps :=> (TForall vs t))) =
-    Scheme (ps' :=> (TForall (map snd ord) (normtype t)))
+normalize (Scheme (ps :=> ty)) = Scheme $ ps' :=> ty'
     where
-        ord = zip (nub $ fv t) (map (\n -> TyVar n Star) [0..])
+        (ord, ty') = normalize_type ty
         find_pred (IsIn sym (TVar t)) =
             maybe (error $ "non-existent type variable: " ++ (show t))
             (\x -> (IsIn sym (TVar x)))
             (Prelude.lookup t ord)
-
         find_pred pred = pred
         ps' = map find_pred ps
-        fv = reverse . S.toList . ftv
-
-        normtype (TForall _ t') = normtype t'
-        normtype (TFun ts) = TFun $ map normtype ts
-        normtype (TSym sym) = TSym sym
-        normtype (TVar tv ) = case Prelude.lookup tv ord of
-            Just x  -> TVar x
-            Nothing -> error "type variable not in signature"
-
-normalize scm = scm
 
 instance Show Scheme where
     show (Scheme t) = show t

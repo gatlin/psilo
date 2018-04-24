@@ -52,4 +52,4 @@ generalize te (ps :=> t) = Scheme ((sort ps) :=> (TForall as t))
 
 -- | Neatly lift qualified types up into type scheme
 closeOver :: Frame -> Qual Type -> Scheme
-closeOver f qt = generalize mempty (substitute f qt)
+closeOver f qt = normalize $ generalize mempty (substitute f qt)
