@@ -15,8 +15,6 @@ import           Data.Set          (Set)
 import qualified Data.Set          as S
 
 -- | A polymorphic, universally quantified type at the top-level scope.
--- The main use for a Scheme at this point is the normalization process, which
--- isn\'t even working correctly right now.
 -- In theory the benefit of a Scheme is that, when normalized, two Schemes which
 -- use different type variables but are isomorphic can be compared.
 data Scheme = Scheme (Qual Type) deriving (Eq, Ord)

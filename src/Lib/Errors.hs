@@ -10,6 +10,7 @@ data PsiloError
     -- type inference
     = UnificationFail Type Type
     | UnificationMismatch [Type] [Type]
+    | TypeMismatch Type Type
     | InfiniteType TyVar Type
     | UnboundVariable Symbol
     | OtherTypeError String
@@ -22,4 +23,41 @@ data PsiloError
     | ParserError String
     -- preprocessor
     | PreprocessError String
-    deriving (Eq, Show)
+    deriving (Eq)
+
+instance Show PsiloError where
+    show (UnificationFail t1 t2) =
+        "Failed to unify types: " ++
+        (show t1) ++ " and " ++ (show t2)
+
+    show (UnificationMismatch ts1 ts2) =
+        "Failed to unify types: " ++
+        (show ts1) ++ " and " ++ (show ts2)
+
+    show (TypeMismatch t1 t2) =
+        "Failed to match types: " ++
+        (show t1) ++ " and " ++ (show t2)
+
+    show (InfiniteType tv ty) =
+        "Infinite type: " ++ (show tv) ++ " ~ " ++ (show ty)
+
+    show (UnboundVariable sym) = "Unbound variable: " ++ sym
+
+    show (OtherTypeError errMsg) =
+        "Other type error: " ++ errMsg
+
+    show (ClassAlreadyDefined sym) =
+        "Duplicate class definition: " ++ sym
+
+    show (SuperclassNotDefined sym) =
+        "Undefined super class: " ++ sym
+
+    show (NoClassForInstance klass ty) =
+        "No class instance definition of " ++ klass ++
+        " for type " ++ (show ty)
+
+    show (OverlappingInstance sym) = "Overlapping instance for " ++ sym
+
+    show (ParserError errMsg) = "Parser error: " ++ errMsg
+
+    show (PreprocessError errMsg) = "Preprocessor error: " ++ errMsg

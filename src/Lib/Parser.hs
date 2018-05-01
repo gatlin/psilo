@@ -141,8 +141,9 @@ defun_parser :: Parser (SurfaceExpr a)
 defun_parser = do
     string "="
     skipSpace
-    char '('
     name <- sym
+    skipSpace
+    char '('
     skipSpace
     args <- typed_sym `sepBy` (many space)
     skipSpace
