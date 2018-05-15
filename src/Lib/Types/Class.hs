@@ -5,10 +5,9 @@ module Lib.Types.Class where
 
 import           Lib.Syntax.Symbol
 import           Lib.Types.Kind        (HasKind, Kind (..))
-import           Lib.Types.Qual        (Pred (..), Qual (..))
 import           Lib.Types.Solve       (Solve, Unifier, initSolveState,
                                         runSolve, unify)
-import           Lib.Types.Type        (TyCon (..), TyVar (..), Type (..))
+import           Lib.Types.Type        (Pred, TyCon (..), TyVar (..), Type (..))
 
 import           Data.Map              (Map)
 import qualified Data.Map              as M
@@ -21,7 +20,7 @@ import           Lib.Compiler
 import           Lib.Errors
 
 -- | A typeclass instance is a qualified predicate
-type Inst = Qual Pred
+type Inst = Type
 
 -- | A typeclass carries information about its superclasses and instances
 type Class = ([Symbol], [Inst])

@@ -34,7 +34,6 @@ import           Lib.Syntax.Symbol
 import           Lib.Syntax.TopLevel
 
 import           Lib.Types.Kind
-import           Lib.Types.Qual
 import           Lib.Types.Scheme
 import           Lib.Types.Type
 import           Lib.Types.TypeEnv      (TypeEnv (..), generalize)

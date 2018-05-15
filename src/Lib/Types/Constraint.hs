@@ -2,7 +2,6 @@ module Lib.Types.Constraint where
 
 import           Lib.Syntax      (Symbol)
 import           Lib.Types.Frame
-import           Lib.Types.Qual
 import           Lib.Types.Type
 
 import           Data.Set        (Set)

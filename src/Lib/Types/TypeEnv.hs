@@ -5,7 +5,6 @@ module Lib.Types.TypeEnv where
 import           Lib.Syntax.Symbol
 import           Lib.Types.Frame
 import           Lib.Types.Kind
-import           Lib.Types.Qual
 import           Lib.Types.Scheme
 import           Lib.Types.Type
 
@@ -46,10 +45,10 @@ envLookup :: TypeEnv -> Symbol -> Maybe Scheme
 envLookup (TypeEnv env) sym = M.lookup sym env
 
 -- | Generalize a qualified type inta a type scheme in a given context
-generalize :: TypeEnv -> Qual Type -> Scheme
-generalize te (ps :=> t) = Scheme ((sort ps) :=> (TForall as t))
+generalize :: TypeEnv -> Type -> Scheme
+generalize te (ps :=> t) = (sort ps) :=> (TForall as t)
     where as = S.toList $ ftv t `S.difference` ftv te
 
 -- | Neatly lift qualified types up into type scheme
-closeOver :: Frame -> Qual Type -> Scheme
+closeOver :: Frame -> Type -> Scheme
 closeOver f qt = normalize $ generalize mempty (substitute f qt)

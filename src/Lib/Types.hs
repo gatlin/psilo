@@ -56,7 +56,6 @@ import           Lib.Types.Frame
 import           Lib.Types.Infer
 import           Lib.Types.Kind
 import           Lib.Types.PredMap
-import           Lib.Types.Qual
 import           Lib.Types.Scheme
 import           Lib.Types.Solve        hiding (predMap)
 import           Lib.Types.Type
@@ -68,15 +67,15 @@ import           Lib.Parser             (parse_expr, parse_multi)
 
 -- * Defaults
 
-num_binop :: Qual Type
+num_binop :: Type
 num_binop = [IsIn "Num" t_0] :=> (TFun [tyFun, t_0, t_0, t_0])
     where t_0 = TVar (TyVar 0 Star)
 
-eq_binop :: Qual Type
+eq_binop :: Type
 eq_binop = [IsIn "Eq" t_0] :=> (TFun [tyFun, t_0, t_0, typeBool])
     where t_0 = TVar (TyVar 0 Star)
 
-ord_binop :: Qual Type
+ord_binop :: Type
 ord_binop = [IsIn "Ord" t_0] :=> (TFun [tyFun, t_0, t_0, typeBool])
     where t_0 = TVar (TyVar 0 Star)
 
@@ -154,9 +153,9 @@ typecheck_pass ce te (sym, expr) = do
     return $ extendEnv te (sym, scheme)
 
 checkTypeEnv :: Symbol -> Scheme -> TypeEnv -> Compiler ()
-checkTypeEnv sym s1@(Scheme (_ :=> t1)) tyEnv = case envLookup tyEnv sym of
+checkTypeEnv sym s1@(_ :=> t1) tyEnv = case envLookup tyEnv sym of
     Nothing -> return ()
-    Just s2@(Scheme (_ :=> t2)) ->
+    Just s2@(_ :=> t2) ->
         (matchTypes t2 t1) `catchError` (errHandler s2)
 
     where errHandler :: Scheme -> PsiloError -> Compiler ()

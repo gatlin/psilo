@@ -28,7 +28,7 @@ module Lib
     , defaultTypeEnv
     , emptyTypeEnv
     , buildTypeEnv
-    , Scheme(..)
+    , Scheme
     , normalize
       -- * Lifted Expressions
     , LiftedExpr(..)

@@ -31,7 +31,6 @@ library
                        Lib.Types.Infer,
                        Lib.Types.Kind,
                        Lib.Types.PredMap,
-                       Lib.Types.Qual,
                        Lib.Types.Scheme,
                        Lib.Types.Solve,
                        Lib.Types.Type,

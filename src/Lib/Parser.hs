@@ -16,7 +16,6 @@ import           Lib.Errors
 import           Lib.Syntax.Surface
 import           Lib.Types.Frame
 import           Lib.Types.Kind
-import           Lib.Types.Qual
 import           Lib.Types.Scheme
 import           Lib.Types.Type
 import           Lib.Types.Type       (tyFun)
@@ -165,7 +164,7 @@ scheme_parser = (parens pred_type) <|> bare_type where
         skipSpace
         t <- type_parser
         skipSpace
-        return $ Scheme (preds :=> (TForall (S.toList $ ftv t) t))
+        return $  (preds :=> (TForall (S.toList $ ftv t) t))
 
     pred :: Parser Pred
     pred = parens $ do
@@ -179,7 +178,7 @@ scheme_parser = (parens pred_type) <|> bare_type where
     bare_type :: Parser Scheme
     bare_type = do
         t <- type_parser
-        return $ Scheme ([] :=> (TForall (S.toList $ ftv t) t))
+        return $ ([] :=> (TForall (S.toList $ ftv t) t))
 
 type_parser :: Parser Type
 type_parser = do

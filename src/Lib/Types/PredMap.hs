@@ -4,8 +4,7 @@ module Lib.Types.PredMap where
 
 import           Lib.Syntax.Symbol
 import           Lib.Types.Frame
-import           Lib.Types.Qual
-import           Lib.Types.Type    (TyVar (..), Type (..))
+import           Lib.Types.Type    (Pred, TyVar (..), Type (..))
 
 import           Data.List         (nub)
 import           Data.Map          (Map)

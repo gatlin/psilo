@@ -5,8 +5,7 @@ import           Lib.Types.Constraint
 import           Lib.Types.Frame
 import           Lib.Types.Kind       (HasKind, Kind (..), kind)
 import           Lib.Types.PredMap
-import           Lib.Types.Qual
-import           Lib.Types.Type       (TyCon (..), TyVar (..), Type (..))
+import           Lib.Types.Type       (Pred, TyCon (..), TyVar (..), Type (..))
 
 import           Data.Map             (Map)
 import qualified Data.Map             as M

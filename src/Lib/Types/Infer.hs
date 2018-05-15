@@ -10,7 +10,6 @@ import           Lib.Types.Constraint
 import           Lib.Types.Frame
 import           Lib.Types.Kind
 import           Lib.Types.PredMap
-import           Lib.Types.Qual
 import           Lib.Types.Scheme
 import           Lib.Types.Type
 import           Lib.Types.TypeEnv
@@ -96,12 +95,12 @@ fresh k = do
     return $ TyVar c k
 
 -- | Instantiate a type scheme into a qualified type
-instantiate :: Scheme -> Infer (Qual Type)
-instantiate (Scheme (ps :=> (TForall vs t))) = do
+instantiate :: Scheme -> Infer Type
+instantiate (ps :=> (TForall vs t)) = do
     vs' <- mapM (const $ fresh Star) vs >>= mapM (return . TVar)
     let frame = M.fromList $ zip vs vs'
     return $ substitute frame (ps :=> t)
-instantiate (Scheme qt) = return qt
+instantiate qt = return qt
 
 -- | Constraint generation and type generation
 infer :: AnnotatedExpr () -> Infer Type
@@ -131,7 +130,7 @@ infer (_ :< IdC sym) = do
 infer (_ :< FunC args body) = do
     (argVars, argScms) <- mapAndUnzipM (\arg -> do
         var <- fresh Star >>= return . TVar
-        return (var, Scheme ([] :=> (TForall [] var)))) args
+        return (var, [] :=> (TForall [] var))) args
     br <- withEnv (zip args argScms) $ infer body
     let fun_ty = TFun $ tyFun : (argVars ++ [br])
     return fun_ty

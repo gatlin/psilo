@@ -7,7 +7,7 @@ import           Lib.Errors
 
 import           Data.Monoid          (Monoid, (<>))
 import           Lib.Syntax.Symbol
-import           Lib.Types.Type       (TyVar (..), Type (..))
+import           Lib.Types.Type       (Pred, TyVar (..), Type (..))
 
 import           Data.Map             (Map)
 import qualified Data.Map.Lazy        as M
@@ -52,6 +52,8 @@ instance TypeLike Type where
     ftv (TForall vs t) = (ftv t) `S.difference` (S.fromList vs)
     ftv (TVar n)       = S.singleton n
     ftv (TFun ts)      = foldl (<>) mempty $ fmap ftv ts
+    ftv (ps :=> t)     = (ftv ps) `S.union` (ftv t)
+    ftv (IsIn i t)     = ftv t
     ftv _              = mempty
 
     substitute frame (TForall vs t) = TForall vs $
@@ -61,4 +63,8 @@ instance TypeLike Type where
         Nothing -> TVar u
 
     substitute frame (TFun ts) = TFun (substitute frame ts)
+    substitute frame (ps :=> t) =
+        (substitute frame ps) :=> (substitute frame t)
     substitute frame t = t
+
+    substitute frame (IsIn i t) = IsIn i (substitute frame t)

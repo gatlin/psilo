@@ -41,8 +41,14 @@ data Type
     = TVar TyVar
     | TSym TyCon
     | TFun [Type]
-    | TForall [TyVar] Type
+    | TForall [TyVar] Type -- Sigma types
+    | [Pred] :=> Type -- Qualified types
+    | IsIn Symbol Type -- Predicates
     deriving (Ord, Eq)
+
+-- | Type alias for refactor convenience because initially predicates were a
+-- separate type
+type Pred = Type
 
 parensShow :: Type -> String
 parensShow ty@(TFun ts) = "(" ++ (show ty) ++ ")"
@@ -59,12 +65,18 @@ instance Show Type where
         go ((TSym (TyCon "->" Star)):ts') = intercalate " -> " $
             map parensShow ts'
         go ts' = intercalate " " $ map parensShow ts'
+    show (IsIn c t) = c ++ " " ++ (show t)
+    show ([] :=> t) = show t
+    show (ps :=> t) = "(" ++ ps' ++ ")" ++ " => " ++ show t
+        where ps' = intercalate ", " $ map show ps
 
 instance HasKind Type where
     kind (TForall vs t) = kind t
     kind (TSym tc)      = kind tc
     kind (TVar tv)      = kind tv
     kind (TFun (t:ts))  = Star -- FIXME NOT ALWAYS
+    kind (ps :=> t)     = kind t
+    kind (IsIn c t)     = kind t
 
 typeInt, typeBool, typeFloat :: Type
 typeInt = TSym (TyCon "Int" Star)
