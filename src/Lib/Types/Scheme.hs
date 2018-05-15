@@ -18,6 +18,7 @@ import qualified Data.Set          as S
 -- use different type variables but are isomorphic can be compared.
 type Scheme = Type
 
+-- | Invariant: Schemes take the form '[pred...*] :=> forall [var...*] t'.
 normalize :: Scheme -> Scheme
 normalize (ps :=> (TForall vs t)) = (ps' :=> (TForall vs' t'))
     where

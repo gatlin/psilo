@@ -9,7 +9,6 @@ import           Lib.Syntax.Symbol
 import           Lib.Types.Constraint
 import           Lib.Types.Frame
 import           Lib.Types.Kind
-import           Lib.Types.PredMap
 import           Lib.Types.Scheme
 import           Lib.Types.Type
 import           Lib.Types.TypeEnv
@@ -35,11 +34,10 @@ import           Control.Comonad.Cofree
 -- | The state we need to mutate during type inference
 data InferState = InferState
     { varCount :: Int -- ^ monotonically increasing type ID number
-    , predMap  :: PredMap
     } deriving (Show)
 
 initInferState :: InferState
-initInferState = InferState 0 mempty
+initInferState = InferState 0
 
 {-
 newtype Infer a =
@@ -72,14 +70,14 @@ logInfer = lift . lift . lift . logMsg
 (@=) :: Type -> Type -> Infer ()
 t1 @= t2 = tell [t1 := t2]
 
+(@~) :: Pred -> Type -> Infer ()
+p @~ t = tell [ p :~ t ]
+
 tyInst :: [Pred] -> Infer ()
 tyInst [] = return ()
 tyInst ps = forM_ ps $ \pred -> do
     let tvs = S.toList . ftv $ pred
-    forM_ tvs $ \tv -> do
-        modify $ \s -> s {
-            predMap = updatePredMap (TVar tv) [pred] $ predMap s
-            }
+    forM_ tvs $ \tv -> pred @~ (TVar tv)
 
 withEnv :: [(Symbol, Scheme)] -> Infer a -> Infer a
 withEnv ss m = local (<> (buildTypeEnv ss)) m

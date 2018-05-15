@@ -4,7 +4,6 @@ import           Lib.Syntax.Symbol
 import           Lib.Types.Constraint
 import           Lib.Types.Frame
 import           Lib.Types.Kind       (HasKind, Kind (..), kind)
-import           Lib.Types.PredMap
 import           Lib.Types.Type       (Pred, TyCon (..), TyVar (..), Type (..))
 
 import           Data.Map             (Map)
@@ -27,9 +26,9 @@ emptyUnifier :: Unifier
 emptyUnifier = (mempty, [])
 
 data SolveState = SolveState
-    { frame       :: Frame
-    , constraints :: [Constraint]
-    , predMap     :: PredMap
+    { frame            :: Frame
+    , constraints      :: [Constraint]
+    , classConstraints :: [Constraint]
     }
 
 initSolveState :: SolveState
@@ -92,28 +91,36 @@ occursCheck a t = a `S.member` (ftv t)
 -- | The actual solving algorithm. Reads the current 'Unifier' and iterates
 -- through the constraints generating 'Unifier's. These are then merged into the
 -- state.
-solver :: Solve (Frame, PredMap)
+solver :: Solve (Frame, [Constraint])
 solver = do
     cs <- gets constraints
-    case cs of
-        [] -> get >>= \(SolveState f _ p) -> return (f, p)
+    case (sort cs) of
+        [] -> get >>= \(SolveState f _ cc) -> return (f, cc)
         ((t1 := t2):cs0) -> do
             su <- gets frame
             (su1, cs1) <- unify (substitute su t1) (substitute su t2)
             modify $ \st -> st {
                 frame = su1 `compose` su,
-                constraints = nub $ (substitute su1 cs1) ++ (substitute su1 cs0),
-                predMap = substitute su1 $ predMap st
+                constraints = nub $ (substitute su1 cs1) ++ (substitute su1 cs0)
+                }
+            solver
+
+        ((p  :~ t ):cs0) -> do
+            su <- gets frame
+            cc <- gets classConstraints
+            let p' = substitute su p
+                t' = substitute su t
+            modify $ \st -> st {
+                classConstraints = (p' :~ t') : cc,
+                constraints = cs0
                 }
             solver
 
 solveConstraints
     :: [Constraint]
-    -> PredMap
-    -> Compiler (Frame, PredMap)
-solveConstraints cs pm = evalStateT solver $ initSolveState {
-    constraints = cs,
-    predMap = pm
+    -> Compiler (Frame, [Constraint])
+solveConstraints cs = evalStateT solver $ initSolveState {
+    constraints = cs
     }
 
 matchTypes

@@ -55,9 +55,8 @@ import           Lib.Types.Constraint
 import           Lib.Types.Frame
 import           Lib.Types.Infer
 import           Lib.Types.Kind
-import           Lib.Types.PredMap
 import           Lib.Types.Scheme
-import           Lib.Types.Solve        hiding (predMap)
+import           Lib.Types.Solve
 import           Lib.Types.Type
 import           Lib.Types.TypeEnv
 
@@ -144,9 +143,10 @@ typecheck_pass
 typecheck_pass ce te (sym, expr) = do
     (sig, inferState, cs) <- runInfer te $
         sequence . extend infer $ expr
-    (frame, pm) <- solveConstraints cs $ predMap inferState
-    verifyPredMap pm ce
-    let scheme = extract $ (extend $ toScheme frame pm) sig
+    (frame, cs') <- solveConstraints cs
+    forM_ cs' $ logMsg . show
+    let scheme = extract $ (extend $ toScheme frame) sig
+    logMsg $ sym ++ " : " ++ (show sig)
     -- if the symbol was already in the type environment, verify that they match
     checkTypeEnv sym scheme te
     -- build the new type environment
@@ -163,22 +163,11 @@ checkTypeEnv sym s1@(_ :=> t1) tyEnv = case envLookup tyEnv sym of
               "Type given for " ++ sym ++ " is " ++ (show s2) ++
               ", but the inferred type is " ++ (show s1) ++ "."
 
-verifyPredMap :: PredMap -> ClassEnv -> Compiler ()
-verifyPredMap (PMap pm) ce = forM_ (M.toList pm) $ \(ty, preds) ->
-    case ty of
-        (TSym _) -> forM_ preds $ \(IsIn c t) -> do
-            let instances = fmap (\(_ :=> (IsIn _ x)) -> x) (insts ce c)
-            unless (elem ty instances) $ throwError $
-                NoClassForInstance c (show ty)
-            return ()
-        _ -> return ()
-
-toScheme :: Frame -> PredMap -> AnnotatedExpr Type -> Scheme
-toScheme frame pm expr =
+toScheme :: Frame -> AnnotatedExpr Type -> Scheme
+toScheme frame expr =
     let ty = extract expr
         ty' = substitute frame ty
-        pm' = substitute frame pm
-    in  closeOver frame ((lookupPreds ty') pm' :=> ty')
+    in  closeOver frame ([] :=> ty')
 
 -- | Compute dependencies for a given expression and return as a list of Symbols
 deps :: [(Symbol, AnnotatedExpr ())] -> AnnotatedExpr () -> [Symbol]

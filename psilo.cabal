@@ -30,7 +30,6 @@ library
                        Lib.Types.Frame,
                        Lib.Types.Infer,
                        Lib.Types.Kind,
-                       Lib.Types.PredMap,
                        Lib.Types.Scheme,
                        Lib.Types.Solve,
                        Lib.Types.Type,
