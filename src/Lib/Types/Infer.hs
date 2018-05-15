@@ -117,17 +117,11 @@ infer (_ :< FloatC _) = return $ typeFloat
 
 infer (_ :< IdC sym) = do
     te <- getEnv
-    logInfer $ "Symbol: " ++ sym
     case envLookup te sym of
-        Nothing -> do
-            var <- fresh Star
-            logInfer $ "New variable: " ++ (show var)
-            return $ TVar var
+        Nothing -> fresh Star >>= return . TVar
         Just scheme -> do
             qt@(ps :=> ty) <- instantiate scheme
             tyInst ps
-            logInfer $ "Scheme: " ++ (show scheme)
-            logInfer $ "Instantiated: " ++ (show qt)
             return ty
 
 -- | A lambda abstraction is a list of symbols and an 'AnnotatedExpr' body. Each

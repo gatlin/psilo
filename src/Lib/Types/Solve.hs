@@ -57,7 +57,6 @@ unify t1 t2                     = throwError $ UnificationFail t1 t2
 unifyMany :: [Type] -> [Type] -> Solve Unifier
 unifyMany [] [] = return emptyUnifier
 unifyMany (t1 : ts1) (t2 : ts2) = do
-    logS $ "Unifying " ++ (show t1) ++ " with " ++ (show t2)
     (su1, cs1) <- unify t1 t2
     (su2, cs2) <- unifyMany (substitute su1 ts1) (substitute su1 ts2)
     return (su2 `compose` su1, nub $ cs1 ++ cs2)
