@@ -6,8 +6,8 @@
 ;(= nine (square three))
 ;(= thirty-six (square six))
 
-(= five-1 5)
+(= five-1 5.0)
 
-(= five-2 () 5)
+(= five-2 () 5.0)
 (= ten-1 (* 2 five-1))
 (= ten-2 (* 2 five-2))

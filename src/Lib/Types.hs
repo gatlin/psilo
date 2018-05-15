@@ -129,6 +129,7 @@ typecheck defns _te = do
     let te = defaultTypeEnv <> _te
     logMsg "Initial type environment"
     logMsg . show $ te
+    logMsg "-----"
     classEnv <- transformCE defaultClassEnv mempty
     let dependency_graph = make_dep_graph defns
     let defns' = reverse $ topo' dependency_graph
@@ -144,9 +145,12 @@ typecheck_pass ce te (sym, expr) = do
     (sig, inferState, cs) <- runInfer te $
         sequence . extend infer $ expr
     (frame, cs') <- solveConstraints cs
-    forM_ cs' $ logMsg . show
-    let scheme = extract $ (extend $ toScheme frame) sig
     logMsg $ sym ++ " : " ++ (show sig)
+    logMsg . show $ frame
+    forM_ (sort cs) $ logMsg . show
+    let scheme = extract $ (extend $ toScheme frame) sig
+    logMsg $ sym ++ " : " ++ (show scheme)
+    logMsg "-----"
     -- if the symbol was already in the type environment, verify that they match
     checkTypeEnv sym scheme te
     -- build the new type environment

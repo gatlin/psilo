@@ -38,22 +38,26 @@ initSolveState = SolveState mempty mempty mempty
 -- constructed. Execution may result in a raised 'TypeError'.
 type Solve = StateT SolveState Compiler
 
+logS :: String -> Solve ()
+logS = lift . logMsg
+
 --runSolve :: Monad m => Solve m a -> SolveState -> m (Either PsiloError a)
 runSolve :: Solve a -> SolveState -> Either PsiloError a
 runSolve s st = compile (evalStateT s st)
 
 -- | Unification of two 'Type's
 unify :: Type -> Type -> Solve Unifier
-unify t1 t2               | t1 == t2 = return emptyUnifier
-unify (TVar v) t          = v `bind` t
-unify t (TVar v)          = v `bind` t
-unify (TFun as) (TFun bs) = unifyMany as bs
-unify t1 t2               = throwError $ UnificationFail t1 t2
+unify t1 t2                     | t1 == t2 = return emptyUnifier
+unify (TVar v) t                = v `bind` t
+unify t (TVar v)                = v `bind` t
+unify t1@(TFun as) t2@(TFun bs) = unifyMany as bs
+unify t1 t2                     = throwError $ UnificationFail t1 t2
 
 -- | Unification of a list of 'Type's.
 unifyMany :: [Type] -> [Type] -> Solve Unifier
 unifyMany [] [] = return emptyUnifier
 unifyMany (t1 : ts1) (t2 : ts2) = do
+    logS $ "Unifying " ++ (show t1) ++ " with " ++ (show t2)
     (su1, cs1) <- unify t1 t2
     (su2, cs2) <- unifyMany (substitute su1 ts1) (substitute su1 ts2)
     return (su2 `compose` su1, nub $ cs1 ++ cs2)

@@ -59,6 +59,7 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
                 putStrLn "Logs\n-----"
                 forM_ logs putStrLn
                 putStrLn "-----"
+{-
                 exprs <- forM defns $ \(symbol, expr) -> do
                     let mScheme = envLookup typeEnv symbol
                     when (isJust mScheme) $ do
@@ -68,6 +69,7 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
                     putStrLn . show $ convertClosure globals expr
                     return lExprs
                 --codegen (emptyModule "hey") $ concat exprs
+-}
                 return ()
 
 globals = S.toList builtin_syms

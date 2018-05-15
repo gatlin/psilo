@@ -97,7 +97,9 @@ instantiate :: Scheme -> Infer Type
 instantiate (ps :=> (TForall vs t)) = do
     vs' <- mapM (const $ fresh Star) vs >>= mapM (return . TVar)
     let frame = M.fromList $ zip vs vs'
-    return $ substitute frame (ps :=> t)
+        ps' = substitute frame ps
+    tyInst ps
+    return $ substitute frame (ps' :=> t)
 instantiate qt = return qt
 
 -- | Constraint generation and type generation
@@ -115,11 +117,17 @@ infer (_ :< FloatC _) = return $ typeFloat
 
 infer (_ :< IdC sym) = do
     te <- getEnv
+    logInfer $ "Symbol: " ++ sym
     case envLookup te sym of
-        Nothing -> fresh Star >>= return . TVar
+        Nothing -> do
+            var <- fresh Star
+            logInfer $ "New variable: " ++ (show var)
+            return $ TVar var
         Just scheme -> do
             qt@(ps :=> ty) <- instantiate scheme
             tyInst ps
+            logInfer $ "Scheme: " ++ (show scheme)
+            logInfer $ "Instantiated: " ++ (show qt)
             return ty
 
 -- | A lambda abstraction is a list of symbols and an 'AnnotatedExpr' body. Each

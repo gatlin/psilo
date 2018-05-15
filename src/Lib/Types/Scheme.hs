@@ -14,8 +14,7 @@ import           Data.Set          (Set)
 import qualified Data.Set          as S
 
 -- | A polymorphic, universally quantified type at the top-level scope.
--- In theory the benefit of a Scheme is that, when normalized, two Schemes which
--- use different type variables but are isomorphic can be compared.
+-- This is an alias for 'Type' to make navigating the code clearer.
 type Scheme = Type
 
 -- | Invariant: Schemes take the form '[pred...*] :=> forall [var...*] t'.

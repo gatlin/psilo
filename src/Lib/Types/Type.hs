@@ -62,6 +62,7 @@ instance Show Type where
     show (TSym sym) = show sym
     show (TFun ts) = go ts where
         go [] = ""
+        go ((TSym (TyCon "->" _)):t:[]) = "-> " ++ (show t)
         go ((TSym (TyCon "->" Star)):ts') = intercalate " -> " $
             map parensShow ts'
         go ts' = intercalate " " $ map parensShow ts'
