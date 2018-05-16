@@ -19,7 +19,7 @@ type Scheme = Type
 
 -- | Invariant: Schemes take the form '[pred...*] :=> forall [var...*] t'.
 normalize :: Scheme -> Scheme
-normalize (ps :=> (TForall vs t)) = (ps' :=> (TForall vs' t'))
+normalize (TForall vs (ps :=> t)) = TForall vs ((nub ps) :=> t)
     where
         len_vs = (length vs) - 1
         vs' = map (\n -> TyVar n Star) [0..len_vs]

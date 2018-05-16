@@ -37,6 +37,8 @@ import           Data.Monoid            ((<>))
 
 import           Data.Map               (Map)
 import qualified Data.Map.Lazy          as M
+import           Data.Set               (Set)
+import qualified Data.Set               as S
 
 import           Data.Graph             (Graph, Vertex)
 import qualified Data.Graph             as G
@@ -145,19 +147,25 @@ typecheck_pass ce te (sym, expr) = tc_pass `catchError` handler where
     tc_pass = do
         (sig, inferState, cs) <- runInfer te $
             sequence . extend infer $ expr
-        (frame, cs') <- (solveConstraints cs)
-        logMsg . show $ frame
-        forM_ (substitute frame cs') $ logMsg . show
-        let scheme = extract $ (extend $ toScheme frame) sig
+        (frame, preds) <- (solveConstraints cs)
+        let sig' = fmap (substitute frame) sig
+        let vars = ftv $ extract sig'
+        preds' <- forM preds $ \pred@(IsIn c t) -> case t of
+            (TVar v) -> if S.member v vars
+                        then return [substitute frame pred]
+                        else return []
+            _ -> return []
+        let scheme = extract $ (extend $ toScheme frame (concat preds')) sig'
         logMsg $ sym ++ " : " ++ (show scheme)
         logMsg "-----"
         -- if the symbol was already in the type environment, verify that they match
-        checkTypeEnv sym scheme te
+--        checkTypeEnv sym scheme te
         -- build the new type environment
         return $ extendEnv te (sym, scheme)
 
     handler err = do
         logMsg $ "Error: " ++ (show err)
+        logMsg "-----"
         return te
 
 catchSolveErr err = do
@@ -165,9 +173,9 @@ catchSolveErr err = do
     return (mempty, mempty)
 
 checkTypeEnv :: Symbol -> Scheme -> TypeEnv -> Compiler ()
-checkTypeEnv sym s1@(_ :=> t1) tyEnv = case envLookup tyEnv sym of
+checkTypeEnv sym s1@(TForall _ t1) tyEnv = case envLookup tyEnv sym of
     Nothing -> return ()
-    Just s2@(_ :=> t2) ->
+    Just s2@(TForall _ t2) ->
         (matchTypes t2 t1) `catchError` (errHandler s2)
 
     where errHandler :: Scheme -> PsiloError -> Compiler ()
@@ -175,11 +183,10 @@ checkTypeEnv sym s1@(_ :=> t1) tyEnv = case envLookup tyEnv sym of
               "Type given for " ++ sym ++ " is " ++ (show s2) ++
               ", but the inferred type is " ++ (show s1) ++ "."
 
-toScheme :: Frame -> AnnotatedExpr Type -> Scheme
-toScheme frame expr =
+toScheme :: Frame -> [Pred] -> AnnotatedExpr Type -> Scheme
+toScheme frame preds expr =
     let ty = extract expr
-        ty' = substitute frame ty
-    in  closeOver frame ([] :=> ty')
+    in  closeOver frame (preds :=> ty)
 
 -- | Compute dependencies for a given expression and return as a list of Symbols
 deps :: [(Symbol, AnnotatedExpr ())] -> AnnotatedExpr () -> [Symbol]

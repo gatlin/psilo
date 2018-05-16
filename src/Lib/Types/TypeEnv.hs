@@ -46,7 +46,7 @@ envLookup (TypeEnv env) sym = M.lookup sym env
 
 -- | Generalize a qualified type inta a type scheme in a given context
 generalize :: TypeEnv -> Type -> Scheme
-generalize te (ps :=> t) = (sort ps) :=> (TForall as t)
+generalize te (ps :=> t) = TForall as ((sort ps) :=> t)
     where as = S.toList $ ftv t `S.difference` ftv te
 
 -- | Neatly lift qualified types up into type scheme

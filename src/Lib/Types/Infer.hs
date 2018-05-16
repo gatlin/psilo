@@ -16,6 +16,7 @@ import           Lib.Types.TypeEnv
 import           Lib.Compiler
 import           Lib.Errors
 
+import           Data.List              (nub)
 import           Data.Map               (Map)
 import qualified Data.Map               as M
 import           Data.Set               (Set)
@@ -60,7 +61,7 @@ runInfer
 
 runInfer te m = do
     ((a, inferState'), cs) <- runWriterT (runStateT (runReaderT m te) initInferState)
-    return (a, inferState', cs)
+    return (a, inferState', (nub cs))
 
 -- I know it isn't pretty
 logInfer :: String -> Infer ()
@@ -120,7 +121,7 @@ infer (_ :< IdC sym) = do
     case envLookup te sym of
         Nothing -> fresh Star >>= return . TVar
         Just scheme -> do
-            qt@(ps :=> ty) <- instantiate scheme
+            qt@(TForall _ (ps :=> ty)) <- instantiate scheme
             tyInst ps
             return ty
 
@@ -130,7 +131,7 @@ infer (_ :< IdC sym) = do
 infer (_ :< FunC args body) = do
     (argVars, argScms) <- mapAndUnzipM (\arg -> do
         var <- fresh Star >>= return . TVar
-        return (var, [] :=> (TForall [] var))) args
+        return (var, TForall [] ([] :=> var))) args
     br <- withEnv (zip args argScms) $ infer body
     let fun_ty = TFun $ tyFun : (argVars ++ [br])
     return fun_ty
@@ -141,7 +142,6 @@ infer (_ :< FunC args body) = do
 -- producing the return value.
 infer (_ :< AppC op erands) = do
     op' <- infer op
-    logInfer $ "op' = " ++ (show op')
     erands' <- mapM infer erands
     var <- fresh Star >>= return . TVar
     op' @= (TFun $ tyFun : (erands' ++ [var]))

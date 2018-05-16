@@ -26,9 +26,9 @@ emptyUnifier :: Unifier
 emptyUnifier = (mempty, [])
 
 data SolveState = SolveState
-    { frame            :: Frame
-    , constraints      :: [Constraint]
-    , classConstraints :: [Constraint]
+    { frame       :: Frame
+    , constraints :: [Constraint]
+    , preds       :: [Pred]
     }
 
 initSolveState :: SolveState
@@ -112,7 +112,7 @@ occursCheck a t = a `S.member` (ftv t)
 -- | The actual solving algorithm. Reads the current 'Unifier' and iterates
 -- through the constraints generating 'Unifier's. These are then merged into the
 -- state.
-solver :: Solve (Frame, [Constraint])
+solver :: Solve (Frame, [Pred])
 solver = do
     cs <- gets constraints
     case (sort cs) of
@@ -126,20 +126,19 @@ solver = do
                 }
             solver
 
-        ((p  :~ t ):cs0) -> do
+        (((IsIn c _)  :~ t ):cs0) -> do
             su <- gets frame
-            cc <- gets classConstraints
-            let p' = substitute su p
-                t' = substitute su t
+            cc <- gets preds
+            let t' = substitute su t
             modify $ \st -> st {
-                classConstraints = (p' :~ t') : cc,
+                preds = (IsIn c t') : cc,
                 constraints = cs0
                 }
             solver
 
 solveConstraints
     :: [Constraint]
-    -> Compiler (Frame, [Constraint])
+    -> Compiler (Frame, [Pred])
 solveConstraints cs = evalStateT solver $ initSolveState {
     constraints = cs
     }
