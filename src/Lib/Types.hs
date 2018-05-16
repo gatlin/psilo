@@ -148,7 +148,7 @@ typecheck_pass ce te (sym, expr) = tc_pass `catchError` handler where
         (frame, cs') <- (solveConstraints cs)
         logMsg $ sym ++ " : " ++ (show (fmap (substitute frame) sig))
         logMsg . show $ frame
-        forM_ (substitute frame (sort cs)) $ logMsg . show
+        forM_ (substitute frame cs') $ logMsg . show
         let scheme = extract $ (extend $ toScheme frame) sig
         logMsg $ sym ++ " : " ++ (show scheme)
         logMsg "-----"
