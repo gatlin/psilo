@@ -27,11 +27,11 @@ data PsiloError
 
 instance Show PsiloError where
     show (UnificationFail t1 t2) =
-        "Failed to unify types: " ++
+        "Unification failure for types: " ++
         (show t1) ++ " and " ++ (show t2)
 
     show (UnificationMismatch ts1 ts2) =
-        "Failed to unify types: " ++
+        "Unification mismatch for types: " ++
         (show ts1) ++ " and " ++ (show ts2)
 
     show (TypeMismatch t1 t2) =

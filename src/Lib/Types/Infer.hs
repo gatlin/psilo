@@ -141,6 +141,7 @@ infer (_ :< FunC args body) = do
 -- producing the return value.
 infer (_ :< AppC op erands) = do
     op' <- infer op
+    logInfer $ "op' = " ++ (show op')
     erands' <- mapM infer erands
     var <- fresh Star >>= return . TVar
     op' @= (TFun $ tyFun : (erands' ++ [var]))

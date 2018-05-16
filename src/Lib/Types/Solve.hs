@@ -45,13 +45,25 @@ logS = lift . logMsg
 runSolve :: Solve a -> SolveState -> Either PsiloError a
 runSolve s st = compile (evalStateT s st)
 
+showWithKind x = "(" ++ (show x) ++ " :: " ++ (show (kind x)) ++ ")"
+
 -- | Unification of two 'Type's
 unify :: Type -> Type -> Solve Unifier
-unify t1 t2                     | t1 == t2 = return emptyUnifier
-unify (TVar v) t                = v `bind` t
-unify t (TVar v)                = v `bind` t
-unify t1@(TFun as) t2@(TFun bs) = unifyMany as bs
-unify t1 t2                     = throwError $ UnificationFail t1 t2
+unify t1 t2                       | (kind t1) /= (kind t2) =
+                                        throwError $ OtherTypeError $
+                                        "Kind mismatch: " ++
+                                        (showWithKind t1) ++ " and " ++
+                                        (showWithKind t2)
+                                  | t1 == t2 = return emptyUnifier
+--unify t1@(TLiteral _) t2@(TFun _) = throwError $ UnificationFail t1 t2
+--unify t1@(TFun _) t2@(TLiteral _) = throwError $ UnificationFail t1 t2
+unify (TVar v) t                  = v `bind` t
+unify t (TVar v)                  = v `bind` t
+
+--unify (TLiteral v) t              = v `bind` t
+--unify t (TLiteral v)              = v `bind` t
+unify t1@(TFun as) t2@(TFun bs)   = unifyMany as bs
+unify t1 t2                       = throwError $ UnificationFail t1 t2
 
 -- | Unification of a list of 'Type's.
 unifyMany :: [Type] -> [Type] -> Solve Unifier
@@ -76,12 +88,18 @@ matchMany (t1 : ts1) (t2 : ts2) = do
     (su2, cs2) <- matchMany ts1 ts2
     case merge su1 su2 of
         Nothing -> do
-            throwError $ OtherTypeError $ "Frame 1: " ++ (show su1) ++ "  Frame 2: " ++ (show su2)
+            throwError $
+                OtherTypeError $
+                "Frame 1: " ++ (show su1) ++ "  Frame 2: " ++ (show su2)
         Just su -> return (su, nub $ cs1 ++ cs2)
 
 -- | Bind a 'TyVar' to a 'Type' in the 'Frame', unless the result would be an
 -- infinite type.
 bind :: TyVar -> Type -> Solve Unifier
+--bind a t@(TLiteral v) = do
+--    logS $ "[bind] " ++ (show a) ++ " => " ++ (show t)
+--    return emptyUnifier
+--bind a (TLiteral v) = bind a (TVar v)
 bind a t | t == TVar a = return emptyUnifier
          | occursCheck a t = throwError $ InfiniteType a t
          | otherwise = do

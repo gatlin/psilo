@@ -59,8 +59,8 @@ instance Show Type where
         where vs' = intercalate " " $ map show vs
               prefix = "∀" ++ vs' ++ ". "
     show (TVar n) = show n
-    show (TSym sym) = show sym
-    show (TFun ts) = go ts where
+    show t@(TSym sym) = show sym
+    show t@(TFun ts) = go ts where
         go [] = ""
         go ((TSym (TyCon "->" _)):t:[]) = "-> " ++ (show t)
         go ((TSym (TyCon "->" Star)):ts') = intercalate " -> " $
@@ -72,12 +72,19 @@ instance Show Type where
         where ps' = intercalate ", " $ map show ps
 
 instance HasKind Type where
-    kind (TForall vs t) = kind t
-    kind (TSym tc)      = kind tc
-    kind (TVar tv)      = kind tv
-    kind (TFun (t:ts))  = Star -- FIXME NOT ALWAYS
-    kind (ps :=> t)     = kind t
-    kind (IsIn c t)     = kind t
+    kind (TForall vs t)                    = kind t
+    kind (TSym tc)                         = kind tc
+    kind (TVar tv)                         = kind tv
+    kind (TFun (t:ts)) = go ts where
+
+        go ts | length ts == 1 = (Star :-> Star) -- nullary functions
+              | otherwise = go' ts
+
+        go' (t:[]) = kind t
+        go' (t:ts) = (kind t) :-> (go' ts)
+
+    kind (ps :=> t)                        = kind t
+    kind (IsIn c t)                        = kind t
 
 typeInt, typeBool, typeFloat :: Type
 typeInt = TSym (TyCon "Int" Star)

@@ -141,20 +141,29 @@ typecheck_pass
     -> TypeEnv
     -> (Symbol, AnnotatedExpr ())
     -> Compiler TypeEnv
-typecheck_pass ce te (sym, expr) = do
-    (sig, inferState, cs) <- runInfer te $
-        sequence . extend infer $ expr
-    (frame, cs') <- solveConstraints cs
-    logMsg $ sym ++ " : " ++ (show sig)
-    logMsg . show $ frame
-    forM_ (sort cs) $ logMsg . show
-    let scheme = extract $ (extend $ toScheme frame) sig
-    logMsg $ sym ++ " : " ++ (show scheme)
-    logMsg "-----"
-    -- if the symbol was already in the type environment, verify that they match
-    checkTypeEnv sym scheme te
-    -- build the new type environment
-    return $ extendEnv te (sym, scheme)
+typecheck_pass ce te (sym, expr) = tc_pass `catchError` handler where
+    tc_pass = do
+        (sig, inferState, cs) <- runInfer te $
+            sequence . extend infer $ expr
+        (frame, cs') <- (solveConstraints cs)
+        logMsg $ sym ++ " : " ++ (show (fmap (substitute frame) sig))
+        logMsg . show $ frame
+        forM_ (substitute frame (sort cs)) $ logMsg . show
+        let scheme = extract $ (extend $ toScheme frame) sig
+        logMsg $ sym ++ " : " ++ (show scheme)
+        logMsg "-----"
+        -- if the symbol was already in the type environment, verify that they match
+        checkTypeEnv sym scheme te
+        -- build the new type environment
+        return $ extendEnv te (sym, scheme)
+
+    handler err = do
+        logMsg $ "Error: " ++ (show err)
+        return te
+
+catchSolveErr err = do
+    logMsg $ "Error: " ++ (show err)
+    return (mempty, mempty)
 
 checkTypeEnv :: Symbol -> Scheme -> TypeEnv -> Compiler ()
 checkTypeEnv sym s1@(_ :=> t1) tyEnv = case envLookup tyEnv sym of
