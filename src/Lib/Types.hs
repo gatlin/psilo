@@ -145,8 +145,9 @@ typecheck_pass
     -> Compiler TypeEnv
 typecheck_pass ce te (sym, expr) = tc_pass `catchError` handler where
     tc_pass = do
-        (sig, inferState, cs) <- runInfer te $
-            sequence . extend infer $ expr
+        (sig, inferState, cs) <- runInfer te $ do
+            expr' <- sequence . extend infer $ expr
+            return expr'
         (frame, preds) <- (solveConstraints cs)
         let sig' = fmap (substitute frame) sig
         let vars = ftv $ extract sig'
@@ -157,7 +158,6 @@ typecheck_pass ce te (sym, expr) = tc_pass `catchError` handler where
             _ -> return []
         let scheme = extract $ (extend $ toScheme frame (concat preds')) sig'
         logMsg $ sym ++ " : " ++ (show scheme)
-        logMsg "-----"
         -- if the symbol was already in the type environment, verify that they match
 --        checkTypeEnv sym scheme te
         -- build the new type environment

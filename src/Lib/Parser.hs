@@ -8,6 +8,7 @@ import           Control.Monad.Except
 import           Control.Monad.Free
 import           Data.Attoparsec.Text
 import           Data.Char            (isAlpha, isDigit, ord)
+import           Data.List            (nub)
 import qualified Data.Set             as S
 import           Data.Text            (Text)
 import qualified Data.Text            as Text
@@ -164,7 +165,7 @@ scheme_parser = (parens pred_type) <|> bare_type where
         skipSpace
         t <- type_parser
         skipSpace
-        return $ TForall (S.toList $ ftv t) (preds :=> t)
+        return $ TForall (S.toList $ ftv t) ((nub preds) :=> t)
 
     pred :: Parser Pred
     pred = parens $ do
@@ -196,7 +197,7 @@ type_parser = do
             skipSpace
             string "->"
             skipSpace
-            ts <- type_parser `sepBy` (many space)
+            ts <- scheme_parser `sepBy` (many space)
             skipSpace
             return $ TFun $ tyFun : ts
 

@@ -17,12 +17,15 @@ import qualified Data.Set          as S
 -- This is an alias for 'Type' to make navigating the code clearer.
 type Scheme = Type
 
--- | Invariant: Schemes take the form '[pred...*] :=> forall [var...*] t'.
+-- | Invariant: Schemes take the form 'forall [var...*] ([pred...*] => t)'.
 normalize :: Scheme -> Scheme
-normalize (TForall vs (ps :=> t)) = TForall vs ((nub ps) :=> t)
+normalize (TForall vs t) = TForall vs t'
     where
         len_vs = (length vs) - 1
         vs' = map (\n -> TyVar n Star) [0..len_vs]
         frame = M.fromList $ zip vs (map TVar vs')
-        ps' = substitute frame ps
-        t' = substitute frame t
+        t' = pred_massage frame t
+
+        pred_massage fr (preds :=> ty) =
+            (nub (substitute fr preds)) :=> ty
+        pred_massage fr ty = ty

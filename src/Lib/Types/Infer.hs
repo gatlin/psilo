@@ -63,6 +63,16 @@ runInfer te m = do
     ((a, inferState'), cs) <- runWriterT (runStateT (runReaderT m te) initInferState)
     return (a, inferState', (nub cs))
 
+runInfer'
+    :: TypeEnv
+    -> InferState
+    -> Infer a
+    -> Compiler (a, InferState, [Constraint])
+
+runInfer' te inferState m = do
+    ((a, inferState'), cs) <- runWriterT (runStateT (runReaderT m te) inferState)
+    return (a, inferState', (nub cs))
+
 -- I know it isn't pretty
 logInfer :: String -> Infer ()
 logInfer = lift . lift . lift . logMsg
@@ -102,6 +112,25 @@ instantiate (ps :=> (TForall vs t)) = do
     tyInst ps
     return $ substitute frame (ps' :=> t)
 instantiate qt = return qt
+
+type Sigma = Type
+type Rho = Type
+
+skolemize :: Sigma -> Infer ([TyVar], Rho)
+skolemize (TForall vars ty) = do -- Rule PRPOLY
+    sks1 <- mapM (const $ fresh Star) vars
+    let frame = M.fromList $ zip vars (fmap TVar sks1)
+    (sks2, ty') <- skolemize (substitute frame ty)
+    return (sks1 ++ sks2, ty')
+
+skolemize (TFun tys) = do -- Rule PRFUN
+    let tys_len = length tys
+    let (arg_tys, [res_ty]) = splitAt (tys_len - 1) tys
+    (sks, res_ty') <- skolemize res_ty
+    return (sks, TFun $ arg_tys ++ [ res_ty' ])
+
+skolemize ty = do -- Rule PRMONO
+    return ([], ty)
 
 -- | Constraint generation and type generation
 infer :: AnnotatedExpr () -> Infer Type
