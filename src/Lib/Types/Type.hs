@@ -40,7 +40,7 @@ instance HasKind TyCon where
 -- The theoretical type grammar is based on [1], with the addition of qualified
 -- types.
 --
---   Type variables a, b, [a]
+--   Type variables a, b
 --   Type constants K
 --   Qualified type : qual ::= [<symbol> <tau>...] => <rho>
 --   Sigma types :    sigma ::= forall [a...] <rho>
