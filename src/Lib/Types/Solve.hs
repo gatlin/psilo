@@ -53,7 +53,7 @@ unify t1 t2                       {-| (kind t1) /= (kind t2) =
                                         throwError $ OtherTypeError $
                                         "Kind mismatch: " ++
                                         (showWithKind t1) ++ " and " ++
-                                        (showWithKind t2) -}
+                                        (showWithKind t2)-}
                                   | t1 == t2 = return emptyUnifier
 --unify t1@(TLiteral _) t2@(TFun _) = throwError $ UnificationFail t1 t2
 --unify t1@(TFun _) t2@(TLiteral _) = throwError $ UnificationFail t1 t2

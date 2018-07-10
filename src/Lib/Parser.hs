@@ -154,7 +154,43 @@ defun_parser = do
                                (map snd args))
 
 scheme_parser :: Parser Scheme
-scheme_parser = (parens pred_type) <|> bare_type where
+scheme_parser = sigma where
+
+    sigma :: Parser Type
+    sigma = (parens quantified) <|> unquantified
+
+    quantified :: Parser Type
+    quantified = do
+        skipSpace
+        string "forall"
+        skipSpace
+        vars <- parens (sym `sepBy` (many space))
+        skipSpace
+        t <- rho
+        skipSpace
+        return $ TForall (fmap (\v -> TyVar (string_hash v) Star) vars) t
+
+    unquantified :: Parser Type
+    unquantified = do
+        skipSpace
+        t <- (parens pred_type) <|> rho
+        skipSpace
+        return $ t
+
+    rho :: Parser Type
+    rho = tau <|> (parens sigma_arrow)
+
+    sigma_arrow :: Parser Type
+    sigma_arrow = do
+        skipSpace
+        string "->"
+        skipSpace
+        tys <- sigma `sepBy` (many space)
+        skipSpace
+        return $ TFun $ tyFun : tys
+
+    tau :: Parser Type
+    tau = type_parser
 
     pred_type :: Parser Scheme
     pred_type = do
@@ -163,9 +199,9 @@ scheme_parser = (parens pred_type) <|> bare_type where
         skipSpace
         preds <- parens (pred `sepBy` (many space))
         skipSpace
-        t <- type_parser
+        t <- rho
         skipSpace
-        return $ TForall (S.toList $ ftv t) ((nub preds) :=> t)
+        return $ (preds :=> t)
 
     pred :: Parser Pred
     pred = parens $ do
@@ -175,11 +211,6 @@ scheme_parser = (parens pred_type) <|> bare_type where
         t <- ty_sym
         skipSpace
         return $ IsIn p t
-
-    bare_type :: Parser Scheme
-    bare_type = do
-        t <- type_parser
-        return $ TForall (S.toList $ ftv t) ([] :=> t)
 
 type_parser :: Parser Type
 type_parser = do
@@ -197,7 +228,7 @@ type_parser = do
             skipSpace
             string "->"
             skipSpace
-            ts <- scheme_parser `sepBy` (many space)
+            ts <- ty_sym `sepBy` (many space)
             skipSpace
             return $ TFun $ tyFun : ts
 

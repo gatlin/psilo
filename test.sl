@@ -6,14 +6,19 @@
 ;(= nine (square three))
 ;(= thirty-six (square six))
 
-(= five-1 5.0)
-(= five-2 () 5.0)
-(= ten-1 (* 2 five-1))
+;(= five-1 5.0)
+;(= five-2 () 5.0)
+;(= ten-1 (* 2 five-1))
 ;(= ten-2 (* 2 five-2))
 
-(: times-2-then-square (=> ((Num n)) (-> n n)))
-(= times-2-then-square (x)
-  ((\ (y) (square y))
-   (* 2 x)))
+;(: times-2-then-square (=> ((Num n)) (-> n n)))
+;(= times-2-then-square (x)
+;  ((\ (y) (square y))
+;   (* 2 x)))
 
+(: foo
+  (forall (a)
+    (-> a
+      (forall (b)
+        (-> (-> a b) b)))))
 (= foo (x) (\ (f) (f x)))
