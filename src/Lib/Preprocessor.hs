@@ -20,7 +20,9 @@ import           Lib.Syntax.Core
 import           Lib.Syntax.Surface
 import           Lib.Syntax.Symbol
 import           Lib.Syntax.TopLevel
+import           Lib.Types.Frame
 import           Lib.Types.Scheme
+import           Lib.Types.Type
 
 import           Lib.Errors
 import           Lib.Util
@@ -141,11 +143,16 @@ surfaceToTopLevel (Free (DefS sym val)) = do
         Right ann -> return $ Define sym ann
 
 surfaceToTopLevel (Free (SigS sym scheme)) = return $
-    Signature sym $ normalize scheme
+    Signature sym $ normalize $ quantify scheme
 
 surfaceToTopLevel _ = throwError $
     PreprocessError $
     "Expression is not a top level expression"
+
+quantify :: Type -> Type
+quantify (TForall vs ty) = TForall vs ty
+quantify ty = TForall vs ty where
+    vs = S.toList $ ftv ty
 
 -- | Called by 'surfaceToTopLevel' on a subset of 'SurfaceExpr's
 surfaceToCore

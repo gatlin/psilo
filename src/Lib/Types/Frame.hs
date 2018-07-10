@@ -63,8 +63,7 @@ instance TypeLike Type where
         Nothing -> TVar u
 
     substitute frame (TFun ts) = TFun (substitute frame ts)
-    substitute frame (ps :=> t) =
-        (substitute frame ps) :=> (substitute frame t)
-    substitute frame t = t
-
     substitute frame (IsIn i t) = IsIn i (substitute frame t)
+    substitute frame (ps :=> t) =
+        (map (substitute frame) ps) :=> (substitute frame t)
+    substitute frame t = t

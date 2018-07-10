@@ -119,6 +119,10 @@ skolemize (TForall vars ty) = do -- Rule PRPOLY
     (sks2, ty') <- skolemize (substitute frame ty)
     return (sks1 ++ sks2, ty')
 
+skolemize qt@(preds :=> ty) = do -- Rule, uh, PRPRED
+    (sks, ty') <- skolemize ty
+    return (sks, preds :=> ty')
+
 skolemize (TFun tys) = do -- Rule PRFUN
     let tys_len = length tys
     let (arg_tys, [res_ty]) = splitAt (tys_len - 1) tys

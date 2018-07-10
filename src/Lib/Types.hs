@@ -131,21 +131,11 @@ typecheck defns _te = do
     logMsg "Initial type environment"
     logMsg . show $ te
     logMsg "-----"
---    sk_te <- skolemize_type_env te
---    logMsg "Skolemized"
---    logMsg . show $ te
---    logMsg "-----"
     classEnv <- transformCE defaultClassEnv mempty
     let dependency_graph = make_dep_graph defns
     let defns' = reverse $ topo' dependency_graph
     te' <- foldM (typecheck_pass classEnv) te defns'
     return te'
-{-
-skolemize_type_env
-    :: TypeEnv
-    -> Compiler TypeEnv
-skolemize_type
--}
 
 typecheck_pass
     :: ClassEnv

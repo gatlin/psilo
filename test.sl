@@ -1,4 +1,4 @@
-(: square (forall (n) (=> ((Num n)) (-> n n))))
+(: square (=> ((Num n)) (-> n n)))
 (= square (x) (* x x))
 
 ;(= three 3.0)
@@ -17,8 +17,8 @@
 ;   (* 2 x)))
 
 (: foo
-  (forall (a)
-    (-> a
+
+    (=> ((Num a)) (-> a
       (forall (b)
         (-> (-> a b) b)))))
 (= foo (x) (\ (f) (f x)))

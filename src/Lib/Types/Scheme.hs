@@ -13,20 +13,18 @@ import qualified Data.Map          as M
 import           Data.Set          (Set)
 import qualified Data.Set          as S
 
--- | A polymorphic, universally quantified type at the top-level scope.
--- This is an alias for 'Type' to make navigating the code clearer.
+-- | This module was named back when only rank-1 types were considered and a
+-- "type scheme" alias was defined here. The normalization function is still
+-- useful and, since it depends on Lib.Types.Type and Lib.Types.Frame, goes well
+-- in its own module. Look, one thing at a time.
 
 -- | Ideally, after normalization we can determine if two types are the same
 normalize :: Sigma -> Sigma
-normalize (TForall [] t) = t
-normalize (TForall vs t) = TForall vs $ normalize t'
+normalize (TForall [] t) = normalize t
+normalize (TForall vs t) = TForall vs' $ normalize t'
     where
         len_vs = (length vs) - 1
         vs' = map (\n -> TyVar n Star) [0..len_vs]
         frame = M.fromList $ zip vs (map TVar vs')
-        t' = pred_massage frame t
-
-        pred_massage fr (preds :=> ty) =
-            (nub (substitute fr preds)) :=> ty
-        pred_massage fr ty = ty
+        t' = substitute frame t
 normalize t = t
