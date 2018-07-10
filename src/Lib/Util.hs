@@ -12,11 +12,11 @@ import qualified Data.Set               as S
 import           Lib.Compiler
 import           Lib.Errors
 import           Lib.Syntax
-import           Lib.Types.Scheme       (Scheme)
+import           Lib.Types.Type         (Sigma)
 import           Prelude                hiding (lookup)
 
 type Defn = (Symbol, AnnotatedExpr ())
-type Sig = (Symbol, Scheme)
+type Sig = (Symbol, Sigma)
 
 splitUp :: [TopLevel] -> ([Defn], [Sig])
 splitUp = foldl go ([], [])

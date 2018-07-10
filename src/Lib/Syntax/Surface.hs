@@ -8,7 +8,7 @@ module Lib.Syntax.Surface where
 
 import Lib.Syntax.Symbol
 import Lib.Syntax.Core
-import Lib.Types.Scheme
+import Lib.Types.Type
 import Control.Monad.Free
 import Control.Monad (join)
 
@@ -37,7 +37,7 @@ data SurfaceAst a
     | IfS { ifCondS :: a, ifThenS :: a, ifElseS :: a }
     | DefS { defSymS :: Symbol, defValueS :: a }
     | SigS { sigSymS :: Symbol
-           , sigScheme :: Scheme }
+           , sigScheme :: Sigma }
     deriving ( Functor
              , Foldable
              , Traversable
@@ -80,6 +80,6 @@ aDef s b = join . liftF $ DefS s b
 aSig
     :: (MonadFree SurfaceAst m)
     => Symbol
-    -> Scheme
+    -> Type
     -> m a
 aSig sym t = join . liftF $ SigS sym t

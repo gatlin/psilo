@@ -4,6 +4,7 @@ import           Lib.Syntax.Annotated
 import           Lib.Syntax.Core
 import           Lib.Syntax.Symbol
 import           Lib.Types.Scheme
+import           Lib.Types.Type       (Sigma)
 
 -- | Top level syntax forms
 -- Eventually we want to support the following:
@@ -15,5 +16,5 @@ import           Lib.Types.Scheme
 --   New data types
 data TopLevel
     = Define Symbol (AnnotatedExpr ()) -- ^ A value definition
-    | Signature Symbol Scheme -- ^ A top level type scheme
+    | Signature Symbol Sigma -- ^ A top level type scheme
     deriving (Show, Eq)

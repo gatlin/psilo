@@ -153,7 +153,7 @@ defun_parser = do
     return $ aDef name (join $ aFun (map fst args) body
                                (map snd args))
 
-scheme_parser :: Parser Scheme
+scheme_parser :: Parser Type
 scheme_parser = sigma where
 
     sigma :: Parser Type
@@ -166,7 +166,7 @@ scheme_parser = sigma where
         skipSpace
         vars <- parens (sym `sepBy` (many space))
         skipSpace
-        t <- rho
+        t <- unquantified
         skipSpace
         return $ TForall (fmap (\v -> TyVar (string_hash v) Star) vars) t
 
@@ -192,7 +192,7 @@ scheme_parser = sigma where
     tau :: Parser Type
     tau = type_parser
 
-    pred_type :: Parser Scheme
+    pred_type :: Parser Type
     pred_type = do
         skipSpace
         string "=>"

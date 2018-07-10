@@ -3,7 +3,7 @@ module Lib.Types.Scheme where
 import           Lib.Syntax.Symbol
 import           Lib.Types.Frame
 import           Lib.Types.Kind
-import           Lib.Types.Type    (Pred, TyVar (..), Type (..))
+import           Lib.Types.Type    (Pred, Sigma, TyVar (..), Type (..))
 import           Prelude           hiding (lookup)
 import qualified Prelude           as Prelude
 
@@ -15,10 +15,9 @@ import qualified Data.Set          as S
 
 -- | A polymorphic, universally quantified type at the top-level scope.
 -- This is an alias for 'Type' to make navigating the code clearer.
-type Scheme = Type
 
--- | Invariant: Schemes take the form 'forall [var...*] ([pred...*] => t)'.
-normalize :: Scheme -> Scheme
+-- | Ideally, after normalization we can determine if two types are the same
+normalize :: Sigma -> Sigma
 normalize (TForall [] t) = t
 normalize (TForall vs t) = TForall vs $ normalize t'
     where

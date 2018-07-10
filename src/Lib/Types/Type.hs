@@ -46,6 +46,10 @@ data Type
     | IsIn Symbol Type -- Predicates
     deriving (Ord, Eq)
 
+-- | Type aliases for clarity throughout the project
+type Sigma = Type
+type Rho = Type
+
 -- | Type alias for refactor convenience because initially predicates were a
 -- separate type
 type Pred = Type

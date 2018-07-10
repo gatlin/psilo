@@ -8,7 +8,6 @@ module Lib.Types
     , defaultTypeEnv
     , emptyTypeEnv
     , buildTypeEnv
-    , Scheme(..)
     , normalize
     )
 where
@@ -132,11 +131,21 @@ typecheck defns _te = do
     logMsg "Initial type environment"
     logMsg . show $ te
     logMsg "-----"
+--    sk_te <- skolemize_type_env te
+--    logMsg "Skolemized"
+--    logMsg . show $ te
+--    logMsg "-----"
     classEnv <- transformCE defaultClassEnv mempty
     let dependency_graph = make_dep_graph defns
     let defns' = reverse $ topo' dependency_graph
     te' <- foldM (typecheck_pass classEnv) te defns'
     return te'
+{-
+skolemize_type_env
+    :: TypeEnv
+    -> Compiler TypeEnv
+skolemize_type
+-}
 
 typecheck_pass
     :: ClassEnv
@@ -172,18 +181,18 @@ catchSolveErr err = do
     logMsg $ "Error: " ++ (show err)
     return (mempty, mempty)
 
-checkTypeEnv :: Symbol -> Scheme -> TypeEnv -> Compiler ()
+checkTypeEnv :: Symbol -> Sigma -> TypeEnv -> Compiler ()
 checkTypeEnv sym s1@(TForall _ t1) tyEnv = case envLookup tyEnv sym of
     Nothing -> return ()
     Just s2@(TForall _ t2) ->
         (matchTypes t2 t1) `catchError` (errHandler s2)
 
-    where errHandler :: Scheme -> PsiloError -> Compiler ()
+    where errHandler :: Sigma -> PsiloError -> Compiler ()
           errHandler s2 _ = throwError $ OtherTypeError $
               "Type given for " ++ sym ++ " is " ++ (show s2) ++
               ", but the inferred type is " ++ (show s1) ++ "."
 
-toScheme :: Frame -> [Pred] -> AnnotatedExpr Type -> Scheme
+toScheme :: Frame -> [Pred] -> AnnotatedExpr Type -> Sigma
 toScheme frame preds expr =
     let ty = extract expr
     in  closeOver frame (preds :=> ty)

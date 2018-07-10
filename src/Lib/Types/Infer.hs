@@ -22,7 +22,6 @@ import qualified Data.Map               as M
 import           Data.Set               (Set)
 import qualified Data.Set               as S
 
-import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -90,7 +89,7 @@ tyInst ps = forM_ ps $ \pred -> do
     let tvs = S.toList . ftv $ pred
     forM_ tvs $ \tv -> pred @~ (TVar tv)
 
-withEnv :: [(Symbol, Scheme)] -> Infer a -> Infer a
+withEnv :: [(Symbol, Sigma)] -> Infer a -> Infer a
 withEnv ss m = local (<> (buildTypeEnv ss)) m
 
 getEnv :: Infer TypeEnv
@@ -104,7 +103,7 @@ fresh k = do
     return $ TyVar c k
 
 -- | Instantiate a type scheme into a qualified type
-instantiate :: Scheme -> Infer Type
+instantiate :: Sigma -> Infer Type
 instantiate (ps :=> (TForall vs t)) = do
     vs' <- mapM (const $ fresh Star) vs >>= mapM (return . TVar)
     let frame = M.fromList $ zip vs vs'
@@ -112,9 +111,6 @@ instantiate (ps :=> (TForall vs t)) = do
     tyInst ps
     return $ substitute frame (ps' :=> t)
 instantiate qt = return qt
-
-type Sigma = Type
-type Rho = Type
 
 skolemize :: Sigma -> Infer ([TyVar], Rho)
 skolemize (TForall vars ty) = do -- Rule PRPOLY
@@ -155,7 +151,7 @@ infer (_ :< IdC sym) = do
             return ty
 
 -- | A lambda abstraction is a list of symbols and an 'AnnotatedExpr' body. Each
--- argument should generate a unique 'Scheme' and the 'TypeEnv' should be
+-- argument should generate a unique 'Sigma' and the 'TypeEnv' should be
 -- temporarily extended with them to evaluate the body.
 infer (_ :< FunC args body) = do
     (argVars, argScms) <- mapAndUnzipM (\arg -> do
