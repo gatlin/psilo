@@ -44,7 +44,7 @@ instance HasKind TyCon where
 --   Type constants K
 --   Qualified type : qual ::= [<symbol> <tau>...] => <rho>
 --   Sigma types :    sigma ::= forall [a...] <rho>
---   Rho types :      rho   ::= <tau> | <sigma> -> <sigma> | <pred>
+--   Rho types :      rho   ::= <tau> | <sigma> -> <sigma> | <qual>
 --   Tau types :      tau   ::= K | <tau> -> <tau> | a
 --
 -- There are a number of invariants that are (should be) maintained throughout
