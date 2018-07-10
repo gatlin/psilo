@@ -112,6 +112,7 @@ instantiate (ps :=> (TForall vs t)) = do
     return $ substitute frame (ps' :=> t)
 instantiate qt = return qt
 
+-- |
 skolemize :: Sigma -> Infer ([TyVar], Rho)
 skolemize (TForall vars ty) = do -- Rule PRPOLY
     sks1 <- mapM (const $ fresh Star) vars

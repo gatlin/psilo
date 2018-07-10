@@ -37,6 +37,22 @@ instance HasKind TyCon where
     kind (TyCon _ k) = k
 
 -- | Types are like kind-level values :)
+-- The theoretical type grammar is based on [1], with the addition of qualified
+-- types.
+--
+--   Type variables a, b, [a]
+--   Type constants K
+--   Qualified type : qual ::= [<symbol> <tau>...] => <rho>
+--   Sigma types :    sigma ::= forall [a...] <rho>
+--   Rho types :      rho   ::= <tau> | <sigma> -> <sigma> | <pred>
+--   Tau types :      tau   ::= K | <tau> -> <tau> | a
+--
+-- There are a number of invariants that are (should be) maintained throughout
+-- the code, but the grammar itself permits all sorts of violations. Perhaps in
+-- an optimistic future we can encode more safety into the grammar.
+--
+-- [1]: Practical Type inference for arbitrary-rank types,
+--      Peyton-Jones et al
 data Type
     = TVar TyVar
     | TSym TyCon
