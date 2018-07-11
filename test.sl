@@ -16,7 +16,7 @@
 ;  ((\ (y) (square y))
 ;   (* 2 x)))
 
-(::= D (a) (forall (r) (-> (-> a r) r)))
-(: d (-> a (D a)))
-(= d (x) (D (\ (k) (k x))))
-;(::= Pair (x y) (forall (r) (-> (-> x y r) r)))
+;(::= D (a) (forall (r) (-> (-> a r) r)))
+;(: d (-> a (D a)))
+;(= d (x) (D (\ (k) (k x))))
+(::= Pair (x y) (forall (r) (-> (-> x y r) r)))
