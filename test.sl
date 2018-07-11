@@ -71,13 +71,19 @@
 (= map-list (f xs) (foldr (\ (y ys) (cons (f y) ys)) (nil) xs))
 
 (= split (xs)
-  (foldr (\ (y ys)
-           (pair (just y)
-                 (List (\ (c e)
-                         (maybe (fst ys) e (\ (x) (c x (foldr c e (snd
-  ys)))))))))
-  (pair (null) (nil))
-  xs))
+  (foldr
+    (\ (y ys)
+      (pair
+        (just y)
+        (List
+          (\ (c e)
+            (maybe
+              (fst ys)
+              e
+              (\ (x)
+                (c x (foldr c e (snd ys)))))))))
+    (pair (null) (nil))
+    xs))
 
 (= head (xs) (fst (split xs)))
 (= tail (xs) (snd (split xs)))
