@@ -3,6 +3,7 @@ module Lib
       Compiler
     , compile
     , compileWithLogs
+    , logMsg
       -- * Parsing & Syntax
     , parse_expr
     , parse_multi

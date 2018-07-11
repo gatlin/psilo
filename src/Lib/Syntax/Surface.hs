@@ -36,8 +36,10 @@ data SurfaceAst a
     | FunS { funArgsS :: [Symbol], funBodyS :: a, funSigS :: [Maybe a] }
     | IfS { ifCondS :: a, ifThenS :: a, ifElseS :: a }
     | DefS { defSymS :: Symbol, defValueS :: a }
-    | SigS { sigSymS :: Symbol
-           , sigScheme :: Sigma }
+    | SigS { sigSymS :: Symbol , sigScheme :: Sigma }
+    | TypedefS { typedefSymS :: Symbol
+               , typedefVarsS :: [TyVar]
+               , typedefBodyS :: Sigma }
     deriving ( Functor
              , Foldable
              , Traversable
@@ -83,3 +85,11 @@ aSig
     -> Type
     -> m a
 aSig sym t = join . liftF $ SigS sym t
+
+aTypedef
+    :: (MonadFree SurfaceAst m)
+    => Symbol
+    -> [TyVar]
+    -> Sigma
+    -> m a
+aTypedef sym vars body = join . liftF $ TypedefS sym vars body

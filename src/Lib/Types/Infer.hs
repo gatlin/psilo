@@ -104,34 +104,19 @@ fresh k = do
 
 -- | Instantiate a type scheme into a qualified type
 instantiate :: Sigma -> Infer Type
-instantiate (ps :=> (TForall vs t)) = do
+instantiate (TForall vs t) = do
     vs' <- mapM (const $ fresh Star) vs >>= mapM (return . TVar)
     let frame = M.fromList $ zip vs vs'
-        ps' = substitute frame ps
-    tyInst ps
-    return $ substitute frame (ps' :=> t)
+    t' <- case t of
+        (ps :=> ty) -> do
+            let ps' = substitute frame ps
+            return $ ps' :=> (substitute frame ty)
+        _ -> return $ substitute frame $ [] :=> t
+    return t'
+--        ps' = substitute frame ps
+--    tyInst ps
+--    return $ substitute frame (ps' :=> t)
 instantiate qt = return qt
-
--- |
-skolemize :: Sigma -> Infer ([TyVar], Rho)
-skolemize (TForall vars ty) = do -- Rule PRPOLY
-    sks1 <- mapM (const $ fresh Star) vars
-    let frame = M.fromList $ zip vars (fmap TVar sks1)
-    (sks2, ty') <- skolemize (substitute frame ty)
-    return (sks1 ++ sks2, ty')
-
-skolemize qt@(preds :=> ty) = do -- Rule, uh, PRPRED
-    (sks, ty') <- skolemize ty
-    return (sks, preds :=> ty')
-
-skolemize (TFun tys) = do -- Rule PRFUN
-    let tys_len = length tys
-    let (arg_tys, [res_ty]) = splitAt (tys_len - 1) tys
-    (sks, res_ty') <- skolemize res_ty
-    return (sks, TFun $ arg_tys ++ [ res_ty' ])
-
-skolemize ty = do -- Rule PRMONO
-    return ([], ty)
 
 -- | Constraint generation and type generation
 infer :: AnnotatedExpr () -> Infer Type
@@ -151,7 +136,7 @@ infer (_ :< IdC sym) = do
     case envLookup te sym of
         Nothing -> fresh Star >>= return . TVar
         Just scheme -> do
-            qt@(TForall _ (ps :=> ty)) <- instantiate scheme
+            (ps :=> ty) <- instantiate scheme
             tyInst ps
             return ty
 
@@ -161,7 +146,7 @@ infer (_ :< IdC sym) = do
 infer (_ :< FunC args body) = do
     (argVars, argScms) <- mapAndUnzipM (\arg -> do
         var <- fresh Star >>= return . TVar
-        return (var, TForall [] ([] :=> var))) args
+        return (var, TForall [] var)) args
     br <- withEnv (zip args argScms) $ infer body
     let fun_ty = TFun $ tyFun : (argVars ++ [br])
     return fun_ty

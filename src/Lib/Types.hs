@@ -9,6 +9,7 @@ module Lib.Types
     , emptyTypeEnv
     , buildTypeEnv
     , normalize
+    , tyFun
     )
 where
 
@@ -147,7 +148,7 @@ typecheck_pass ce te (sym, expr) = tc_pass `catchError` handler where
         (sig, inferState, cs) <- runInfer te $ do
             expr' <- sequence . extend infer $ expr
             return expr'
-        (frame, preds) <- (solveConstraints cs)
+        (frame, preds) <- (solveConstraints cs (varCount inferState))
         let sig' = fmap (substitute frame) sig
         let vars = ftv $ extract sig'
         preds' <- forM preds $ \pred@(IsIn c t) -> case t of

@@ -49,7 +49,10 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
         contents <- TextIO.readFile inFile
         let result = compileWithLogs $ do
                 toplevels <- process_file contents
-                let (defns, sigs) = splitUp toplevels
+                let (defns, sigs, tds) = splitUp toplevels
+                forM_ tds $ \(name, vars, body) ->
+                    logMsg $ "Type definition: " ++
+                    name ++ " " ++ (show vars) ++ " ::= " ++ (show body)
                 let tyEnv = buildTypeEnv sigs
                 typeEnv <- typecheck defns tyEnv
                 return (typeEnv, defns)
@@ -72,6 +75,6 @@ process_file :: Text -> Compiler [TopLevel]
 process_file file_contents = do
     defns <- parse_multi $ removeComments file_contents
     preprocess $ do
-        toplevels <- mapM surfaceToTopLevel defns
+        toplevels <- mapM surfaceToTopLevel defns >>= return . concat
         boundVarCheck toplevels
         return toplevels

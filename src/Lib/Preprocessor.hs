@@ -21,6 +21,8 @@ import           Lib.Syntax.Surface
 import           Lib.Syntax.Symbol
 import           Lib.Syntax.TopLevel
 import           Lib.Types.Frame
+import           Lib.Types.Infer
+import           Lib.Types.Kind         (Kind (..))
 import           Lib.Types.Scheme
 import           Lib.Types.Type
 
@@ -134,16 +136,29 @@ uniqueIds whatever = return whatever
 -- | Transforms a 'SurfaceExpr' into a 'TopLevel' expression
 surfaceToTopLevel
     :: SurfaceExpr ()
-    -> Preprocess TopLevel
+    -> Preprocess [TopLevel]
 surfaceToTopLevel (Free (DefS sym val)) = do
     uval <- uniqueIds val
     val' <- surfaceToCore uval
     case compile (annotated val') of
         Left _    -> throwError $ PreprocessError "wut"
-        Right ann -> return $ Define sym ann
+        Right ann -> return [ Define sym ann ]
 
-surfaceToTopLevel (Free (SigS sym scheme)) = return $
-    Signature sym $ normalize $ quantify scheme
+surfaceToTopLevel (Free (SigS sym scheme)) = return
+    [ Signature sym $ normalize $ quantify scheme ]
+
+surfaceToTopLevel (Free (TypedefS name vars body)) = do
+    let body' = normalize . quantify $ body
+    let ret_type = TFun $ (TSym (TyCon name Star)) : (fmap TVar vars)
+    let ctor = normalize $ TForall vars $ TFun $
+               tyFun : (body : [ret_type])
+    let dtor = normalize $ TForall vars $ TFun $
+               tyFun : (ret_type : [body])
+    return
+        [ Typedef name vars $ normalize $ quantify body
+        , Signature name ctor
+        , Signature ("~"++name) dtor
+        ]
 
 surfaceToTopLevel _ = throwError $
     PreprocessError $
@@ -181,11 +196,22 @@ surfaceToCore (Free (IfS c t e)) = do
 surfaceToCore s = throwError $ PreprocessError $
     "Expression " ++ show s ++ " cannot be converted into a core expression."
 
+fst' :: (a, b, c) -> a
+fst' (x, y, z) = x
+
+snd' :: (a, b, c) -> b
+snd' (x, y, z) = y
+
+thd' :: (a, b, c) -> c
+thd' (x, y, z) = z
+
 -- | Ensures that all symbols are either bound or global
 boundVarCheck :: [TopLevel] -> Preprocess ()
 boundVarCheck toplevels = withBoundVars bvs $ mapM_ go toplevels
     where
-        syms = fmap (\x -> (x,x)) $ fmap fst $ fst $ splitUp toplevels
+        syms = defn_syms ++ ty_defn_syms
+        defn_syms = fmap (\x -> (x,x)) $ fmap fst $ fst' $ splitUp toplevels
+        ty_defn_syms = fmap (\x -> (x, x)) $ fmap fst' $ thd' $ splitUp toplevels
         builtins = fmap (\x -> (x,x)) $ S.toList builtin_syms
         bvs = M.fromList $ builtins ++ syms
 

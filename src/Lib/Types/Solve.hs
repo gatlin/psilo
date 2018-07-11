@@ -4,7 +4,8 @@ import           Lib.Syntax.Symbol
 import           Lib.Types.Constraint
 import           Lib.Types.Frame
 import           Lib.Types.Kind       (HasKind, Kind (..), kind)
-import           Lib.Types.Type       (Pred, TyCon (..), TyVar (..), Type (..))
+import           Lib.Types.Type       (Pred, Rho, Sigma, TyCon (..), TyVar (..),
+                                       Type (..))
 
 import           Data.Map             (Map)
 import qualified Data.Map             as M
@@ -29,10 +30,11 @@ data SolveState = SolveState
     { frame       :: Frame
     , constraints :: [Constraint]
     , preds       :: [Pred]
+    , skolemVar   :: Int
     }
 
 initSolveState :: SolveState
-initSolveState = SolveState mempty mempty mempty
+initSolveState = SolveState mempty mempty mempty 0
 
 -- | A monad for solving constraints. The state is a 'Unifier' being
 -- constructed. Execution may result in a raised 'TypeError'.
@@ -59,9 +61,8 @@ unify t1 t2                       {-| (kind t1) /= (kind t2) =
 --unify t1@(TFun _) t2@(TLiteral _) = throwError $ UnificationFail t1 t2
 unify (TVar v) t                  = v `bind` t
 unify t (TVar v)                  = v `bind` t
-
---unify (TLiteral v) t              = v `bind` t
---unify t (TLiteral v)              = v `bind` t
+unify t1 t2@(TForall _ _)         = unifySkolem t2 t1
+unify t1@(TForall _ _) t2         = unifySkolem t2 t1
 unify t1@(TFun as) t2@(TFun bs)   = unifyMany as bs
 unify t1 t2                       = throwError $ UnificationFail t1 t2
 
@@ -73,6 +74,19 @@ unifyMany (t1 : ts1) (t2 : ts2) = do
     (su2, cs2) <- unifyMany (substitute su1 ts1) (substitute su1 ts2)
     return (su2 `compose` su1, nub $ cs1 ++ cs2)
 unifyMany t1 t2 = throwError $ UnificationMismatch t1 t2
+
+-- | Unification of terms which might be sigma types
+unifySkolem :: Sigma -> Sigma -> Solve Unifier
+unifySkolem sigma1 sigma2@(TForall _ _) = do
+    logS $ "Unify skolem 1: " ++ (show sigma1) ++ " <=> " ++ (show sigma2)
+    (sk_vars, rho2) <- skolemize sigma2
+    logS $ "Unify skolem 1.1: " ++ (show rho2)
+    unify sigma1 rho2
+
+unifySkolem sigma1@(TForall _ _) rho2 = do
+    rho1 <- instantiate sigma1
+    logS $ "Unify skolem 2: " ++ (show rho1) ++ " <=> " ++ (show rho2)
+    unify rho1 rho2
 
 -- | Determine if two types match. Similar to unification.
 match :: Type -> Type -> Solve Unifier
@@ -113,34 +127,35 @@ occursCheck a t = a `S.member` (ftv t)
 -- through the constraints generating 'Unifier's. These are then merged into the
 -- state.
 solver :: Solve (Frame, [Pred])
-solver = do
-    cs <- gets constraints
-    case (sort cs) of
-        [] -> get >>= \(SolveState f _ cc) -> return (f, cc)
-        ((t1 := t2):cs0) -> do
-            su <- gets frame
-            (su1, cs1) <- unify (substitute su t1) (substitute su t2)
-            modify $ \st -> st {
-                frame = su1 `compose` su,
-                constraints = nub $ (substitute su1 cs1) ++ (substitute su1 cs0)
-                }
-            solver
+solver = gets constraints >>= go . sort where
+    go [] = get >>= \(SolveState f _ cc sks) -> return (f, cc)
 
-        (((IsIn c _)  :~ t ):cs0) -> do
-            su <- gets frame
-            cc <- gets preds
-            let t' = substitute su t
-            modify $ \st -> st {
-                preds = (IsIn c t') : cc,
-                constraints = cs0
-                }
-            solver
+    go ((t1 := t2):cs0) = do
+        su <- gets frame
+        (su1, cs1) <- unify (substitute su t1) (substitute su t2)
+        modify $ \st -> st {
+            frame = su1 `compose` su,
+            constraints = nub $ (substitute su1 cs1) ++ (substitute su1 cs0)
+            }
+        solver
+
+    go (((IsIn c _)  :~ t ):cs0) = do
+        su <- gets frame
+        cc <- gets preds
+        let t' = substitute su t
+        modify $ \st -> st {
+            preds = (IsIn c t') : cc,
+            constraints = cs0
+            }
+        solver
 
 solveConstraints
     :: [Constraint]
+    -> Int
     -> Compiler (Frame, [Pred])
-solveConstraints cs = evalStateT solver $ initSolveState {
-    constraints = cs
+solveConstraints cs skolem_start = evalStateT solver $ initSolveState {
+    constraints = cs,
+    skolemVar = skolem_start
     }
 
 matchTypes
@@ -150,3 +165,41 @@ matchTypes
 matchTypes t1 t2 = do
     evalStateT (match t1 t2) initSolveState
     return ()
+
+fresh :: Kind -> Solve TyVar
+fresh k = do
+    c <- gets skolemVar
+    modify $ \st -> st { skolemVar = c + 1 }
+    return $ TyVar c k
+
+instantiate :: Sigma -> Solve Type
+instantiate (TForall vs t) = do
+    vs' <- mapM (const $ fresh Star) vs >>= mapM (return . TVar)
+    let frame = M.fromList $ zip vs vs'
+    t' <- case t of
+        (ps :=> ty) -> do
+            let ps' = substitute frame ps
+            return $ ps' :=> (substitute frame ty)
+        _ -> return $ substitute frame $ [] :=> t
+    return t'
+
+-- |
+skolemize :: Sigma -> Solve ([TyVar], Rho)
+skolemize (TForall vars ty) = do -- Rule PRPOLY
+    sks1 <- mapM (const $ fresh Star) vars
+    let frame = M.fromList $ zip vars (fmap TVar sks1)
+    (sks2, ty') <- skolemize (substitute frame ty)
+    return (sks1 ++ sks2, ty')
+
+skolemize qt@(preds :=> ty) = do -- Rule, uh, PRPRED
+    (sks, ty') <- skolemize ty
+    return (sks, preds :=> ty')
+
+skolemize (TFun tys) = do -- Rule PRFUN
+    let tys_len = length tys
+    let (arg_tys, [res_ty]) = splitAt (tys_len - 1) tys
+    (sks, res_ty') <- skolemize res_ty
+    return (sks, TFun $ arg_tys ++ [ res_ty' ])
+
+skolemize ty = do -- Rule PRMONO
+    return ([], ty)

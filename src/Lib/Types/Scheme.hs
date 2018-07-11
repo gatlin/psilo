@@ -24,7 +24,7 @@ normalize (TForall [] t) = normalize t
 normalize (TForall vs t) = TForall vs' $ normalize t'
     where
         len_vs = (length vs) - 1
-        vs' = map (\n -> TyVar n Star) [0..len_vs]
+        vs' = map (\v -> TyVar v Star) [0..len_vs]
         frame = M.fromList $ zip vs (map TVar vs')
         t' = substitute frame t
 normalize t = t

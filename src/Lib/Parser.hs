@@ -153,6 +153,20 @@ defun_parser = do
     return $ aDef name (join $ aFun (map fst args) body
                                (map snd args))
 
+typedef_parser :: Parser (SurfaceExpr a)
+typedef_parser = do
+    string "::="
+    skipSpace
+    name <- sym
+    skipSpace
+    vars <- parens (sym `sepBy` (many space))
+    vars' <- forM vars $ \var ->
+        return (TyVar (string_hash var) Star)
+    skipSpace
+    body <- scheme_parser
+    skipSpace
+    return $ aTypedef name vars' body
+
 scheme_parser :: Parser Type
 scheme_parser = sigma where
 
@@ -226,11 +240,9 @@ type_parser = do
         more :: Parser Type
         more = do
             skipSpace
-            string "->"
-            skipSpace
             ts <- ty_sym `sepBy` (many space)
             skipSpace
-            return $ TFun $ tyFun : ts
+            return $ TFun ts
 
 ty_sym :: Parser Type
 ty_sym = do
@@ -252,7 +264,10 @@ sig_parser = do
 toplevel_parser :: Parser (SurfaceExpr a)
 toplevel_parser = do
     skipSpace
-    defn <- (parens defun_parser) <|> (parens def_parser) <|> (parens sig_parser)
+    defn <- (parens defun_parser)
+        <|> (parens def_parser)
+        <|> (parens sig_parser)
+        <|> (parens typedef_parser)
     skipSpace
     return defn
 
@@ -267,6 +282,7 @@ parse_expr' input = do
     let parse_result = parseOnly ((parens defun_parser)
                                   <|> (parens def_parser)
                                   <|> (parens sig_parser)
+                                  <|> (parens typedef_parser)
                                   <|> expr_parser) input
     return parse_result
 
