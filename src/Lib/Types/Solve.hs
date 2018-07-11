@@ -5,7 +5,7 @@ import           Lib.Types.Constraint
 import           Lib.Types.Frame
 import           Lib.Types.Kind       (HasKind, Kind (..), kind)
 import           Lib.Types.Type       (Pred, Rho, Sigma, TyCon (..), TyVar (..),
-                                       Type (..))
+                                       Type (..), removeEmptyPreds)
 
 import           Data.Map             (Map)
 import qualified Data.Map             as M
@@ -78,14 +78,11 @@ unifyMany t1 t2 = throwError $ UnificationMismatch t1 t2
 -- | Unification of terms which might be sigma types
 unifySkolem :: Sigma -> Sigma -> Solve Unifier
 unifySkolem sigma1 sigma2@(TForall _ _) = do
-    logS $ "Unify skolem 1: " ++ (show sigma1) ++ " <=> " ++ (show sigma2)
     (sk_vars, rho2) <- skolemize sigma2
-    logS $ "Unify skolem 1.1: " ++ (show rho2)
     unify sigma1 rho2
 
 unifySkolem sigma1@(TForall _ _) rho2 = do
     rho1 <- instantiate sigma1
-    logS $ "Unify skolem 2: " ++ (show rho1) ++ " <=> " ++ (show rho2)
     unify rho1 rho2
 
 -- | Determine if two types match. Similar to unification.
@@ -93,7 +90,9 @@ match :: Type -> Type -> Solve Unifier
 match t1 t2               | t1 == t2 = return emptyUnifier
 match (TVar v) t          | (kind v) == (kind t) = return (v |-> t, [])
 match (TFun as) (TFun bs) = matchMany as bs
-match t1 t2               = throwError $ OtherTypeError "Error matching types"
+match t1 t2               = throwError $ OtherTypeError $
+                            "Error matching types " ++ (show t1) ++
+                            " and " ++ (show t2)
 
 matchMany :: [Type] -> [Type] -> Solve Unifier
 matchMany [] [] = return emptyUnifier
@@ -163,7 +162,10 @@ matchTypes
     -> Type
     -> Compiler ()
 matchTypes t1 t2 = do
-    evalStateT (match t1 t2) initSolveState
+    (flip evalStateT) initSolveState $ do
+        (_, s1) <- skolemize t1
+        (_, s2) <- skolemize t2
+        (match (removeEmptyPreds s1) (removeEmptyPreds s2))
     return ()
 
 fresh :: Kind -> Solve TyVar

@@ -10,6 +10,8 @@ module Lib.Types
     , buildTypeEnv
     , normalize
     , tyFun
+    , quantify
+    , removeEmptyPreds
     )
 where
 
@@ -143,7 +145,7 @@ typecheck_pass
     -> TypeEnv
     -> (Symbol, AnnotatedExpr ())
     -> Compiler TypeEnv
-typecheck_pass ce te (sym, expr) = tc_pass `catchError` handler where
+typecheck_pass ce te (sym, expr) = tc_pass where
     tc_pass = do
         (sig, inferState, cs) <- runInfer te $ do
             expr' <- sequence . extend infer $ expr
@@ -159,29 +161,14 @@ typecheck_pass ce te (sym, expr) = tc_pass `catchError` handler where
         let scheme = extract $ (extend $ toSigma frame (concat preds')) sig'
         logMsg $ sym ++ " : " ++ (show scheme)
         -- if the symbol was already in the type environment, verify that they match
---        checkTypeEnv sym scheme te
+        checkTypeEnv sym scheme te
         -- build the new type environment
         return $ extendEnv te (sym, scheme)
 
-    handler err = do
-        logMsg $ "Error: " ++ (show err)
-        logMsg "-----"
-        return te
-
-catchSolveErr err = do
-    logMsg $ "Error: " ++ (show err)
-    return (mempty, mempty)
-
 checkTypeEnv :: Symbol -> Sigma -> TypeEnv -> Compiler ()
-checkTypeEnv sym s1@(TForall _ t1) tyEnv = case envLookup tyEnv sym of
+checkTypeEnv sym t1 tyEnv = case envLookup tyEnv sym of
     Nothing -> return ()
-    Just s2@(TForall _ t2) ->
-        (matchTypes t2 t1) `catchError` (errHandler s2)
-
-    where errHandler :: Sigma -> PsiloError -> Compiler ()
-          errHandler s2 _ = throwError $ OtherTypeError $
-              "Type given for " ++ sym ++ " is " ++ (show s2) ++
-              ", but the inferred type is " ++ (show s1) ++ "."
+    Just t2 -> matchTypes t2 t1
 
 toSigma :: Frame -> [Pred] -> AnnotatedExpr Type -> Sigma
 toSigma frame preds expr =

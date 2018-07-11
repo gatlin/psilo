@@ -1,22 +1,31 @@
-(: square (=> ((Num n)) (-> n n)))
-(= square (x) (* x x))
+(::= Pair (a b)
+  (forall (r) (-> (-> a b r) r)))
 
-;(= three 3.0)
-;(= six (* 2 three))
-;(= nine (square three))
-;(= thirty-six (square six))
+(= pair (x y) (Pair (\ (k) (k x y))))
 
-;(= five-1 5.0)
-;(= five-2 () 5.0)
-;(= ten-1 (* 2 five-1))
-;(= ten-2 (* 2 five-2))
+(= fst (pr) ((~Pair pr) (\ (x y) x)))
+(= snd (pr) ((~Pair pr) (\ (x y) y)))
 
-;(: times-2-then-square (=> ((Num n)) (-> n n)))
-;(= times-2-then-square (x)
-;  ((\ (y) (square y))
-;   (* 2 x)))
+(= p1 (pair 1.0 #t))
 
-;(::= D (a) (forall (r) (-> (-> a r) r)))
+(= p1-fst (fst p1))
+
+(: p1-snd Boolean)
+(= p1-snd (snd p1))
+
+(= p1-test-good (* 2.0 p1-fst))
+
+(::= D (a)
+  (forall (r) (-> (-> a r) r)))
+
 ;(: d (-> a (D a)))
-;(= d (x) (D (\ (k) (k x))))
-(::= Pair (x y) (forall (r) (-> (-> x y r) r)))
+(= d (x) (D (\ (k) (k x))))
+
+;(= p1-test-bad  (* 2.0 p1-snd))
+
+;(: foo
+;  (forall (a)
+;    (-> a
+;      (forall (b)
+;        (-> (-> a b) b)))))
+;(= foo (x) (\ (f) (f x)))

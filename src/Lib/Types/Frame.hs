@@ -67,3 +67,8 @@ instance TypeLike Type where
     substitute frame (ps :=> t) =
         (map (substitute frame) ps) :=> (substitute frame t)
     substitute frame t = t
+
+quantify :: Type -> Type
+quantify (TForall vs ty) = TForall vs ty
+quantify ty = TForall vs ty where
+    vs = S.toList $ ftv ty

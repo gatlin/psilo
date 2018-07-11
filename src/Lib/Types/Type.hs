@@ -113,3 +113,10 @@ typeFloat = TSym (TyCon "Float" Star)
 
 tyFun :: Type
 tyFun = TSym $ TyCon "->" Star
+
+removeEmptyPreds :: Type -> Type
+removeEmptyPreds ([] :=> t)     = removeEmptyPreds t
+removeEmptyPreds (ps :=> t)     = ps :=> (removeEmptyPreds t)
+removeEmptyPreds (TForall vs t) = TForall vs (removeEmptyPreds t)
+removeEmptyPreds (TFun tys)     = TFun $ fmap removeEmptyPreds tys
+removeEmptyPreds t              = t

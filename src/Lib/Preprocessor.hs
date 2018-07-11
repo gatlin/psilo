@@ -21,9 +21,9 @@ import           Lib.Syntax.Surface
 import           Lib.Syntax.Symbol
 import           Lib.Syntax.TopLevel
 import           Lib.Types.Frame
-import           Lib.Types.Infer
 import           Lib.Types.Kind         (Kind (..))
 import           Lib.Types.Scheme
+import           Lib.Types.Solve
 import           Lib.Types.Type
 
 import           Lib.Errors
@@ -152,8 +152,12 @@ surfaceToTopLevel (Free (TypedefS name vars body)) = do
     let ret_type = TFun $ (TSym (TyCon name Star)) : (fmap TVar vars)
     let ctor = normalize $ TForall vars $ TFun $
                tyFun : (body : [ret_type])
-    let dtor = normalize $ TForall vars $ TFun $
+    let dtor' = normalize $ TForall vars $ TFun $
                tyFun : (ret_type : [body])
+    let mDtor = runSolve (skolemize dtor') initSolveState
+    dtor <- case mDtor of
+        Left err              -> throwError err
+        Right (sk_vars, dtor) -> return $ TForall sk_vars dtor
     return
         [ Typedef name vars $ normalize $ quantify body
         , Signature name ctor
@@ -164,10 +168,6 @@ surfaceToTopLevel _ = throwError $
     PreprocessError $
     "Expression is not a top level expression"
 
-quantify :: Type -> Type
-quantify (TForall vs ty) = TForall vs ty
-quantify ty = TForall vs ty where
-    vs = S.toList $ ftv ty
 
 -- | Called by 'surfaceToTopLevel' on a subset of 'SurfaceExpr's
 surfaceToCore
@@ -206,12 +206,15 @@ thd' :: (a, b, c) -> c
 thd' (x, y, z) = z
 
 -- | Ensures that all symbols are either bound or global
+-- TODO why am I not using a Set here?
 boundVarCheck :: [TopLevel] -> Preprocess ()
 boundVarCheck toplevels = withBoundVars bvs $ mapM_ go toplevels
     where
-        syms = defn_syms ++ ty_defn_syms
+        syms = defn_syms ++
+               (fmap (\x -> (x, x)) ty_defn_syms) ++
+               (fmap (\x -> (x, x)) (fmap ("~"++) ty_defn_syms))
         defn_syms = fmap (\x -> (x,x)) $ fmap fst $ fst' $ splitUp toplevels
-        ty_defn_syms = fmap (\x -> (x, x)) $ fmap fst' $ thd' $ splitUp toplevels
+        ty_defn_syms = fmap fst' $ thd' $ splitUp toplevels
         builtins = fmap (\x -> (x,x)) $ S.toList builtin_syms
         bvs = M.fromList $ builtins ++ syms
 

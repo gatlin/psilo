@@ -50,9 +50,6 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
         let result = compileWithLogs $ do
                 toplevels <- process_file contents
                 let (defns, sigs, tds) = splitUp toplevels
-                forM_ tds $ \(name, vars, body) ->
-                    logMsg $ "Type definition: " ++
-                    name ++ " " ++ (show vars) ++ " ::= " ++ (show body)
                 let tyEnv = buildTypeEnv sigs
                 typeEnv <- typecheck defns tyEnv
                 return (typeEnv, defns)
@@ -62,11 +59,6 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
                 putStrLn "Logs\n-----"
                 forM_ logs putStrLn
                 putStrLn "-----"
-                forM_ defns $ \(symbol, expr) -> do
-                    let mScheme = envLookup typeEnv symbol
-                    when (isJust mScheme) $ do
-                        let scheme = fromJust mScheme
-                        putStrLn $ symbol ++ " : " ++ (ushow scheme)
                 return ()
 
 globals = S.toList builtin_syms
