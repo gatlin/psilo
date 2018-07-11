@@ -10,7 +10,7 @@
 
 (= p1-fst (fst p1))
 
-(: p1-snd Boolean)
+(: p1-snd Float)
 (= p1-snd (snd p1))
 
 (= p1-test-good (* 2.0 p1-fst))
