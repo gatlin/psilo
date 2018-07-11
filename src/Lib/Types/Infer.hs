@@ -136,9 +136,12 @@ infer (_ :< IdC sym) = do
     case envLookup te sym of
         Nothing -> fresh Star >>= return . TVar
         Just scheme -> do
-            (ps :=> ty) <- instantiate scheme
-            tyInst ps
-            return ty
+            ty <- instantiate scheme
+            case ty of
+                (ps :=> ty') -> do
+                    tyInst ps
+                    return ty'
+                _ -> return ty
 
 -- | A lambda abstraction is a list of symbols and an 'AnnotatedExpr' body. Each
 -- argument should generate a unique 'Sigma' and the 'TypeEnv' should be
