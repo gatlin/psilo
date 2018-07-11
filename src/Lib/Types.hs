@@ -155,7 +155,7 @@ typecheck_pass ce te (sym, expr) = tc_pass `catchError` handler where
                         then return [substitute frame pred]
                         else return []
             _ -> return []
-        let scheme = extract $ (extend $ toScheme frame (concat preds')) sig'
+        let scheme = extract $ (extend $ toSigma frame (concat preds')) sig'
         logMsg $ sym ++ " : " ++ (show scheme)
         -- if the symbol was already in the type environment, verify that they match
 --        checkTypeEnv sym scheme te
@@ -182,8 +182,8 @@ checkTypeEnv sym s1@(TForall _ t1) tyEnv = case envLookup tyEnv sym of
               "Type given for " ++ sym ++ " is " ++ (show s2) ++
               ", but the inferred type is " ++ (show s1) ++ "."
 
-toScheme :: Frame -> [Pred] -> AnnotatedExpr Type -> Sigma
-toScheme frame preds expr =
+toSigma :: Frame -> [Pred] -> AnnotatedExpr Type -> Sigma
+toSigma frame preds expr =
     let ty = extract expr
     in  closeOver frame (preds :=> ty)
 
