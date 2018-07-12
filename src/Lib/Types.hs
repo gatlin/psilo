@@ -74,6 +74,10 @@ num_binop :: Type
 num_binop = [IsIn "Num" t_0] :=> (TFun [tyFun, t_0, t_0, t_0])
     where t_0 = TVar (TyVar 0 Star)
 
+integral_binop :: Type
+integral_binop = [IsIn "Integral" t_0] :=> (TFun [tyFun, t_0, t_0, t_0])
+    where t_0 = TVar (TyVar 0 Star)
+
 eq_binop :: Type
 eq_binop = [IsIn "Eq" t_0] :=> (TFun [tyFun, t_0, t_0, typeBool])
     where t_0 = TVar (TyVar 0 Star)
@@ -89,11 +93,12 @@ defaultTypeEnv = TypeEnv $ M.fromList
     , ("+", generalize mempty num_binop)
     , ("-", generalize mempty num_binop)
     , ("/", generalize mempty num_binop)
+    , ("modulo", generalize mempty integral_binop)
     , ("=?", generalize mempty eq_binop)
     , ("<", generalize mempty ord_binop)
     , (">", generalize mempty ord_binop)
-    , ("id", generalize mempty $ [] :=> (TFun [tyFun, TVar (TyVar 0 Star),
-                                               TVar (TyVar 0 Star)]))
+--    , ("id", generalize mempty $ [] :=> (TFun [tyFun, TVar (TyVar 0 Star),
+--                                               TVar (TyVar 0 Star)]))
     ]
 
 addCoreClasses :: EnvTransformer
