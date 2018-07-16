@@ -31,79 +31,50 @@ import           Data.Functor.Identity
 import           Control.Comonad
 import           Control.Comonad.Cofree
 
--- | The state we need to mutate during type inference
-data InferState = InferState
-    { varCount :: Int -- ^ monotonically increasing type ID number
-    } deriving (Show)
-
-initInferState :: InferState
-initInferState = InferState 0
-
-{-
-newtype Infer a =
-    Infer (StateT InferState (WriterT [Constraint] (Except PsiloError)) a)
-    deriving ( Functor
-             , Applicative
-             , Monad
-             , MonadState InferState
-             , MonadWriter [Constraint]
-             , MonadError PsiloError
-             )
--}
-
-type Infer = ReaderT TypeEnv (StateT InferState (WriterT [Constraint] Compiler))
+import           Lib.Types.TypeCheck
 
 runInfer
     :: TypeEnv
-    -> Infer  a
-    -> Compiler (a, InferState, [Constraint])
-
-runInfer te m = do
-    ((a, inferState'), cs) <- runWriterT (runStateT (runReaderT m te) initInferState)
-    return (a, inferState', (nub cs))
+    -> TypeCheck a
+    -> Compiler (a)
+runInfer te m = runInfer' te initTypeCheckState m
 
 runInfer'
     :: TypeEnv
-    -> InferState
-    -> Infer a
-    -> Compiler (a, InferState, [Constraint])
-
-runInfer' te inferState m = do
-    ((a, inferState'), cs) <- runWriterT (runStateT (runReaderT m te) inferState)
-    return (a, inferState', (nub cs))
-
--- I know it isn't pretty
-logInfer :: String -> Infer ()
-logInfer = lift . lift . lift . logMsg
+    -> TypeCheckState
+    -> TypeCheck a
+    -> Compiler (a)
+runInfer' te tcState m = do
+    ((a, tcState'), cs) <- runWriterT $
+        runStateT (runReaderT m te) tcState
+--    return (a, tcState', cs)
+    return a
 
 -- | helper to record an equality constraint
-(@=) :: Type -> Type -> Infer ()
-t1 @= t2 = tell [t1 := t2]
+(@=) :: Type -> Type -> TypeCheck ()
+t1 @= t2 = modify $ \st -> st {
+    constraints = [t1 := t2] ++ (constraints st)
+    }
 
-(@~) :: Pred -> Type -> Infer ()
-p @~ t = tell [ p :~ t ]
+(@~) :: Pred -> Type -> TypeCheck ()
+p @~ t = modify $ \st -> st {
+    constraints = [p :~ t] ++ (constraints st)
+    }
 
-tyInst :: [Pred] -> Infer ()
+tyInst :: [Pred] -> TypeCheck ()
 tyInst [] = return ()
 tyInst ps = forM_ ps $ \pred -> do
     let tvs = S.toList . ftv $ pred
     forM_ tvs $ \tv -> pred @~ (TVar tv)
 
-withEnv :: [(Symbol, Sigma)] -> Infer a -> Infer a
+withEnv :: [(Symbol, Sigma)] -> TypeCheck a -> TypeCheck a
 withEnv ss m = local (<> (buildTypeEnv ss)) m
 
-getEnv :: Infer TypeEnv
+getEnv :: TypeCheck TypeEnv
 getEnv = ask
 
--- | Generate a fresh type variable with a specific 'Kind'
-fresh :: Kind -> Infer TyVar
-fresh k = do
-    c <- gets varCount
-    modify $ \st -> st { varCount = c + 1 }
-    return $ TyVar c k
-
 -- | Instantiate a type scheme into a qualified type
-instantiate :: Sigma -> Infer Type
+instantiate :: Sigma -> TypeCheck Type
 instantiate (TForall vs t) = do
     vs' <- mapM (const $ fresh Star) vs >>= mapM (return . TVar)
     let frame = M.fromList $ zip vs vs'
@@ -119,7 +90,7 @@ instantiate (TForall vs t) = do
 instantiate qt = return qt
 
 -- | Constraint generation and type generation
-infer :: AnnotatedExpr () -> Infer Type
+infer :: AnnotatedExpr () -> TypeCheck Type
 
 -- constants are straightforward, except integers could be any @Num@ instance
 

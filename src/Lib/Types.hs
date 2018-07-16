@@ -62,6 +62,7 @@ import           Lib.Types.Kind
 import           Lib.Types.Scheme
 import           Lib.Types.Solve
 import           Lib.Types.Type
+import           Lib.Types.TypeCheck
 import           Lib.Types.TypeEnv
 
 import           Lib.Compiler
@@ -150,27 +151,23 @@ typecheck_pass
     -> TypeEnv
     -> (Symbol, AnnotatedExpr ())
     -> Compiler TypeEnv
-typecheck_pass ce te (sym, expr) = tc_pass where
-    tc_pass = do
-        (sig, inferState, cs) <- runInfer te $ do
-            expr' <- sequence . extend infer $ expr
-            return expr'
-        (frame, preds) <- (solveConstraints cs (varCount inferState))
-        let sig' = fmap (substitute frame) sig
-        let vars = ftv $ extract sig'
-        preds' <- forM preds $ \pred@(IsIn c t) -> case t of
-            (TVar v) -> if S.member v vars
-                        then return [substitute frame pred]
-                        else return []
-            _ -> return []
-        let scheme = extract $ (extend $ toSigma frame (concat preds')) sig'
-        logMsg $ sym ++ " : " ++ (show scheme)
-        -- if the symbol was already in the type environment, verify that they match
-        checkTypeEnv sym scheme te
-        -- build the new type environment
-        return $ extendEnv te (sym, scheme)
+typecheck_pass ce te (sym, expr) = runInfer te $ do
+    expr' <- sequence . extend infer $ expr
+    (frame, preds) <- solver
+    let sig = fmap (substitute frame) expr'
+    let vars = ftv $ extract sig
+    preds' <- forM preds $ \pred@(IsIn c t) -> case t of
+        (TVar v) -> if S.member v vars
+                    then return [substitute frame pred]
+                    else return []
+        _ -> return []
 
-checkTypeEnv :: Symbol -> Sigma -> TypeEnv -> Compiler ()
+    let scheme = extract $ (extend $ toSigma frame (concat preds')) sig
+    logTypeCheck $ sym ++ " : " ++ (show scheme)
+    checkTypeEnv sym scheme te
+    return $ extendEnv te (sym, scheme)
+
+checkTypeEnv :: Symbol -> Sigma -> TypeEnv -> TypeCheck ()
 checkTypeEnv sym t1 tyEnv = case envLookup tyEnv sym of
     Nothing -> return ()
     Just t2 -> matchTypes t2 t1

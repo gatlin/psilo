@@ -36,7 +36,7 @@ f1 `merge` f2
     | otherwise = Nothing
     where
         agree = all (\v -> substitute f1 (TVar v) == substitute f2 (TVar v))
-                (fmap fst $ M.toList $ f1 `M.union` f2)
+                (fmap fst $ M.toList $ f1 `M.intersection` f2)
 
 -- | This name is not optimal: entities which contain 'Type' information that
 -- can be updated with a 'Frame' and which potentially bind 'TyVar's in them.

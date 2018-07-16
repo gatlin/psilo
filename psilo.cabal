@@ -34,6 +34,7 @@ library
                        Lib.Types.Solve,
                        Lib.Types.Type,
                        Lib.Types.TypeEnv,
+                       Lib.Types.TypeCheck,
                        Lib.Types,
                        Lib.Errors,
                        Lib.Codegen

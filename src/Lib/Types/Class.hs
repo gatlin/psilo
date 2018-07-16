@@ -5,9 +5,10 @@ module Lib.Types.Class where
 
 import           Lib.Syntax.Symbol
 import           Lib.Types.Kind        (HasKind, Kind (..))
-import           Lib.Types.Solve       (Solve, Unifier, initSolveState,
-                                        runSolve, unify)
+import           Lib.Types.Solve       (Unifier, runSolve, unify)
 import           Lib.Types.Type        (Pred, TyCon (..), TyVar (..), Type (..))
+import           Lib.Types.TypeCheck   (TypeCheck, TypeCheckState (..),
+                                        initTypeCheckState)
 
 import           Data.Map              (Map)
 import qualified Data.Map              as M
@@ -89,6 +90,6 @@ overlap :: Pred -> Pred -> Bool
 overlap (IsIn _ t1) (IsIn _ t2) = case runSolve u st of
     Left _  -> False
     Right _ -> True
-    where st = initSolveState
-          u :: Solve Unifier
+    where st = initTypeCheckState
+          u :: TypeCheck Unifier
           u = unify t1 t2

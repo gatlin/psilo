@@ -25,6 +25,7 @@ import           Lib.Types.Kind         (Kind (..))
 import           Lib.Types.Scheme
 import           Lib.Types.Solve
 import           Lib.Types.Type
+import           Lib.Types.TypeCheck
 
 import           Lib.Errors
 import           Lib.Util
@@ -154,7 +155,7 @@ surfaceToTopLevel (Free (TypedefS name vars body)) = do
                tyFun : (body : [ret_type])
     let dtor' = normalize $ TForall vars $ TFun $
                tyFun : (ret_type : [body])
-    let mDtor = runSolve (skolemize dtor') initSolveState
+    let mDtor = runSolve (skolemize dtor') initTypeCheckState
     dtor <- case mDtor of
         Left err              -> throwError err
         Right (sk_vars, dtor) -> return $ TForall sk_vars dtor

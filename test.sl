@@ -28,6 +28,7 @@
 ; can be concrete and predicative.
 
 ; ∀a. a -> (Box a)
+(: box (forall (a) (-> a (Box a))))
 (= box (thing) (Box (\ (k) (k thing))))
 
 ; ∀a. (Box a) -> a
@@ -106,6 +107,7 @@
 (= either (e l r) ((~Either e) l r))
 
 ; ∀a b. a -> (Either a b)
+(: left (forall (a b) (-> a (Either a b))))
 (= left (x) (Either (\ (l r) (l x))))
 
 ; ∀a b. b -> (Either a b)
@@ -184,6 +186,7 @@
     r )))
 
 ; ∀f. ∀a b. (a -> b) -> (f a) -> (f b) -> (Functor f)
+(: functor (forall (f) (-> (forall (a b) (-> (-> a b) (f a) (f b))) (Functor ))))
 (= functor (map-fn) (Functor (\ (k) (k map-fn))))
 
 ; ∀f a b. (Functor f) -> (a -> b) -> (f a) -> (f b)
@@ -198,10 +201,13 @@
 
 ;; Our little demonstration functions:
 ; ∀a. a -> a
+(: id (forall (a) (-> a a)))
 (= id (x) x)
 
 ; ∀a. (Integral a) => a -> Boolean
+(: even-number? (=> ((Integral n)) (-> n Boolean)))
 (= even-number? (n) (=? 0 (modulo n 2)))
 
 ; ∀a. (Num a) => a -> a
+(: square (=> ((Num n)) (-> n n)))
 (= square (x) (* x x))
