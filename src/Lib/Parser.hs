@@ -228,9 +228,7 @@ scheme_parser = sigma where
 
 type_parser :: Parser Type
 type_parser = do
-    skipSpace
     t <- one <|> (parens more)
-    skipSpace
     return t
 
     where
@@ -241,6 +239,7 @@ type_parser = do
         more = do
             skipSpace
             ts <- ty_sym `sepBy` (many space)
+--            ts <- type_parser `sepBy` (many space)
             skipSpace
             return $ TFun ts
 

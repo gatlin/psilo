@@ -57,10 +57,8 @@ import           Lib.Syntax             (AnnotatedExpr, CoreAst (..), CoreExpr,
 import           Lib.Types.Class
 import           Lib.Types.Constraint
 import           Lib.Types.Frame
-import           Lib.Types.Infer
 import           Lib.Types.Kind
 import           Lib.Types.Scheme
-import           Lib.Types.Solve
 import           Lib.Types.Type
 import           Lib.Types.TypeCheck
 import           Lib.Types.TypeEnv
@@ -151,7 +149,7 @@ typecheck_pass
     -> TypeEnv
     -> (Symbol, AnnotatedExpr ())
     -> Compiler TypeEnv
-typecheck_pass ce te (sym, expr) = runInfer te $ do
+typecheck_pass ce te (sym, expr) = runTypeCheck te $ do
     expr' <- sequence . extend infer $ expr
     (frame, preds) <- solver
     let sig = fmap (substitute frame) expr'

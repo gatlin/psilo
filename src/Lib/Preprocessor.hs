@@ -23,7 +23,6 @@ import           Lib.Syntax.TopLevel
 import           Lib.Types.Frame
 import           Lib.Types.Kind         (Kind (..))
 import           Lib.Types.Scheme
-import           Lib.Types.Solve
 import           Lib.Types.Type
 import           Lib.Types.TypeCheck
 

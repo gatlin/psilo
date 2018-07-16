@@ -5,10 +5,8 @@ module Lib.Types.Class where
 
 import           Lib.Syntax.Symbol
 import           Lib.Types.Kind        (HasKind, Kind (..))
-import           Lib.Types.Solve       (Unifier, runSolve, unify)
 import           Lib.Types.Type        (Pred, TyCon (..), TyVar (..), Type (..))
-import           Lib.Types.TypeCheck   (TypeCheck, TypeCheckState (..),
-                                        initTypeCheckState)
+import           Lib.Types.TypeCheck
 
 import           Data.Map              (Map)
 import qualified Data.Map              as M

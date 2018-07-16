@@ -67,9 +67,11 @@
 (= test-pair-2 (map-pair square test-pair-1))
 
 ; Pair Boolean Boolean
+(: test-pair-3 (Pair Boolean Boolean))
 (= test-pair-3 (map-pair even-number? test-pair-2))
 
 ; Boolean
+(: test-pair-4 Boolean)
 (= test-pair-4 (snd test-pair-3))
 
 ;; The Mighty Optional type
@@ -103,17 +105,17 @@
         (-> b r)
         r)))
 
-; ∀a b c. (Either a b) -> (a -> c) -> (b -> c) -> c
+
+(: either (forall (a b c) (-> (Either a b) (-> a c) (-> b c) c)))
 (= either (e l r) ((~Either e) l r))
 
-; ∀a b. a -> (Either a b)
 (: left (forall (a b) (-> a (Either a b))))
 (= left (x) (Either (\ (l r) (l x))))
 
-; ∀a b. b -> (Either a b)
+(: right (forall (a b) (-> b (Either a b))))
 (= right (y) (Either (\ (l r) (r y))))
 
-; ∀a b c. (b -> c) -> (Either a b) -> (Either a c)
+(: map-either (forall (a b c) (-> (-> b c) (Either a b) (Either a c))))
 (= map-either (f e) (either e (\ (x) (left x)) (\ (y) (right (f y)))))
 
 ;; Okay here's the Big Boy: The List Type
@@ -122,22 +124,23 @@
     (-> (-> a r r)
         r
         r)))
-; ∀a b. (a -> b -> b) -> b -> (List a) -> b
+
+(: foldr (-> (-> a b b) b (List a) b))
 (= foldr (c e xs) ((~List xs) c e))
 
-; ∀a. a -> (List a) -> (List a)
+(: cons (-> a (List a) (List a)))
 (= cons (x xs) (List (\ (c e) (c x (foldr c e xs)))))
 
-; ∀a. List a
+(: empty-list (List a))
 (= empty-list (List (\ (c e) e)))
 
-; ∀a b. (a -> b) -> (List a) -> (List b)
+(: map-list (-> (-> a b) (List a) (List b)))
 (= map-list (f xs) (foldr (\ (y ys) (cons (f y) ys)) empty-list xs))
 
-; ∀a. (List a) -> (List a) -> (List a)
+(: append (-> (List a) (List a) (List a)))
 (= append (xs ys) (foldr cons ys xs))
 
-; ∀a. (List (List a)) -> (List a)
+;(: concat (forall (a) (-> (List (List a)) (List a))))
 (= concat (xs) (foldr append empty-list xs))
 
 ; ∀a. a -> (List a)
@@ -186,15 +189,15 @@
     r )))
 
 ; ∀f. ∀a b. (a -> b) -> (f a) -> (f b) -> (Functor f)
-(: functor (forall (f) (-> (forall (a b) (-> (-> a b) (f a) (f b))) (Functor ))))
+(: functor (forall (f) (-> (forall (a b) (-> (-> a b) (f a) (f b))) (Functor z))))
 (= functor (map-fn) (Functor (\ (k) (k map-fn))))
 
 ; ∀f a b. (Functor f) -> (a -> b) -> (f a) -> (f b)
 (= map (fctor f x) ((~Functor fctor) (\ (fn) (fn f x))))
 
 ; Functor Box
-(= box-functor (functor map-box))
-(= optional-functor (functor map-optional))
+;(= box-functor (functor map-box))
+;(= optional-functor (functor map-optional))
 
 ; Not quite yet, but soon:
 ; (= pair-functor (functor map-pair))
@@ -211,3 +214,9 @@
 ; ∀a. (Num a) => a -> a
 (: square (=> ((Num n)) (-> n n)))
 (= square (x) (* x x))
+
+(: fact (=> ((Num n)) (-> n n)))
+(= fact (n)
+  (if (=? n 2)
+    n
+    (fact (* n (- n 1)))))
