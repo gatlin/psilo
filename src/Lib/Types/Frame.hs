@@ -7,7 +7,8 @@ import           Lib.Errors
 
 import           Data.Monoid          (Monoid, (<>))
 import           Lib.Syntax.Symbol
-import           Lib.Types.Type       (Pred, TyVar (..), Type (..))
+import           Lib.Types.Type       (Pred, TyCon (..), TyVar (..), Type (..),
+                                       tyFun)
 
 import           Data.Map             (Map)
 import qualified Data.Map.Lazy        as M

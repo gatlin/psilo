@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Lib.Types
@@ -34,6 +35,7 @@ import           Control.Monad          (foldM, forM, forM_, guard, liftM2,
                                          mapAndUnzipM, unless, zipWithM)
 import           Control.Monad.Except
 import           Control.Monad.Free
+import           Control.Monad.State
 import           Data.Maybe             (fromJust, fromMaybe, isJust, isNothing)
 import           Data.Monoid            ((<>))
 
@@ -142,6 +144,9 @@ typecheck defns _te = do
     let dependency_graph = make_dep_graph defns
     let defns' = reverse $ topo' dependency_graph
     te' <- foldM (typecheck_pass classEnv) te defns'
+    logMsg "Final type environment"
+    logMsg . show $ te'
+    logMsg "-----"
     return te'
 
 typecheck_pass
@@ -159,16 +164,25 @@ typecheck_pass ce te (sym, expr) = runTypeCheck te $ do
                     then return [substitute frame pred]
                     else return []
         _ -> return []
-
     let scheme = extract $ (extend $ toSigma frame (concat preds')) sig
-    logTypeCheck $ sym ++ " : " ++ (show scheme)
-    checkTypeEnv sym scheme te
-    return $ extendEnv te (sym, scheme)
 
-checkTypeEnv :: Symbol -> Sigma -> TypeEnv -> TypeCheck ()
+    --return $ extendEnv te (sym, scheme)
+    te' <- checkTypeEnv sym scheme te
+    return te'
+
+checkTypeEnv :: Symbol -> Sigma -> TypeEnv -> TypeCheck TypeEnv
 checkTypeEnv sym t1 tyEnv = case envLookup tyEnv sym of
-    Nothing -> return ()
-    Just t2 -> matchTypes t2 t1
+    Nothing -> return $ extendEnv tyEnv (sym, t1)
+    Just t2 -> do
+        let t1' = removeEmptyPreds t1
+            t2' = removeEmptyPreds t2
+        matchTypes t1' t2' `catchError` (addContext sym t2)
+        logTypeCheck $ "Unified " ++ (show t1) ++ " and " ++ (show $ quantify t2)
+        return tyEnv
+
+    where addContext sym ty err =
+              throwError $ OtherError $
+              "For " ++ sym ++ " : " ++ (show ty) ++ ",\n " ++ (show err)
 
 toSigma :: Frame -> [Pred] -> AnnotatedExpr Type -> Sigma
 toSigma frame preds expr =

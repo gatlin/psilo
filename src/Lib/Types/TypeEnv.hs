@@ -8,14 +8,18 @@ import           Lib.Types.Kind
 import           Lib.Types.Scheme
 import           Lib.Types.Type
 
-import           Data.List         (sort)
+import           Data.List         (intercalate, sort)
 
 import           Data.Map          (Map)
 import qualified Data.Map          as M
 import           Data.Set          (Set)
 import qualified Data.Set          as S
 
-newtype TypeEnv = TypeEnv (Map Symbol Sigma) deriving (Show)
+newtype TypeEnv = TypeEnv (Map Symbol Sigma)
+
+instance Show TypeEnv where
+    show (TypeEnv mp) = intercalate "\n" $ fmap mapper $ M.toList mp where
+        mapper (sym, sigma) = sym ++ " : " ++ (show sigma)
 
 instance Monoid TypeEnv where
     mempty = TypeEnv M.empty

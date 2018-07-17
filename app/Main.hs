@@ -47,26 +47,26 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
     Nothing -> return ()
     Just inFile -> do
         contents <- TextIO.readFile inFile
-        let result = compileWithLogs $ do
-                toplevels <- process_file contents
-                let (defns, sigs, tds) = splitUp toplevels
-                let tyEnv = buildTypeEnv sigs
-                typeEnv <- typecheck defns tyEnv
-                return (typeEnv, defns)
+        let result = compileWithLogs $
+                     process_file contents
+
         case result of
             Left err -> putStrLn . ushow $ err
             Right ((typeEnv, defns), logs) -> do
                 putStrLn "Logs\n-----"
                 forM_ logs putStrLn
                 putStrLn "-----"
-                return ()
 
 globals = S.toList builtin_syms
 
-process_file :: Text -> Compiler [TopLevel]
+process_file :: Text -> Compiler (TypeEnv, [(Symbol, AnnotatedExpr ())])
 process_file file_contents = do
     defns <- parse_multi $ removeComments file_contents
-    preprocess $ do
+    toplevels <- preprocess $ do
         toplevels <- mapM surfaceToTopLevel defns >>= return . concat
         boundVarCheck toplevels
         return toplevels
+    let (defns, sigs, tds) = splitUp toplevels
+    let tyEnv = buildTypeEnv sigs
+    typeEnv <- typecheck defns tyEnv
+    return (typeEnv, defns)

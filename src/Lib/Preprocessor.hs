@@ -148,18 +148,18 @@ surfaceToTopLevel (Free (SigS sym scheme)) = return
     [ Signature sym $ normalize $ quantify scheme ]
 
 surfaceToTopLevel (Free (TypedefS name vars body)) = do
-    let body' = normalize . quantify $ body
+    let (TForall _ body') = normalize body
     let ret_type = TFun $ (TSym (TyCon name Star)) : (fmap TVar vars)
     let ctor = normalize $ TForall vars $ TFun $
-               tyFun : (body : [ret_type])
+               tyFun : (body' : [ret_type])
     let dtor' = normalize $ TForall vars $ TFun $
-               tyFun : (ret_type : [body])
+               tyFun : (ret_type : [body'])
     let mDtor = runSolve (skolemize dtor') initTypeCheckState
     dtor <- case mDtor of
         Left err              -> throwError err
         Right (sk_vars, dtor) -> return $ TForall sk_vars dtor
     return
-        [ Typedef name vars $ normalize $ quantify body
+        [ Typedef name vars $ normalize body
         , Signature name ctor
         , Signature ("~"++name) dtor
         ]

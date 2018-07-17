@@ -80,8 +80,10 @@ runTypeCheck' te tcState m = do
 
 -- | helper to record an equality constraint
 (@=) :: Type -> Type -> TypeCheck ()
-t1 @= t2 = modify $ \st -> st {
-    constraints = [t1 := t2] ++ (constraints st)
+t1 @= t2 = do
+    logTypeCheck $ "Constraint: " ++ (show $ t1 := t2)
+    modify $ \st -> st {
+        constraints = [t1 := t2] ++ (constraints st)
     }
 
 -- | helper to record a predicate constraint
@@ -106,13 +108,18 @@ getEnv = ask
 -- | Instantiate a 'Sigma' into a 'Rho' type
 instantiate :: Sigma -> TypeCheck Rho
 instantiate (TForall vs t) = do
+--    logTypeCheck $ "Instantiating " ++ (show (TForall vs t))
     vs' <- mapM (const $ fresh Star) vs >>= mapM (return . TVar)
     let frame = M.fromList $ zip vs vs'
+        t' = substitute frame t
+--    logTypeCheck $ "Instantiated to: " ++ (show t')
+    {-
     t' <- case t of
         (ps :=> ty) -> do
             let ps' = substitute frame ps
             return $ ps' :=> (substitute frame ty)
         _ -> return $ substitute frame $ [] :=> t
+-}
     return t'
 --        ps' = substitute frame ps
 --    tyInst ps
@@ -148,8 +155,8 @@ infer (_ :< IdC sym) = do
 -- temporarily extended with them to evaluate the body.
 infer (_ :< FunC args body) = do
     (argVars, argScms) <- mapAndUnzipM (\arg -> do
-        var <- fresh Star >>= return . TVar
-        return (var, TForall [] var)) args
+        var <- fresh Star
+        return (TVar var, TForall [] (TVar var))) args
     br <- withEnv (zip args argScms) $ infer body
     let fun_ty = TFun $ tyFun : (argVars ++ [br])
     return fun_ty
@@ -162,6 +169,7 @@ infer (_ :< AppC op erands) = do
     op' <- infer op
     erands' <- mapM infer erands
     var <- fresh Star >>= return . TVar
+    logTypeCheck "what"
     op' @= (TFun $ tyFun : (erands' ++ [var]))
     return var
 
@@ -183,7 +191,7 @@ logS = logTypeCheck
 emptyUnifier :: Unifier
 emptyUnifier = (mempty, [])
 
---runSolve :: Monad m => Solve m a -> SolveState -> m (Either PsiloError a)
+-- | Makes the solver available elsewhere in the compiler.
 runSolve :: TypeCheck a -> TypeCheckState -> Either PsiloError a
 runSolve s st = compile $ do
     ((a, _)) <- runStateT (runReaderT s mempty) st
@@ -193,14 +201,14 @@ showWithKind x = "(" ++ (show x) ++ " :: " ++ (show (kind x)) ++ ")"
 
 -- | Unification of two 'Type's
 unify :: Type -> Type -> TypeCheck Unifier
-unify t1 t2                       {-| (kind t1) /= (kind t2) =
-                                        throwError $ OtherTypeError $
-                                        "Kind mismatch: " ++
-                                        (showWithKind t1) ++ " and " ++
-                                        (showWithKind t2)-}
-                                  | t1 == t2 = return emptyUnifier
---unify t1@(TLiteral _) t2@(TFun _) = throwError $ UnificationFail t1 t2
---unify t1@(TFun _) t2@(TLiteral _) = throwError $ UnificationFail t1 t2
+unify t1 t2
+    {- | (kind t1) /= (kind t2) =
+          throwError $ OtherTypeError $
+          "Kind mismatch: " ++
+          (showWithKind t1) ++ " and " ++
+          (showWithKind t2)
+-}
+    | t1 == t2 = return emptyUnifier
 unify (TVar v) t                  = v `bind` t
 unify t (TVar v)                  = v `bind` t
 unify t1 t2@(TForall _ _)         = do
@@ -223,31 +231,34 @@ unifyMany t1 t2 = throwError $ UnificationMismatch t1 t2
 
 -- | Determine if two types match. Similar to unification.
 match :: Type -> Type -> TypeCheck Unifier
-match t1 t2                 | t1 == t2 = return emptyUnifier
-match (TVar v) t            | (kind v) == (kind t) = return (v |-> t, [])
-match (_ :=> t1) (_ :=> t2) = match t1 t2
-match (TFun as) (TFun bs)   = matchMany as bs
-match (TForall _ t1) (TForall _ t2) = do
-    (_, rho1) <- skolemize t1
-    (_, rho2) <- skolemize t2
-    match t2 t1
-match t1 t2                 = throwError $ TypeMismatch t1 t2
+match t1 t2                         | t1 == t2 = return emptyUnifier
+match (_ :=> t1) (_ :=> t2)         = match t1 t2
+--match (TVar v) t            | (kind v) == (kind t) = return (v |-> t, [])
+match (TVar v) t                    = return (v |-> t, [])
+match (TFun as) (TFun bs)           = matchMany as bs
+match t1@(TForall _ _) t2@(TForall _ _) = do
+    (_, t1') <- skolemize t1
+    (_, t2') <- skolemize t2
+    match t1' t2'
+match t1 t2                         = throwError $ TypeMismatch t1 t2
 
 matchMany :: [Type] -> [Type] -> TypeCheck Unifier
 matchMany t1@([]) t2@(x:xs) = throwError $ OtherTypeError $
     "Cannot match " ++ (show t2) ++ " with an empty type."
 matchMany [] [] = return emptyUnifier
-matchMany (t1 : ts1) (t2 : ts2) = do
+matchMany ty1@(t1 : ts1) ty2@(t2 : ts2) = do
     (su1, cs1) <- match t1 t2
     (su2, cs2) <- matchMany ts1 ts2
     case merge su1 su2 of
-        Nothing -> do
-            throwError $
-                OtherTypeError $
-                "Frame 1: " ++ (show su1) ++ "  Frame 2: " ++ (show su2)
+        Nothing -> throwError $
+                   OtherTypeError $
+                   "Frame 1: " ++ (show su1) ++ "  Frame 2: " ++ (show su2) ++
+                   "  ty1: " ++ (show ty1) ++ "  ty2: " ++ (show ty2)
+
         Just su -> return (su, nub $ cs1 ++ cs2)
 matchMany t1 t2 = throwError $ OtherTypeError $
     "Cannot match " ++ (show t1) ++ " and " ++ (show t2)
+
 
 -- | Bind a 'TyVar' to a 'Type' in the 'Frame', unless the result would be an
 -- infinite type.
@@ -268,7 +279,7 @@ solver :: TypeCheck (Frame, [Pred])
 solver = gets constraints >>= go . sort where
     go [] = get >>= \(TypeCheckState  vc f cc ps) -> return (f, ps)
 
-    go ((t1 := t2):cs0) = do
+    go (c@(t1 := t2):cs0) = do
         su <- gets frame
         (su1, cs1) <- unify (substitute su t1) (substitute su t2)
         modify $ \st -> st {
@@ -292,9 +303,7 @@ matchTypes
     -> Type
     -> TypeCheck ()
 matchTypes t1 t2 = do
-    (_, s1) <- skolemize t1
-    (_, s2) <- skolemize t2
-    (match (removeEmptyPreds s1) (removeEmptyPreds s2))
+    match t1 t2
     return ()
 
 -- |

@@ -92,19 +92,14 @@ instance Show Type where
         where ps' = intercalate ", " $ map show ps
 
 instance HasKind Type where
-    kind (TForall vs t)                    = kind t
-    kind (TSym tc)                         = kind tc
-    kind (TVar tv)                         = kind tv
-    kind (TFun (t:ts)) = go ts where
+    kind (TForall vs t) = kind t
+    kind (TSym tc)      = kind tc
+    kind (TVar tv)      = kind tv
+    kind (TFun (t:_))   = kind t
 
-        go ts | length ts == 1 = (Star :-> Star) -- nullary functions
-              | otherwise = go' ts
 
-        go' (t:[]) = kind t
-        go' (t:ts) = (kind t) :-> (go' ts)
-
-    kind (ps :=> t)                        = kind t
-    kind (IsIn c t)                        = kind t
+    kind (ps :=> t)     = kind t
+    kind (IsIn c t)     = kind t
 
 typeInt, typeBool, typeFloat :: Type
 typeInt = TSym (TyCon "Int" Star)

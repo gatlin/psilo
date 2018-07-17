@@ -23,6 +23,7 @@ data PsiloError
     | ParserError String
     -- preprocessor
     | PreprocessError String
+    | OtherError String
     deriving (Eq)
 
 instance Show PsiloError where
@@ -61,3 +62,5 @@ instance Show PsiloError where
     show (ParserError errMsg) = "Parser error: " ++ errMsg
 
     show (PreprocessError errMsg) = "Preprocessor error: " ++ errMsg
+
+    show (OtherError errMsg) = errMsg
