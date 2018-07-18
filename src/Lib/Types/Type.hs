@@ -28,13 +28,13 @@ instance HasKind TyVar where
     kind (TyVar _ k) = k
 
 -- | A type constant is a unique symbol along with a 'Kind'
-data TyCon = TyCon Symbol Kind deriving (Eq, Ord)
+data TyLit = TyLit Symbol Kind deriving (Eq, Ord)
 
-instance Show TyCon where
-    show (TyCon sym k) = sym
+instance Show TyLit where
+    show (TyLit sym k) = sym
 
-instance HasKind TyCon where
-    kind (TyCon _ k) = k
+instance HasKind TyLit where
+    kind (TyLit _ k) = k
 
 -- | Types are like kind-level values :)
 -- The theoretical type grammar is based on [1], with the addition of qualified
@@ -55,7 +55,7 @@ instance HasKind TyCon where
 --      Peyton-Jones et al
 data Type
     = TVar TyVar
-    | TSym TyCon
+    | TSym TyLit
     | TFun [Type]
     | TForall [TyVar] Type -- Sigma types
     | [Pred] :=> Type -- Qualified types
@@ -82,8 +82,8 @@ instance Show Type where
     show t@(TSym sym) = show sym
     show t@(TFun ts) = go ts where
         go [] = ""
-        go ((TSym (TyCon "->" _)):t:[]) = "-> " ++ (show t)
-        go ((TSym (TyCon "->" Star)):ts') = intercalate " -> " $
+        go ((TSym (TyLit "->" _)):t:[]) = "-> " ++ (show t)
+        go ((TSym (TyLit "->" Star)):ts') = intercalate " -> " $
             map parensShow ts'
         go ts' = intercalate " " $ map parensShow ts'
     show (IsIn c t) = c ++ " " ++ (show t)
@@ -102,12 +102,12 @@ instance HasKind Type where
     kind (IsIn c t)     = kind t
 
 typeInt, typeBool, typeFloat :: Type
-typeInt = TSym (TyCon "Int" Star)
-typeBool = TSym (TyCon "Boolean" Star)
-typeFloat = TSym (TyCon "Float" Star)
+typeInt = TSym (TyLit "Int" Star)
+typeBool = TSym (TyLit "Boolean" Star)
+typeFloat = TSym (TyLit "Float" Star)
 
 tyFun :: Type
-tyFun = TSym $ TyCon "->" Star
+tyFun = TSym $ TyLit "->" Star
 
 removeEmptyPreds :: Type -> Type
 removeEmptyPreds ([] :=> t)     = removeEmptyPreds t

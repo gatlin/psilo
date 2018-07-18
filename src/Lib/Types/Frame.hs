@@ -7,7 +7,7 @@ import           Lib.Errors
 
 import           Data.Monoid          (Monoid, (<>))
 import           Lib.Syntax.Symbol
-import           Lib.Types.Type       (Pred, TyCon (..), TyVar (..), Type (..),
+import           Lib.Types.Type       (Pred, TyLit (..), TyVar (..), Type (..),
                                        tyFun)
 
 import           Data.Map             (Map)

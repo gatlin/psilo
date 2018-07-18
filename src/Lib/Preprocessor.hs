@@ -149,7 +149,7 @@ surfaceToTopLevel (Free (SigS sym scheme)) = return
 
 surfaceToTopLevel (Free (TypedefS name vars body)) = do
     let body' = normalize . quantify $ body
-    let ret_type = TFun $ (TSym (TyCon name Star)) : (fmap TVar vars)
+    let ret_type = TFun $ (TSym (TyLit name Star)) : (fmap TVar vars)
     let ctor = normalize $ TForall vars $ TFun $
                tyFun : (body : [ret_type])
     let dtor' = normalize $ TForall vars $ TFun $

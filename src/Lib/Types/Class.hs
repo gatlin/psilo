@@ -5,7 +5,7 @@ module Lib.Types.Class where
 
 import           Lib.Syntax.Symbol
 import           Lib.Types.Kind        (HasKind, Kind (..))
-import           Lib.Types.Type        (Pred, TyCon (..), TyVar (..), Type (..))
+import           Lib.Types.Type        (Pred, TyLit (..), TyVar (..), Type (..))
 import           Lib.Types.TypeCheck
 
 import           Data.Map              (Map)

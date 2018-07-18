@@ -248,7 +248,7 @@ ty_sym = do
     s@(c:cs) <- sym
     return $ if (elem c ['a'..'z'])
                 then TVar (TyVar (string_hash s) Star)
-                else TSym (TyCon s Star)
+                else TSym (TyLit s Star)
 
 sig_parser :: Parser (SurfaceExpr a)
 sig_parser = do
