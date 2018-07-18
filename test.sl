@@ -11,3 +11,10 @@
 
 (: map-constant (-> (-> a b) (Constant r a) (Constant r b)))
 (= map-constant (fn c) c)
+
+(= even-number? (n) (=? 0 (modulo n 2)))
+
+(: c1 (Constant Int Int))
+(= c1 (constant 2))
+(= c2 (map-constant even-number? c1))
+(= c3 (get-constant c2))

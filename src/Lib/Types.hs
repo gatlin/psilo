@@ -176,9 +176,8 @@ checkTypeEnv sym t1 tyEnv = case envLookup tyEnv sym of
     Just t2 -> do
         let t1' = removeEmptyPreds t1
             t2' = removeEmptyPreds t2
-        matchTypes t1' t2' `catchError` (addContext sym t2)
-        logTypeCheck $ "Unified " ++ (show t1) ++ " and " ++ (show $ quantify t2)
-        return tyEnv
+        unify t1' t2' `catchError` (addContext sym t2)
+        return $ extendEnv tyEnv (sym, t2)
 
     where addContext sym ty err =
               throwError $ OtherError $

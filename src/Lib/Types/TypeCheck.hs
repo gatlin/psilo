@@ -108,11 +108,10 @@ getEnv = ask
 -- | Instantiate a 'Sigma' into a 'Rho' type
 instantiate :: Sigma -> TypeCheck Rho
 instantiate (TForall vs t) = do
---    logTypeCheck $ "Instantiating " ++ (show (TForall vs t))
     vs' <- mapM (const $ fresh Star) vs >>= mapM (return . TVar)
     let frame = M.fromList $ zip vs vs'
         t' = substitute frame t
---    logTypeCheck $ "Instantiated to: " ++ (show t')
+
     {-
     t' <- case t of
         (ps :=> ty) -> do
@@ -169,7 +168,6 @@ infer (_ :< AppC op erands) = do
     op' <- infer op
     erands' <- mapM infer erands
     var <- fresh Star >>= return . TVar
-    logTypeCheck "what"
     op' @= (TList $ tyFun : (erands' ++ [var]))
     return var
 
@@ -211,6 +209,8 @@ unify t1 t2
     | t1 == t2 = return emptyUnifier
 unify (TVar v) t                  = v `bind` t
 unify t (TVar v)                  = v `bind` t
+unify (_ :=> t1) t2 = unify t1 t2
+unify t1 (_ :=> t2) = unify t1 t2
 unify t1 t2@(TForall _ _)         = do
     (_, t2') <- skolemize t2
     unify t1 t2'
