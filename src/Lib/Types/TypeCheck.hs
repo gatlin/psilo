@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 module Lib.Types.TypeCheck where
 
 import           Lib.Syntax.Annotated
@@ -14,7 +15,7 @@ import           Lib.Types.TypeEnv
 import           Lib.Compiler
 import           Lib.Errors
 
-import           Data.List              (nub, sort)
+import           Data.List              (nub, sort, splitAt)
 import           Data.Map               (Map)
 import qualified Data.Map               as M
 import           Data.Monoid            ((<>))
@@ -211,10 +212,12 @@ unify t (TVar v)                  = v `bind` t
 unify (_ :=> t1) t2 = unify t1 t2
 unify t1 (_ :=> t2) = unify t1 t2
 unify t1 t2@(TForall _ _)         = do
-    (_, t2') <- skolemize t2
+--    (_, t2') <- skolemize t2
+    t2' <- instantiate t2
     unify t1 t2'
 unify t1@(TForall _ _) t2         = do
-    (_, t1') <- skolemize t1
+--    (_, t1') <- skolemize t1
+    t1' <- instantiate t1
     unify t1' t2
 unify t1@(TList as) t2@(TList bs)   = unifyMany as bs
 unify t1 t2                       = throwError $ UnificationFail t1 t2
@@ -222,11 +225,24 @@ unify t1 t2                       = throwError $ UnificationFail t1 t2
 -- | Unification of a list of 'Type's.
 unifyMany :: [Type] -> [Type] -> TypeCheck Unifier
 unifyMany [] [] = return emptyUnifier
-unifyMany (t1 : ts1) (t2 : ts2) = do
-    (su1, cs1) <- unify t1 t2
-    (su2, cs2) <- unifyMany (substitute su1 ts1) (substitute su1 ts2)
-    return (su2 `compose` su1, nub $ cs1 ++ cs2)
+unifyMany ty1@(t1 : ts1) ty2@(t2 : ts2)
+    | length ty1 > length ty2 = unifyUneven ty1 ty2
+    | length ty1 < length ty2 = unifyUneven ty2 ty1
+    | otherwise = do
+          (su1, cs1) <- unify t1 t2
+          (su2, cs2) <- unifyMany (substitute su1 ts1) (substitute su1 ts2)
+          return (su2 `compose` su1, nub $ cs1 ++ cs2)
+
 unifyMany t1 t2 = throwError $ UnificationMismatch t1 t2
+
+-- | Partially applied types can throw a curveball.
+unifyUneven :: [Type] -> [Type] -> TypeCheck Unifier
+unifyUneven longer shorter = do
+    let diff = (length longer) - (length shorter)
+    let (hd, tl) = splitAt (diff+1) longer
+    (frame, cs) <- unifyMany ((TList hd): tl) shorter
+    logTypeCheck $ "Uneven frame <" ++ (show frame) ++ ">"
+    return (frame, cs)
 
 -- | Determine if two types match. Similar to unification.
 match :: Type -> Type -> TypeCheck Unifier
@@ -297,13 +313,6 @@ solver = gets constraints >>= go . sort where
             }
         solver
 
-matchTypes
-    :: Type
-    -> Type
-    -> TypeCheck ()
-matchTypes t1 t2 = do
-    match t1 t2
-    return ()
 
 -- |
 skolemize :: Sigma -> TypeCheck ([TyVar], Rho)

@@ -192,7 +192,7 @@ scheme_parser = sigma where
         return $ t
 
     rho :: Parser Type
-    rho = tau <|> (parens sigma_arrow)
+    rho = (parens sigma_arrow) <|> tau
 
     sigma_arrow :: Parser Type
     sigma_arrow = do
@@ -204,7 +204,14 @@ scheme_parser = sigma where
         return $ TList $ tyFun : tys
 
     tau :: Parser Type
-    tau = type_parser
+    tau = ty_sym <|> (parens compound)
+
+    compound :: Parser Type
+    compound = do
+        skipSpace
+        ts <- tau `sepBy` (many space)
+        skipSpace
+        return $ TList ts
 
     pred_type :: Parser Type
     pred_type = do
@@ -225,23 +232,6 @@ scheme_parser = sigma where
         t <- ty_sym
         skipSpace
         return $ IsIn p t
-
-type_parser :: Parser Type
-type_parser = do
-    t <- one <|> (parens more)
-    return t
-
-    where
-        one :: Parser Type
-        one = ty_sym
-
-        more :: Parser Type
-        more = do
-            skipSpace
---            ts <- ty_sym `sepBy` (many space)
-            ts <- type_parser `sepBy` (many space)
-            skipSpace
-            return $ TList ts
 
 ty_sym :: Parser Type
 ty_sym = do

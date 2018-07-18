@@ -1,4 +1,7 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE OverlappingInstances #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 module Lib.Types.Frame where
 
@@ -16,11 +19,14 @@ import qualified Data.Map.Lazy        as M
 import           Data.Set             (Set)
 import qualified Data.Set             as S
 
-import           Data.List            (intersect)
+import           Data.List            (intercalate, intersect)
 
 -- * Frames and Substitutions
 
 type Frame = Map TyVar Type
+
+instance Show Frame where
+    show mp = intercalate "\n" $ fmap show $ M.toList mp
 
 nullFrame :: Frame
 nullFrame = M.empty

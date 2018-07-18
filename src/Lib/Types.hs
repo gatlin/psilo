@@ -49,7 +49,7 @@ import qualified Data.Graph             as G
 import qualified Data.Text              as T
 import           Data.Tree              (flatten)
 
-import           Data.List              (sort, sortBy)
+import           Data.List              (intercalate, sort, sortBy)
 import           Data.Ord               (Ordering (..))
 
 import           Lib.Syntax             (AnnotatedExpr, CoreAst (..), CoreExpr,
@@ -156,7 +156,7 @@ typecheck_pass
     -> Compiler TypeEnv
 typecheck_pass ce te (sym, expr) = runTypeCheck te $ do
     expr' <- sequence . extend infer $ expr
-    (frame, preds) <- solver
+    (frame, preds) <- solver `catchError` (handleTypecheckError sym)
     let sig = fmap (substitute frame) expr'
     let vars = ftv $ extract sig
     preds' <- forM preds $ \pred@(IsIn c t) -> case t of
@@ -170,13 +170,17 @@ typecheck_pass ce te (sym, expr) = runTypeCheck te $ do
     te' <- checkTypeEnv sym scheme te
     return te'
 
+handleTypecheckError sym err = throwError $
+    OtherError $ "For " ++ sym ++ ", " ++ (show err)
+
 checkTypeEnv :: Symbol -> Sigma -> TypeEnv -> TypeCheck TypeEnv
 checkTypeEnv sym t1 tyEnv = case envLookup tyEnv sym of
     Nothing -> return $ extendEnv tyEnv (sym, t1)
     Just t2 -> do
         let t1' = removeEmptyPreds t1
             t2' = removeEmptyPreds t2
-        unify t1' t2' `catchError` (addContext sym t2)
+        (frame, _) <- unify t1' t2' `catchError` (addContext sym t2)
+        logTypeCheck $ "Frame: " ++ (show frame)
         return tyEnv
 
     where addContext sym ty err =
