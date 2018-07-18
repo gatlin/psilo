@@ -238,8 +238,8 @@ type_parser = do
         more :: Parser Type
         more = do
             skipSpace
-            ts <- ty_sym `sepBy` (many space)
---            ts <- type_parser `sepBy` (many space)
+--            ts <- ty_sym `sepBy` (many space)
+            ts <- type_parser `sepBy` (many space)
             skipSpace
             return $ TList ts
 

@@ -200,12 +200,11 @@ showWithKind x = "(" ++ (show x) ++ " :: " ++ (show (kind x)) ++ ")"
 -- | Unification of two 'Type's
 unify :: Type -> Type -> TypeCheck Unifier
 unify t1 t2
-    {- | (kind t1) /= (kind t2) =
+    | (kind t1) /= (kind t2) =
           throwError $ OtherTypeError $
           "Kind mismatch: " ++
           (showWithKind t1) ++ " and " ++
           (showWithKind t2)
--}
     | t1 == t2 = return emptyUnifier
 unify (TVar v) t                  = v `bind` t
 unify t (TVar v)                  = v `bind` t

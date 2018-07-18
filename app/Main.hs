@@ -57,8 +57,6 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
                 forM_ logs putStrLn
                 putStrLn "-----"
 
-globals = S.toList builtin_syms
-
 process_file :: Text -> Compiler (TypeEnv, [(Symbol, AnnotatedExpr ())])
 process_file file_contents = do
     defns <- parse_multi $ removeComments file_contents

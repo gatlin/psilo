@@ -177,7 +177,7 @@ checkTypeEnv sym t1 tyEnv = case envLookup tyEnv sym of
         let t1' = removeEmptyPreds t1
             t2' = removeEmptyPreds t2
         unify t1' t2' `catchError` (addContext sym t2)
-        return $ extendEnv tyEnv (sym, t2)
+        return tyEnv
 
     where addContext sym ty err =
               throwError $ OtherError $

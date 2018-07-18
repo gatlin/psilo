@@ -1,20 +1,28 @@
-(= id (x) x)
+(::= Functor (f)
+  (forall (r)
+    (->
+      (-> (forall (a b)
+        (-> (-> a b) (f a) (f b))) r) r)))
 
-(: square (=> ((Num n)) (-> n n)))
-(= square (x) (* x x))
+(: functor (forall (f) (-> (forall (a b) (-> (-> a b) (f a) (f b))) (Functor f))))
+(= functor (map-fn) (Functor (\ (k) (k map-fn))))
 
-(::= Constant (a b)
-  (forall (r) (-> (-> a r) r)))
+(= map (fctor f x) ((~Functor fctor) (\ (fn) (fn f x))))
 
-(= constant (x) (Constant (\ (k) (k x))))
-(= get-constant (c) ((~Constant c) id))
+;(= even-number? (x) (=? 0 (modulo x 2)))
 
-(: map-constant (-> (-> a b) (Constant r a) (Constant r b)))
-(= map-constant (fn c) c)
+;(= id (x) x)
+;(::= Box (a) (forall (r) (-> (-> a r) r)))
+;(= box (x) (Box (\ (k) (k x))))
+;(= unbox (b) ((~Box b) id))
 
-(= even-number? (n) (=? 0 (modulo n 2)))
+;(: functor-box (Functor Box))
+;(= functor-box
+;  (functor (\ (fn b)
+;    (box (fn (unbox b))))))
 
-(: c1 (Constant Int Int))
-(= c1 (constant 2))
-(= c2 (map-constant even-number? c1))
-(= c3 (get-constant c2))
+;(: b1 (Box Float))
+;(= b1 (box 2.0))
+
+;(: b2 (Box Boolean))
+;(= b2 (map functor-box even-number? b1))

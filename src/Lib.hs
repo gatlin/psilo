@@ -35,13 +35,13 @@ module Lib
     , liftExpr
     , convertClosure
       -- * Codegen
-    , codegen
-    , emptyModule
+--    , codegen
+--    , emptyModule
       -- * Errors
     , PsiloError(..)
     ) where
 
-import           Lib.Codegen
+--import           Lib.Codegen
 import           Lib.Compiler
 import           Lib.Errors
 import           Lib.Parser
