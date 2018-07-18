@@ -72,19 +72,19 @@ import           Lib.Parser             (parse_expr, parse_multi)
 -- * Defaults
 
 num_binop :: Type
-num_binop = [IsIn "Num" t_0] :=> (TFun [tyFun, t_0, t_0, t_0])
+num_binop = [IsIn "Num" t_0] :=> (TList [tyFun, t_0, t_0, t_0])
     where t_0 = TVar (TyVar 0 Star)
 
 integral_binop :: Type
-integral_binop = [IsIn "Integral" t_0] :=> (TFun [tyFun, t_0, t_0, t_0])
+integral_binop = [IsIn "Integral" t_0] :=> (TList [tyFun, t_0, t_0, t_0])
     where t_0 = TVar (TyVar 0 Star)
 
 eq_binop :: Type
-eq_binop = [IsIn "Eq" t_0] :=> (TFun [tyFun, t_0, t_0, typeBool])
+eq_binop = [IsIn "Eq" t_0] :=> (TList [tyFun, t_0, t_0, typeBool])
     where t_0 = TVar (TyVar 0 Star)
 
 ord_binop :: Type
-ord_binop = [IsIn "Ord" t_0] :=> (TFun [tyFun, t_0, t_0, typeBool])
+ord_binop = [IsIn "Ord" t_0] :=> (TList [tyFun, t_0, t_0, typeBool])
     where t_0 = TVar (TyVar 0 Star)
 
 -- | Builtin operators and functions with explicit type schemes
@@ -98,7 +98,7 @@ defaultTypeEnv = TypeEnv $ M.fromList
     , ("=?", generalize mempty eq_binop)
     , ("<", generalize mempty ord_binop)
     , (">", generalize mempty ord_binop)
---    , ("id", generalize mempty $ [] :=> (TFun [tyFun, TVar (TyVar 0 Star),
+--    , ("id", generalize mempty $ [] :=> (TList [tyFun, TVar (TyVar 0 Star),
 --                                               TVar (TyVar 0 Star)]))
     ]
 

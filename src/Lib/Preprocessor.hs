@@ -149,10 +149,10 @@ surfaceToTopLevel (Free (SigS sym scheme)) = return
 
 surfaceToTopLevel (Free (TypedefS name vars body)) = do
     let body' = normalize . quantify $ body
-    let ret_type = TFun $ (TSym (TyLit name Star)) : (fmap TVar vars)
-    let ctor = normalize $ TForall vars $ TFun $
+    let ret_type = TList $ (TSym (TyLit name Star)) : (fmap TVar vars)
+    let ctor = normalize $ TForall vars $ TList $
                tyFun : (body : [ret_type])
-    let dtor' = normalize $ TForall vars $ TFun $
+    let dtor' = normalize $ TForall vars $ TList $
                tyFun : (ret_type : [body])
     let mDtor = runSolve (skolemize dtor') initTypeCheckState
     dtor <- case mDtor of

@@ -158,7 +158,7 @@ infer (_ :< FunC args body) = do
         var <- fresh Star
         return (TVar var, TForall [] (TVar var))) args
     br <- withEnv (zip args argScms) $ infer body
-    let fun_ty = TFun $ tyFun : (argVars ++ [br])
+    let fun_ty = TList $ tyFun : (argVars ++ [br])
     return fun_ty
 
 -- | Lambda application is straightforward: infer types for the operator and the
@@ -170,7 +170,7 @@ infer (_ :< AppC op erands) = do
     erands' <- mapM infer erands
     var <- fresh Star >>= return . TVar
     logTypeCheck "what"
-    op' @= (TFun $ tyFun : (erands' ++ [var]))
+    op' @= (TList $ tyFun : (erands' ++ [var]))
     return var
 
 -- | Assert that the condition expression is a boolean and that the two branches
@@ -217,7 +217,7 @@ unify t1 t2@(TForall _ _)         = do
 unify t1@(TForall _ _) t2         = do
     (_, t1') <- skolemize t1
     unify t1' t2
-unify t1@(TFun as) t2@(TFun bs)   = unifyMany as bs
+unify t1@(TList as) t2@(TList bs)   = unifyMany as bs
 unify t1 t2                       = throwError $ UnificationFail t1 t2
 
 -- | Unification of a list of 'Type's.
@@ -235,7 +235,7 @@ match t1 t2                         | t1 == t2 = return emptyUnifier
 match (_ :=> t1) (_ :=> t2)         = match t1 t2
 --match (TVar v) t            | (kind v) == (kind t) = return (v |-> t, [])
 match (TVar v) t                    = return (v |-> t, [])
-match (TFun as) (TFun bs)           = matchMany as bs
+match (TList as) (TList bs)           = matchMany as bs
 match t1@(TForall _ _) t2@(TForall _ _) = do
     (_, t1') <- skolemize t1
     (_, t2') <- skolemize t2
@@ -318,11 +318,11 @@ skolemize qt@(preds :=> ty) = do -- Rule, uh, PRPRED
     (sks, ty') <- skolemize ty
     return (sks, preds :=> ty')
 
-skolemize (TFun tys) = do -- Rule PRFUN
+skolemize (TList tys) = do -- Rule PRFUN
     let tys_len = length tys
     let (arg_tys, [res_ty]) = splitAt (tys_len - 1) tys
     (sks, res_ty') <- skolemize res_ty
-    return (sks, TFun $ arg_tys ++ [ res_ty' ])
+    return (sks, TList $ arg_tys ++ [ res_ty' ])
 
 skolemize ty = do -- Rule PRMONO
     return ([], ty)

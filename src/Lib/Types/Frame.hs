@@ -52,7 +52,7 @@ instance TypeLike a => TypeLike [a] where
 instance TypeLike Type where
     ftv (TForall vs t) = (ftv t) `S.difference` (S.fromList vs)
     ftv (TVar n)       = S.singleton n
-    ftv (TFun ts)      = foldl (<>) mempty $ fmap ftv ts
+    ftv (TList ts)     = foldl (<>) mempty $ fmap ftv ts
     ftv (ps :=> t)     = (ftv ps) `S.union` (ftv t)
     ftv (IsIn i t)     = ftv t
     ftv _              = mempty
@@ -63,7 +63,7 @@ instance TypeLike Type where
         Just t  -> t
         Nothing -> TVar u
 
-    substitute frame (TFun ts) = TFun (substitute frame ts)
+    substitute frame (TList ts) = TList (substitute frame ts)
     substitute frame (IsIn i t) = IsIn i (substitute frame t)
     substitute frame (ps :=> t) =
         (map (substitute frame) ps) :=> (substitute frame t)

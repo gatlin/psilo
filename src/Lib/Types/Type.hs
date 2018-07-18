@@ -56,7 +56,7 @@ instance HasKind TyLit where
 data Type
     = TVar TyVar
     | TSym TyLit
-    | TFun [Type]
+    | TList [Type]
     | TForall [TyVar] Type -- Sigma types
     | [Pred] :=> Type -- Qualified types
     | IsIn Symbol Type -- Predicates
@@ -71,8 +71,8 @@ type Rho = Type
 type Pred = Type
 
 parensShow :: Type -> String
-parensShow ty@(TFun ts) = "(" ++ (show ty) ++ ")"
-parensShow ty           = show ty
+parensShow ty@(TList ts) = "(" ++ (show ty) ++ ")"
+parensShow ty            = show ty
 
 instance Show Type where
     show (TForall vs t) = "(" ++ prefix ++ (show t) ++ ")"
@@ -80,7 +80,7 @@ instance Show Type where
               prefix = "∀" ++ vs' ++ ". "
     show (TVar n) = show n
     show t@(TSym sym) = show sym
-    show t@(TFun ts) = go ts where
+    show t@(TList ts) = go ts where
         go [] = ""
         go ((TSym (TyLit "->" _)):t:[]) = "-> " ++ (show t)
         go ((TSym (TyLit "->" Star)):ts') = intercalate " -> " $
@@ -95,7 +95,7 @@ instance HasKind Type where
     kind (TForall vs t) = kind t
     kind (TSym tc)      = kind tc
     kind (TVar tv)      = kind tv
-    kind (TFun (t:_))   = kind t
+    kind (TList (t:_))  = kind t
 
 
     kind (ps :=> t)     = kind t
@@ -113,5 +113,5 @@ removeEmptyPreds :: Type -> Type
 removeEmptyPreds ([] :=> t)     = removeEmptyPreds t
 removeEmptyPreds (ps :=> t)     = ps :=> (removeEmptyPreds t)
 removeEmptyPreds (TForall vs t) = TForall vs (removeEmptyPreds t)
-removeEmptyPreds (TFun tys)     = TFun $ fmap removeEmptyPreds tys
+removeEmptyPreds (TList tys)    = TList $ fmap removeEmptyPreds tys
 removeEmptyPreds t              = t

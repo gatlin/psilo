@@ -201,7 +201,7 @@ scheme_parser = sigma where
         skipSpace
         tys <- sigma `sepBy` (many space)
         skipSpace
-        return $ TFun $ tyFun : tys
+        return $ TList $ tyFun : tys
 
     tau :: Parser Type
     tau = type_parser
@@ -241,7 +241,7 @@ type_parser = do
             ts <- ty_sym `sepBy` (many space)
 --            ts <- type_parser `sepBy` (many space)
             skipSpace
-            return $ TFun ts
+            return $ TList ts
 
 ty_sym :: Parser Type
 ty_sym = do
