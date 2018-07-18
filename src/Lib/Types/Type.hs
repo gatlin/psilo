@@ -75,7 +75,7 @@ parensShow ty@(TFun ts) = "(" ++ (show ty) ++ ")"
 parensShow ty           = show ty
 
 instance Show Type where
-    show (TForall vs t) = prefix ++ (show t)
+    show (TForall vs t) = "(" ++ prefix ++ (show t) ++ ")"
         where vs' = intercalate " " $ map show vs
               prefix = "∀" ++ vs' ++ ". "
     show (TVar n) = show n

@@ -167,30 +167,29 @@ typedef_parser = do
     skipSpace
     return $ aTypedef name vars' body
 
-scheme_parser :: Parser Sigma
+scheme_parser :: Parser Type
 scheme_parser = sigma where
 
     sigma :: Parser Type
-    sigma = (parens quantified) <|> (unquantified S.empty)
+    sigma = (parens quantified) <|> unquantified
 
-    quantified :: Parser Sigma
+    quantified :: Parser Type
     quantified = do
         skipSpace
         string "forall"
         skipSpace
         vars <- parens (sym `sepBy` (many space))
-        let vars' = fmap (\v -> TyVar (string_hash v) Star) vars
         skipSpace
-        t <- unquantified $ S.fromList vars'
+        t <- unquantified
         skipSpace
-        return $ TForall vars' t
+        return $ TForall (fmap (\v -> TyVar (string_hash v) Star) vars) t
 
-    unquantified :: S.Set TyVar -> Parser Sigma
-    unquantified vars = do
+    unquantified :: Parser Type
+    unquantified = do
         skipSpace
         t <- (parens pred_type) <|> rho
         skipSpace
-        return $ TForall (S.toList $ (ftv t) `S.difference` vars) t
+        return $ t
 
     rho :: Parser Type
     rho = tau <|> (parens sigma_arrow)
