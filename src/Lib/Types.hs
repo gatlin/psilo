@@ -141,9 +141,11 @@ typecheck defns _te = do
     let dependency_graph = make_dep_graph defns
     let defns' = reverse $ topo' dependency_graph
     te' <- foldM (typecheck_pass classEnv) te defns'
-    logMsg "Final type environment"
-    logMsg . show $ te'
-    logMsg "-----"
+    logMsg . concat $ [ "Final type environment\n"
+                      , show te'
+                      , "\n"
+                      , "-----"
+                      ]
     return te'
 
 typecheck_pass
