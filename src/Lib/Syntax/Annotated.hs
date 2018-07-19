@@ -1,10 +1,12 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 module Lib.Syntax.Annotated where
 
 import           Control.Comonad
 import           Control.Comonad.Cofree
 import           Control.Monad.Free
 import           Data.Traversable
-import           Lib.Compiler
+import Control.Monad.Error
 import           Lib.Errors
 import           Lib.Syntax.Core
 import           Lib.Syntax.Surface     (SurfaceAst, SurfaceExpr ())
@@ -16,6 +18,9 @@ import           Lib.Syntax.Symbol
 type AnnotatedExpr = Cofree CoreAst
 
 -- | Converts a 'CoreExpr' fresh out of the parser into an 'AnnotatedExpr'.
-annotated :: Traversable f => Free f () -> Compiler (Cofree f ())
+annotated
+    :: (MonadError PsiloError m, Traversable f)
+    => Free f ()
+    -> m (Cofree f ())
 annotated (Pure _) = throwError $ PreprocessError "Error annotating syntax tree"
 annotated (Free m) = fmap (() :<) $ traverse annotated m
