@@ -60,13 +60,11 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
 process_file :: Text -> Compiler (TypeEnv, [(Symbol, AnnotatedExpr ())])
 process_file file_contents = do
     defns <- parse_multi $ removeComments file_contents
-    logMsg $ show defns
     toplevels <- preprocess $ do
         toplevels <- mapM surfaceToTopLevel defns >>= return . concat
         boundVarCheck toplevels
         return toplevels
     let (defns, sigs, tds) = splitUp toplevels
     let tyEnv = buildTypeEnv sigs
-    logMsg $ ushow tyEnv
     typeEnv <- typecheck defns tyEnv
     return (typeEnv, defns)

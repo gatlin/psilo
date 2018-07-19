@@ -137,9 +137,6 @@ typecheck
     -> Compiler TypeEnv
 typecheck defns _te = do
     let te = defaultTypeEnv <> _te
-    logMsg "Initial type environment"
-    logMsg . show $ te
-    logMsg "-----"
     classEnv <- transformCE defaultClassEnv mempty
     let dependency_graph = make_dep_graph defns
     let defns' = reverse $ topo' dependency_graph
@@ -180,7 +177,6 @@ checkTypeEnv sym t1 tyEnv = case envLookup tyEnv sym of
         let t1' = removeEmptyPreds t1
             t2' = removeEmptyPreds t2
         (frame, _) <- unify t1' t2' `catchError` (addContext sym t2)
-        logTypeCheck $ "Frame: " ++ (show frame)
         return tyEnv
 
     where addContext sym ty err =

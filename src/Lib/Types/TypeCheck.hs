@@ -82,7 +82,7 @@ runTypeCheck' te tcState m = do
 -- | helper to record an equality constraint
 (@=) :: Type -> Type -> TypeCheck ()
 t1 @= t2 = do
-    logTypeCheck $ "Constraint: " ++ (show $ t1 := t2)
+--    logTypeCheck $ "Constraint: " ++ (show $ t1 := t2)
     modify $ \st -> st {
         constraints = [t1 := t2] ++ (constraints st)
     }
@@ -216,7 +216,7 @@ unify t1 t2@(TForall _ _)         = do
     t2' <- instantiate t2
     unify t1 t2'
 unify t1@(TForall _ _) t2         = do
---    (_, t1') <- skolemize t1
+    (_, t1') <- skolemize t1
     t1' <- instantiate t1
     unify t1' t2
 unify t1@(TList as) t2@(TList bs)   = unifyMany as bs
@@ -240,9 +240,7 @@ unifyUneven :: [Type] -> [Type] -> TypeCheck Unifier
 unifyUneven longer shorter = do
     let diff = (length longer) - (length shorter)
     let (hd, tl) = splitAt (diff+1) longer
-    (frame, cs) <- unifyMany ((TList hd): tl) shorter
-    logTypeCheck $ "Uneven frame <" ++ (show frame) ++ ">"
-    return (frame, cs)
+    unifyMany ((TList hd): tl) shorter
 
 -- | Determine if two types match. Similar to unification.
 match :: Type -> Type -> TypeCheck Unifier
@@ -261,18 +259,23 @@ matchMany :: [Type] -> [Type] -> TypeCheck Unifier
 matchMany t1@([]) t2@(x:xs) = throwError $ OtherTypeError $
     "Cannot match " ++ (show t2) ++ " with an empty type."
 matchMany [] [] = return emptyUnifier
-matchMany ty1@(t1 : ts1) ty2@(t2 : ts2) = do
-    (su1, cs1) <- match t1 t2
-    (su2, cs2) <- matchMany ts1 ts2
-    case merge su1 su2 of
-        Nothing -> throwError $
-                   OtherTypeError $
-                   "Frame 1: " ++ (show su1) ++ "  Frame 2: " ++ (show su2) ++
-                   "  ty1: " ++ (show ty1) ++ "  ty2: " ++ (show ty2)
+matchMany ty1@(t1 : ts1) ty2@(t2 : ts2)
+    | length ty1 > length ty2 = matchUneven ty1 ty2
+    | length ty1 < length ty2 = matchUneven ty2 ty1
+    | otherwise = do
+          (su1, cs1) <- match t1 t2
+          (su2, cs2) <- matchMany ts1 ts2
+          case merge su1 su2 of
+              Nothing -> throwError $ TypeMismatch (TList ty1) (TList ty2)
 
-        Just su -> return (su, nub $ cs1 ++ cs2)
+              Just su -> return (su, nub $ cs1 ++ cs2)
 matchMany t1 t2 = throwError $ OtherTypeError $
     "Cannot match " ++ (show t1) ++ " and " ++ (show t2)
+
+matchUneven longer shorter = do
+    let diff = (length longer) - (length shorter)
+    let (hd, tl) = splitAt (diff + 1) longer
+    matchMany ((TList hd):tl) shorter
 
 
 -- | Bind a 'TyVar' to a 'Type' in the 'Frame', unless the result would be an
