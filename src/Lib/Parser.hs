@@ -167,6 +167,20 @@ typedef_parser = do
     skipSpace
     return $ aTypedef name vars' body
 
+classdef_parser :: Parser (SurfaceExpr a)
+classdef_parser = do
+    string "class"
+    skipSpace
+    name <- sym
+    skipSpace
+    vars <- parens (sym `sepBy` (many space))
+    vars' <- forM vars $ \var ->
+        return (TyVar (string_hash var) Star)
+    skipSpace
+    body <- (parens sig_parser) `sepBy` (many space)
+    skipSpace
+    return $ aClassDef name vars' body
+
 scheme_parser :: Parser Type
 scheme_parser = sigma where
 
@@ -257,6 +271,7 @@ toplevel_parser = do
         <|> (parens def_parser)
         <|> (parens sig_parser)
         <|> (parens typedef_parser)
+        <|> (parens classdef_parser)
     skipSpace
     return defn
 
