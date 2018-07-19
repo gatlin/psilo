@@ -136,16 +136,21 @@ uniqueIds whatever = return whatever
 -- | Transforms a 'SurfaceExpr' into a 'TopLevel' expression
 surfaceToTopLevel
     :: SurfaceExpr ()
-    -> Preprocess [TopLevel]
+    -> Preprocess TopLevel
 surfaceToTopLevel (Free (DefS sym val)) = do
     uval <- uniqueIds val
     val' <- surfaceToCore uval
     case compile (annotated val') of
         Left _    -> throwError $ PreprocessError "wut"
-        Right ann -> return [ Define sym ann ]
+        Right ann -> return $ mempty {
+            definitions = M.singleton sym ann
+            }
+--        Right ann -> return [ Define sym ann ]
 
-surfaceToTopLevel (Free (SigS sym scheme)) = return
-    [ Signature sym $ normalize $ quantify scheme ]
+surfaceToTopLevel (Free (SigS sym scheme)) = return $ mempty {
+    signatures = M.singleton sym (normalize $ quantify scheme)
+    }
+--    [ Signature sym $ normalize $ quantify scheme ]
 
 surfaceToTopLevel (Free (TypedefS name vars body)) = do
     let body' = normalize . quantify $ body
@@ -158,11 +163,18 @@ surfaceToTopLevel (Free (TypedefS name vars body)) = do
     dtor <- case mDtor of
         Left err              -> throwError err
         Right (sk_vars, dtor) -> return $ TForall sk_vars dtor
+
+    return $ mempty {
+        typedefs = M.singleton name (vars, normalize $ quantify body),
+        signatures = M.fromList [(name, ctor), (('~':name), dtor)]
+        }
+{-
     return
         [ Typedef name vars $ normalize $ quantify body
         , Signature name ctor
         , Signature ("~"++name) dtor
         ]
+-}
 
 surfaceToTopLevel _ = throwError $
     PreprocessError $
@@ -207,20 +219,21 @@ thd' (x, y, z) = z
 
 -- | Ensures that all symbols are either bound or global
 -- TODO why am I not using a Set here?
-boundVarCheck :: [TopLevel] -> Preprocess ()
-boundVarCheck toplevels = withBoundVars bvs $ mapM_ go toplevels
+boundVarCheck :: TopLevel -> Preprocess ()
+boundVarCheck (TopLevel defns sigs tds) =
+    withBoundVars bvs $ mapM_ go $ M.toList defns
     where
+        dup x = (x, x)
         syms = defn_syms ++
-               (fmap (\x -> (x, x)) ty_defn_syms) ++
-               (fmap (\x -> (x, x)) (fmap ("~"++) ty_defn_syms))
-        defn_syms = fmap (\x -> (x,x)) $ fmap fst $ fst' $ splitUp toplevels
-        ty_defn_syms = fmap fst' $ thd' $ splitUp toplevels
-        builtins = fmap (\x -> (x,x)) $ S.toList builtin_syms
+               (fmap dup ty_defn_syms) ++
+               (fmap dup (fmap ("~"++) ty_defn_syms))
+        defn_syms = fmap dup $ M.keys defns
+        ty_defn_syms = M.keys tds
+        builtins = fmap dup $ S.toList builtin_syms
         bvs = M.fromList $ builtins ++ syms
 
-        go :: TopLevel -> Preprocess ()
-        go (Define s core) = check core
-        go whatever        = return ()
+        go :: (Symbol, AnnotatedExpr ()) -> Preprocess ()
+        go (s, core) = check core
 
         check :: AnnotatedExpr () -> Preprocess ()
         check (() :< (FunC args body)) = do

@@ -19,7 +19,7 @@ module Lib
     , preprocess
     , uniqueIds
     , surfaceToTopLevel
-    , splitUp
+--    , splitUp
     , boundVarCheck
       -- * Type checking
     , typecheck

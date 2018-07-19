@@ -5,6 +5,8 @@ module Main where
 import           Control.Comonad.Cofree
 import           Control.Monad              (foldM, forM_, mapM, mapM_, when)
 import           Control.Monad.Except
+import           Data.Foldable
+import qualified Data.Map                   as M
 import           Data.Maybe                 (fromJust, isJust)
 import           Data.Monoid                ((<>))
 import qualified Data.Set                   as S
@@ -59,12 +61,11 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
 
 process_file :: Text -> Compiler (TypeEnv, [(Symbol, AnnotatedExpr ())])
 process_file file_contents = do
-    defns <- parse_multi $ removeComments file_contents
-    toplevels <- preprocess $ do
-        toplevels <- mapM surfaceToTopLevel defns >>= return . concat
-        boundVarCheck toplevels
-        return toplevels
-    let (defns, sigs, tds) = splitUp toplevels
-    let tyEnv = buildTypeEnv sigs
-    typeEnv <- typecheck defns tyEnv
-    return (typeEnv, defns)
+    exprs <- parse_multi $ removeComments file_contents
+    (TopLevel defns sigs _) <- preprocess $ do
+        toplevel <- mapM surfaceToTopLevel exprs >>= return . fold
+        boundVarCheck toplevel
+        return toplevel
+    let tyEnv = TypeEnv sigs
+    typeEnv <- typecheck (M.toList defns) tyEnv
+    return (typeEnv, M.toList defns)
