@@ -6,6 +6,7 @@ import           Control.Comonad.Cofree
 import           Control.Monad              (foldM, forM_, mapM, mapM_, when)
 import           Control.Monad.Except
 import           Data.Foldable
+import           Data.Map                   (Map)
 import qualified Data.Map                   as M
 import           Data.Maybe                 (fromJust, isJust)
 import           Data.Monoid                ((<>))
@@ -59,7 +60,7 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
                 forM_ logs putStrLn
                 putStrLn "-----"
 
-process_file :: Text -> Compiler (TypeEnv, [(Symbol, AnnotatedExpr ())])
+process_file :: Text -> Compiler (TypeEnv, Map Symbol (AnnotatedExpr ()))
 process_file file_contents = do
     exprs <- parse_multi $ removeComments file_contents
     (TopLevel defns sigs _) <- preprocess $ do
@@ -67,5 +68,5 @@ process_file file_contents = do
         boundVarCheck toplevel
         return toplevel
     let tyEnv = TypeEnv sigs
-    typeEnv <- typecheck (M.toList defns) tyEnv
-    return (typeEnv, M.toList defns)
+    typeEnv <- typecheck defns tyEnv
+    return (typeEnv, defns)

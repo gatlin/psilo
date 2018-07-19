@@ -132,7 +132,7 @@ defaultClassEnv =     addCoreClasses
 -- them. Then typechecking, as crude as it may be, is simply folding the initial
 -- type environment with the 'typecheck_pass' function over the sorted list.
 typecheck
-    :: [(Symbol, AnnotatedExpr ())]
+    :: Map Symbol (AnnotatedExpr ())
     -> TypeEnv
     -> Compiler TypeEnv
 typecheck defns _te = do
@@ -189,9 +189,10 @@ toSigma frame preds expr =
     in  closeOver frame (preds :=> ty)
 
 -- | Compute dependencies for a given expression and return as a list of Symbols
-deps :: [(Symbol, AnnotatedExpr ())] -> AnnotatedExpr () -> [Symbol]
+--deps :: [(Symbol, AnnotatedExpr ())] -> AnnotatedExpr () -> [Symbol]
+deps :: Map Symbol (AnnotatedExpr ()) -> AnnotatedExpr () -> [Symbol]
 deps xs expr = go expr where
-    go (() :< (IdC sym)) = case lookup sym xs of
+    go (() :< (IdC sym)) = case M.lookup sym xs of
         Nothing -> []
         Just _  -> [sym]
 
@@ -223,5 +224,5 @@ topo' :: Grph node key -> [node]
 topo' g = vertexLabels g $ G.topSort (_graph g)
 
 -- | Traverse an expression tree and create a dependency graph
-make_dep_graph defns = fromList $ fmap dep_list defns where
-    dep_list (sym, expr) = ((sym, expr), sym, extract ( extend (deps defns) expr))
+make_dep_graph defns = fromList $ M.elems $ M.mapWithKey dep_list defns where
+    dep_list sym expr = ((sym, expr), sym, extract ( extend (deps defns) expr))

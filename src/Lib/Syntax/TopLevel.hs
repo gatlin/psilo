@@ -21,14 +21,16 @@ data TopLevel = TopLevel
     { definitions :: Map Symbol (AnnotatedExpr ())
     , signatures  :: Map Symbol Sigma
     , typedefs    :: Map Symbol ([TyVar], Sigma)
-    } deriving (Show, Monoid)
+    } deriving (Show)
 
-{-
+
 instance Monoid TopLevel where
     mempty = TopLevel mempty mempty mempty
-    (TopLevel aD aS aT) `mappend` (TopLevel bD bS bT) =
-        TopLevel (aD `mappend` bD) (aS `mappend` bS) (aT `mappend` bT)
--}
+    (TopLevel aD aS aT) `mappend` (TopLevel bD bS bT) = TopLevel {
+        definitions = (aD `mappend` bD),
+        signatures = (aS `mappend` bS),
+        typedefs = (aT `mappend` bT)
+        }
 {-
 data TopLevel
     = Define Symbol (AnnotatedExpr ()) -- ^ A value definition
