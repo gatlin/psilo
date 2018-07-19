@@ -194,9 +194,6 @@
 (= view (lens s)
   (get-constant ((~Lens lens) functor-constant constant s)))
 
-; l .= f = unbox . l (Box . (\_ -> f))
-(= .= (l f) (compose unbox  ((~Lens l) functor-box (compose box (\ (_) f)))))
-
 ; Example lenses to focus on the first and second parts of a pair
 (: _1 (Lens (Pair a b) (Pair c b) a c))
 (= _1 (Lens (\ (mapper f p)
