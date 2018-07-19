@@ -112,6 +112,7 @@
 
 ; The left fold doesn't need to traverse the entire list before processing,
 ; unlike the right fold.
+(: foldl (forall (a b) (-> (-> b a b) b (List a) b)))
 (= foldl (fold-fn init-value list)
   ((foldr (\ (xs k) (\ (x) (k (fold-fn x xs))))
           id
