@@ -122,7 +122,9 @@
 ;; We can mimic typeclasses, too
 
 (::= Functor (f)
-  (forall (r) (-> (-> (forall (a b) (-> (-> a b) (f a) (f b))) r) r)))
+  (forall (r)
+    (-> (-> (forall (a b) (-> (-> a b) (f a) (f b))) r) ; map
+        r)))
 
 (= functor (map-fn) (Functor (\ (k) (k map-fn))))
 (= map (fctor f x) ((~Functor fctor) (\ (fn) (fn f x))))
@@ -217,6 +219,53 @@
 
 (: a-boolean Boolean)
 (= a-boolean (view _1st_of_2nd (over _1st_of_2nd even-number? pair-2)))
+
+;; oh shit what up
+(::= IO (a)
+  (forall (r)
+    (-> (-> a r)
+        (forall (t) (-> (FFI t) (-> t r) r))
+        r)))
+
+; Basically just Box, but it's Different
+(::= FFI (a) (forall (r) (-> (-> a r) r)))
+
+(: run-ffi (-> (FFI a) (IO a)))
+(= run-ffi (ffi) (IO (\ (kp kf) (kf ffi kp))))
+
+(: run-io (-> (IO a) (-> a r) (forall (i) (-> (FFI i) (-> i r) r)) r))
+(= run-io (io a b) ((~IO io) a b))
+
+(: functor-io (Functor IO))
+(= functor-io
+  (functor (\ (f io)
+    (IO (\ (kp kf) (run-io io (\ (x) (kp (f x))) kf))))))
+
+(::= Monad (m)
+  (forall (r)
+    (-> (-> (Functor m)
+            (forall (a) (-> a (m a)))
+            (forall (a b) (-> (m a) (-> a (m b)) (m b)))
+            r)
+        r )))
+
+(= monad (functor-impl unit-fn bind-fn)
+  (Monad (\ (k) (k functor-impl unit-fn bind-fn))))
+
+(: unit (-> (Monad m) a (m a)))
+(= unit (m x) ((~Monad m) (\ (f u b) (u x))))
+
+(: bind (-> (Monad m) (m a) (-> a (m b)) (m b)))
+(= bind (mnd m f) ((~Monad mnd) (\ (_ u b) (b m f))))
+
+(: unit-io (-> a (IO a)))
+(= unit-io (x) (IO (\ (kp kf) (kp x))))
+
+(: bind-io (-> (IO a) (-> a (IO b)) (IO b)))
+(= bind-io (m f)
+  (IO (\ (kp kf) (run-io m (\ (a) (run-io (f a) kp kf)) kf))))
+
+(= monad-io (monad functor-io unit-io bind-io))
 
 ;; Some functions for demonstration purposes
 (= even-number? (n) (=? 0 (modulo n 2)))

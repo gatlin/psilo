@@ -39,7 +39,7 @@ num_parser = do
         _ -> return $ aInt (read whole_part)
 
 symchars :: String
-symchars = "~=<>.?!@#$%^&*{}[]+-/\\_"
+symchars = "~=<>.?!@#$%^&*{}[]+-/_"
 
 symchar :: Parser Char
 symchar = satisfy $ \c -> elem c symchars
