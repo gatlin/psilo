@@ -27,7 +27,6 @@ import           Lib.Types.Type
 import           Lib.Types.TypeCheck
 
 import           Lib.Errors
-import           Lib.Util
 
 import           Control.Comonad.Cofree
 import           Control.Monad          (forM, mapM, mapM_, when)

@@ -20,7 +20,6 @@ import           Lib.Types.Kind
 import           Lib.Types.Scheme
 import           Lib.Types.Type
 import           Lib.Types.Type       (tyFun)
-import           Lib.Util
 import           Prelude              hiding (takeWhile)
 
 -- String hashing, for getting a unique Int from type variables
