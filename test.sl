@@ -126,6 +126,10 @@
     (-> (-> (forall (a b) (-> (-> a b) (f a) (f b))) r) ; map
         r)))
 
+(: functor (forall (f)
+             (-> (forall (a b)
+               (-> (-> a b) (f a) (f b)))
+               (Functor f))))
 (= functor (map-fn) (Functor (\ (k) (k map-fn))))
 
 (: map (forall (f) (-> (Functor f) (forall (a b) (-> (-> a b) (f a) (f b))))))
@@ -182,7 +186,7 @@
 
 ; The explicit annotation is necessary because the wrong type will be inferred
 ; (for obvious reasons)
-(: map-constant (-> (-> a b) (Constant c a) (Constant c b)))
+(: functor-constant (Functor (Constant a)))
 (= functor-constant
   (functor (\ (f c) c)))
 
