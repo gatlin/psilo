@@ -215,9 +215,10 @@
 ; Now let's use our lenses.
 (: pair-1 (Pair Boolean Boolean))
 (= pair-1 (over _1 even-number? (pair 3.0 #t)))
+
+(: pair-2 (Pair Float (Pair Float Boolean)))
 (= pair-2 (pair 2.0 (pair 3.0 #t)))
 
-(: _1st_of_2nd (Lens (Pair d (Pair a b)) (Pair d (Pair c b)) a c))
 (= _1st_of_2nd (. _1 _2))
 
 (: a-float Float)
@@ -258,11 +259,15 @@
 (= monad (functor-impl unit-fn bind-fn)
   (Monad (\ (k) (k functor-impl unit-fn bind-fn))))
 
-(: unit (-> (Monad m) a (m a)))
-(= unit (m x) ((~Monad m) (\ (f u b) (u x))))
+(: unit (forall (m)
+          (-> (Monad m)
+            (forall (a) (-> a (m a))))))
+(= unit (m) (\ (x) ((~Monad m) (\ (f u b) (u x)))))
 
-(: bind (-> (Monad m) (m a) (-> a (m b)) (m b)))
-(= bind (mnd m f) ((~Monad mnd) (\ (_ u b) (b m f))))
+(: bind (forall (m)
+          (-> (Monad m)
+            (forall (a b) (-> (m a) (-> a (m b)) (m b))))))
+(= bind (mnd) (\ (m f) ((~Monad mnd) (\ (_ u b) (b m f)))))
 
 (: unit-io (-> a (IO a)))
 (= unit-io (x) (IO (\ (kp kf) (kp x))))
