@@ -127,7 +127,9 @@
         r)))
 
 (= functor (map-fn) (Functor (\ (k) (k map-fn))))
-(= map (fctor f x) ((~Functor fctor) (\ (fn) (fn f x))))
+
+(: map (forall (f) (-> (Functor f) (forall (a b) (-> (-> a b) (f a) (f b))))))
+(= map (fctor) (\ (f x) ((~Functor fctor) (\ (fn) (fn f x)))))
 
 (: functor-box (Functor Box))
 (= functor-box (functor (\ (f b) (box (f (unbox b))))))
@@ -200,11 +202,11 @@
 ; Example lenses to focus on the first and second parts of a pair
 (: _1 (Lens (Pair a b) (Pair c b) a c))
 (= _1 (Lens (\ (mapper f p)
-  ((~Pair p) (\ (a b) (map mapper (\ (x) (pair x b)) (f a)))))))
+  ((~Pair p) (\ (a b) ((map mapper) (\ (x) (pair x b)) (f a)))))))
 
 (: _2 (Lens (Pair a b) (Pair a c) b c))
 (= _2 (Lens (\ (mapper f p)
-  ((~Pair p) (\ (a b) (map mapper (\ (x) (pair a x)) (f b)))))))
+  ((~Pair p) (\ (a b) ((map mapper) (\ (x) (pair a x)) (f b)))))))
 
 ; Now let's use our lenses.
 (: pair-1 (Pair Boolean Boolean))
