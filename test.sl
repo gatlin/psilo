@@ -252,31 +252,43 @@
   (forall (r)
     (-> (-> (Functor m)
             (forall (a) (-> a (m a)))
-            (forall (a b) (-> (m a) (-> a (m b)) (m b)))
+            (forall (a) (-> (m (m a)) (m a)))
             r)
         r )))
 
-(= monad (functor-impl unit-fn bind-fn)
-  (Monad (\ (k) (k functor-impl unit-fn bind-fn))))
+(= monad (functor-impl unit-fn join-fn)
+  (Monad (\ (k) (k functor-impl unit-fn join-fn))))
+
+(: monad-functor (-> (Monad m) (Functor m)))
+(= monad-functor (m) ((~Monad m) (\ (f u j) f)))
 
 (: unit (forall (m)
           (-> (Monad m)
             (forall (a) (-> a (m a))))))
 (= unit (m) (\ (x) ((~Monad m) (\ (f u b) (u x)))))
 
-(: bind (forall (m)
+
+(: join (forall (m)
           (-> (Monad m)
-            (forall (a b) (-> (m a) (-> a (m b)) (m b))))))
-(= bind (mnd) (\ (m f) ((~Monad mnd) (\ (_ u b) (b m f)))))
+            (forall (a) (-> (m (m a)) (m a))))))
+(= join (mnd) (\ (m) ((~Monad mnd) (\ (f u j) (j m)))))
+
+(: bind
+  (forall (m)
+    (-> (Monad m)
+        (forall (a b)
+          (-> (m a) (-> a (m b)) (m b))))))
+(= bind (mnd)
+  (\ (m f) ((join mnd) ((map (monad-functor mnd)) f m))))
 
 (: unit-io (-> a (IO a)))
 (= unit-io (x) (IO (\ (kp kf) (kp x))))
 
-(: bind-io (-> (IO a) (-> a (IO b)) (IO b)))
-(= bind-io (m f)
-  (IO (\ (kp kf) (run-io m (\ (a) (run-io (f a) kp kf)) kf))))
+(: join-io (-> (IO (IO a)) (IO a)))
+(= join-io (io)
+  (IO (\ (kp kf) (run-io io (\ (a) (run-io a kp kf)) kf))))
 
-(= monad-io (monad functor-io unit-io bind-io))
+(= monad-io (monad functor-io unit-io join-io))
 
 ;; Some functions for demonstration purposes
 (= even-number? (n) (=? 0 (modulo n 2)))
