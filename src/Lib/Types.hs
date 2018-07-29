@@ -157,18 +157,13 @@ typecheck_pass ce te (sym, expr) = runTypeCheck te $ do
     expr' <- sequence . extend infer $ expr
     (frame, preds) <- solver `catchError` (handleTypecheckError sym)
     let sig = fmap (substitute frame) expr'
-    logTypeCheck $ "sig = " ++ (show $ extract sig)
     let vars = ftv $ extract sig
-    logTypeCheck $ "vars = " ++ (show vars)
     preds' <- forM preds $ \pred@(IsIn c t) -> case t of
         (TVar v) -> if S.member v vars
                     then return [substitute frame pred]
                     else return []
         _ -> return []
     let scheme = extract $ (extend $ toSigma frame (concat preds')) sig
-    logTypeCheck $ "scheme = " ++ (show scheme)
-
-    --return $ extendEnv te (sym, scheme)
     te' <- checkTypeEnv sym scheme te
     return te'
 
@@ -180,11 +175,8 @@ checkTypeEnv sym t1 tyEnv = case envLookup tyEnv sym of
     Nothing -> return $ extendEnv tyEnv (sym, t1)
     Just t2 -> do
         let t1' = removeEmptyPreds t1
-            t2' = removeEmptyPreds t2
-        (frame, _) <- unify t1' t2' `catchError` (addContext sym t2)
-        logTypeCheck $ "t1' = " ++ (show t1')
-        logTypeCheck $ "t2' = " ++ (show t2')
-        logTypeCheck $ "Frame: " ++ (show frame)
+        let t2' = removeEmptyPreds t2
+        (frame, _) <- match t1' t2' `catchError` (addContext sym t2)
         return tyEnv
 
     where addContext sym ty err =

@@ -189,17 +189,18 @@ showWithKind x = "(" ++ (show x) ++ " :: " ++ (show (kind x)) ++ ")"
 
 -- | Unification of two 'Type's
 unify :: Tau -> Tau -> TypeCheck Unifier
-unify t1 t2
-    | (kind t1) /= (kind t2) =
-          throwError $ OtherTypeError $
-          "Kind mismatch: " ++
-          (showWithKind t1) ++ " and " ++
-          (showWithKind t2)
-    | t1 == t2 = return emptyUnifier
-unify (TVar v) t                  = v `bind` t
-unify t (TVar v)                  = v `bind` t
+unify (_ :=> t1) t2 = unify t1 t2
+unify t1 (_ :=> t2) = unify t1 t2
 
+unify (TVar tv) ty = bind tv ty
+unify ty (TVar tv) = bind tv ty
 unify t1@(TList as) t2@(TList bs)   = unifyMany as bs
+unify t1@(TSym s1) t2@(TSym s2)
+    | s1 == s2 = return emptyUnifier
+    | otherwise = throwError $ UnificationFail t1 t2
+unify (TForall _ t1) t2 = unify t1 t2
+unify t1 (TForall _ t2) = unify t1 t2
+
 unify t1 t2                       = throwError $ UnificationFail t1 t2
 
 -- | Unification of a list of 'Type's.
@@ -222,6 +223,42 @@ unifyUneven longer shorter = do
     let (hd, tl) = splitAt (diff+1) longer
     unifyMany ((TList hd): tl) shorter
 
+-- | Determine if two types match. Similar to unification.
+match :: Type -> Type -> TypeCheck Unifier
+match t1 t2                         | t1 == t2 = return emptyUnifier
+match (_ :=> t1) t2         = match t1 t2
+match t1 (_ :=> t2) = match t1 t2
+--match (TVar v) t            | (kind v) == (kind t) = return (v |-> t, [])
+match (TVar v) t                    = return (v |-> t, [])
+match (TList as) (TList bs)           = matchMany as bs
+match t1@(TForall _ _) t2@(TForall _ _) = do
+    (_, t1') <- skolemize t1
+    (_, t2') <- skolemize t2
+    match t1' t2'
+match t1 t2                         = throwError $ TypeMismatch t1 t2
+
+matchMany :: [Type] -> [Type] -> TypeCheck Unifier
+matchMany t1@([]) t2@(x:xs) = throwError $ OtherTypeError $
+    "Cannot match " ++ (show t2) ++ " with an empty type."
+matchMany [] [] = return emptyUnifier
+matchMany ty1@(t1 : ts1) ty2@(t2 : ts2)
+    | length ty1 > length ty2 = matchUneven ty1 ty2
+    | length ty1 < length ty2 = matchUneven ty2 ty1
+    | otherwise = do
+          (su1, cs1) <- match t1 t2
+          (su2, cs2) <- matchMany ts1 ts2
+          case merge su1 su2 of
+              Nothing -> throwError $ TypeMismatch (TList ty1) (TList ty2)
+              Just su -> return (su, nub $ cs1 ++ cs2)
+
+matchMany t1 t2 = throwError $ OtherTypeError $
+    "Cannot match " ++ (show t1) ++ " and " ++ (show t2)
+
+matchUneven longer shorter = do
+    let diff = (length longer) - (length shorter)
+    let (hd, tl) = splitAt (diff + 1) longer
+    matchMany ((TList hd):tl) shorter
+
 -- | Bind a 'TyVar' to a 'Type' in the 'Frame', unless the result would be an
 -- infinite type.
 bind :: TyVar -> Type -> TypeCheck Unifier
@@ -243,7 +280,9 @@ solver = gets constraints >>= go . sort where
 
     go (c@(t1 := t2):cs0) = do
         su <- gets frame
-        (su1, cs1) <- unify (substitute su t1) (substitute su t2)
+        (_, t1') <- skolemize (substitute su t1)
+        (_, t2') <- skolemize (substitute su t2)
+        (su1, cs1) <- unify t1' t2'
         modify $ \st -> st {
             frame = su1 `compose` su,
             constraints = nub $ (substitute su1 cs1) ++ (substitute su1 cs0)
@@ -260,7 +299,6 @@ solver = gets constraints >>= go . sort where
             }
         solver
 
-
 -- |
 skolemize :: Sigma -> TypeCheck ([TyVar], Rho)
 skolemize (TForall vars ty) = do -- Rule PRPOLY
@@ -273,11 +311,11 @@ skolemize qt@(preds :=> ty) = do -- Rule, uh, PRPRED
     (sks, ty') <- skolemize ty
     return (sks, preds :=> ty')
 
-skolemize (TList tys) = do -- Rule PRFUN
+skolemize (TList ((TSym (TyLit "->" _)):tys)) = do -- Rule PRFUN
     let tys_len = length tys
     let (arg_tys, [res_ty]) = splitAt (tys_len - 1) tys
     (sks, res_ty') <- skolemize res_ty
-    return (sks, TList $ arg_tys ++ [ res_ty' ])
+    return (sks, TList $ tyFun : (arg_tys ++ [ res_ty' ]))
 
 skolemize ty = do -- Rule PRMONO
     return ([], ty)
