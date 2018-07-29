@@ -7,7 +7,7 @@
 -- [x] Converting surface-level definitions into TopLevel
 -- [x] Converting surface-level signatures into TopLevel
 -- [x] Ensuring all symbols are either bound or top level
--- [ ] Forming a default type environment for type checking
+-- [x] Forming a default type environment for type checking
 -- [ ] Gathering predicate information to form a class environment
 -- [ ] Lambda lifting
 

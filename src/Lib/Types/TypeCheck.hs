@@ -111,19 +111,7 @@ instantiate :: Sigma -> TypeCheck Rho
 instantiate (TForall vs t) = do
     vs' <- mapM (const $ fresh Star) vs >>= mapM (return . TVar)
     let frame = M.fromList $ zip vs vs'
-        t' = substitute frame t
-
-    {-
-    t' <- case t of
-        (ps :=> ty) -> do
-            let ps' = substitute frame ps
-            return $ ps' :=> (substitute frame ty)
-        _ -> return $ substitute frame $ [] :=> t
--}
-    return t'
---        ps' = substitute frame ps
---    tyInst ps
---    return $ substitute frame (ps' :=> t)
+    return $ substitute frame t
 instantiate qt = return qt
 
 -- | Constraint generation and type generation
@@ -185,6 +173,7 @@ infer (_ :< IfC c t e) = do
 -- * Solving type constraints
 type Unifier = (Frame, [Constraint])
 
+-- vestige
 logS = logTypeCheck
 
 emptyUnifier :: Unifier
@@ -199,7 +188,7 @@ runSolve s st = compile $ do
 showWithKind x = "(" ++ (show x) ++ " :: " ++ (show (kind x)) ++ ")"
 
 -- | Unification of two 'Type's
-unify :: Type -> Type -> TypeCheck Unifier
+unify :: Tau -> Tau -> TypeCheck Unifier
 unify t1 t2
     | (kind t1) /= (kind t2) =
           throwError $ OtherTypeError $
@@ -209,16 +198,7 @@ unify t1 t2
     | t1 == t2 = return emptyUnifier
 unify (TVar v) t                  = v `bind` t
 unify t (TVar v)                  = v `bind` t
-unify (_ :=> t1) t2 = unify t1 t2
-unify t1 (_ :=> t2) = unify t1 t2
-unify t1 t2@(TForall _ _)         = do
---    (_, t2') <- skolemize t2
-    t2' <- instantiate t2
-    unify t1 t2'
-unify t1@(TForall _ _) t2         = do
-    (_, t1') <- skolemize t1
-    t1' <- instantiate t1
-    unify t1' t2
+
 unify t1@(TList as) t2@(TList bs)   = unifyMany as bs
 unify t1 t2                       = throwError $ UnificationFail t1 t2
 
@@ -241,42 +221,6 @@ unifyUneven longer shorter = do
     let diff = (length longer) - (length shorter)
     let (hd, tl) = splitAt (diff+1) longer
     unifyMany ((TList hd): tl) shorter
-
--- | Determine if two types match. Similar to unification.
-match :: Type -> Type -> TypeCheck Unifier
-match t1 t2                         | t1 == t2 = return emptyUnifier
-match (_ :=> t1) (_ :=> t2)         = match t1 t2
---match (TVar v) t            | (kind v) == (kind t) = return (v |-> t, [])
-match (TVar v) t                    = return (v |-> t, [])
-match (TList as) (TList bs)           = matchMany as bs
-match t1@(TForall _ _) t2@(TForall _ _) = do
-    (_, t1') <- skolemize t1
-    (_, t2') <- skolemize t2
-    match t1' t2'
-match t1 t2                         = throwError $ TypeMismatch t1 t2
-
-matchMany :: [Type] -> [Type] -> TypeCheck Unifier
-matchMany t1@([]) t2@(x:xs) = throwError $ OtherTypeError $
-    "Cannot match " ++ (show t2) ++ " with an empty type."
-matchMany [] [] = return emptyUnifier
-matchMany ty1@(t1 : ts1) ty2@(t2 : ts2)
-    | length ty1 > length ty2 = matchUneven ty1 ty2
-    | length ty1 < length ty2 = matchUneven ty2 ty1
-    | otherwise = do
-          (su1, cs1) <- match t1 t2
-          (su2, cs2) <- matchMany ts1 ts2
-          case merge su1 su2 of
-              Nothing -> throwError $ TypeMismatch (TList ty1) (TList ty2)
-
-              Just su -> return (su, nub $ cs1 ++ cs2)
-matchMany t1 t2 = throwError $ OtherTypeError $
-    "Cannot match " ++ (show t1) ++ " and " ++ (show t2)
-
-matchUneven longer shorter = do
-    let diff = (length longer) - (length shorter)
-    let (hd, tl) = splitAt (diff + 1) longer
-    matchMany ((TList hd):tl) shorter
-
 
 -- | Bind a 'TyVar' to a 'Type' in the 'Frame', unless the result would be an
 -- infinite type.

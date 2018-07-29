@@ -65,6 +65,7 @@ data Type
 -- | Type aliases for clarity throughout the project
 type Sigma = Type
 type Rho = Type
+type Tau = Type
 
 -- | Type alias for refactor convenience because initially predicates were a
 -- separate type
