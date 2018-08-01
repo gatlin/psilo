@@ -154,7 +154,7 @@ defun_parser = do
 
 typedef_parser :: Parser (SurfaceExpr a)
 typedef_parser = do
-    string "::="
+    string "::"
     skipSpace
     name <- sym
     skipSpace

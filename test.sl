@@ -1,7 +1,7 @@
 ;;;
 ; Syntax for new types:
 ;
-;     (::= <name:symbol> (<variable:symbol> ...) <typeexpr>)
+;     (:: <name:symbol> (<variable:symbol> ...) <typeexpr>)
 ;
 ; This says that `(TypeName vars...)` is an alias for the type expression. Two
 ; phantom functions are generated, a constructor and a destructor. Their types
@@ -22,7 +22,7 @@
 (= compose (f g) (\ (x) (f (g x))))
 
 ;; The simplest data structure: a container of one value
-(::= Box (a) (forall (r) (-> (-> a r) r)))
+(:: Box (a) (forall (r) (-> (-> a r) r)))
 
 (: box (-> a (Box a)))
 (= box (x) (Box (\ (k) (k x))))
@@ -31,7 +31,7 @@
 (= unbox (b) ((~Box b) id))
 
 ;; Pairs
-(::= Pair (a b) (forall (r) (-> (-> a b r) r)))
+(:: Pair (a b) (forall (r) (-> (-> a b r) r)))
 
 (: pair (-> a b (Pair a b)))
 (= pair (x y) (Pair (\ (k) (k x y))))
@@ -43,7 +43,7 @@
 (= snd (p) ((~Pair p) (\ (x y) y)))
 
 ;; Optional types
-(::= Optional (a) (-> r (-> a r) r))
+(:: Optional (a) (-> r (-> a r) r))
 
 (: just (-> a (Optional a)))
 (= just (x) (Optional (\ (n j) (j x))))
@@ -55,7 +55,7 @@
 (= maybe (o n j) ((~Optional o) n j))
 
 ;; A variant type, Either
-(::= Either (a b)
+(:: Either (a b)
   (forall (r) (-> (-> a r) (-> b r) r)))
 
 (: left (-> a (Either a b)))
@@ -68,7 +68,7 @@
   ((~Either e) l r))
 
 ;; Lists
-(::= List (a)
+(:: List (a)
   (forall (r)
     (-> (-> a r r)
         r
@@ -121,7 +121,7 @@
 
 ;; We can mimic typeclasses, too
 
-(::= Functor (f)
+(:: Functor (f)
   (forall (r)
     (-> (-> (forall (a b) (-> (-> a b) (f a) (f b))) r) ; map
         r)))
@@ -161,7 +161,7 @@
 ;; A Lens focuses on a constituent part of a given structure, allowing it to be
 ; inspected and modified.
 
-(::= Lens (s t a b)
+(:: Lens (s t a b)
   (forall (f) (-> (Functor f) (-> a (f b)) s (f t))))
 
 ; What makes lenses interesting is that they compose.
@@ -175,7 +175,7 @@
 
 ; Detour: Constant is like Box, except no matter how much you map over it, its
 ; internal value stays, well, constant.
-(::= Constant (a b)
+(:: Constant (a b)
   (forall (r) (-> (-> a r) r)))
 
 (: constant (-> a (Constant a b)))
@@ -228,14 +228,14 @@
 (= a-boolean (view _1st_of_2nd (over _1st_of_2nd even-number? pair-2)))
 
 ;; oh shit what up
-(::= IO (a)
+(:: IO (a)
   (forall (r)
     (-> (-> a r)
         (forall (t) (-> (FFI t) (-> t r) r))
         r)))
 
 ; Basically just Box, but it's Different
-(::= FFI (a) (forall (r) (-> (-> a r) r)))
+(:: FFI (a) (forall (r) (-> (-> a r) r)))
 
 (: run-ffi (-> (FFI a) (IO a)))
 (= run-ffi (ffi) (IO (\ (kp kf) (kf ffi kp))))
@@ -248,7 +248,7 @@
   (functor (\ (f io)
     (IO (\ (kp kf) (run-io io (\ (x) (kp (f x))) kf))))))
 
-(::= Monad (m)
+(:: Monad (m)
   (forall (r)
     (-> (-> (Functor m)
             (forall (a) (-> a (m a)))
@@ -273,11 +273,8 @@
             (forall (a) (-> (m (m a)) (m a))))))
 (= join (mnd) (\ (m) ((~Monad mnd) (\ (f u j) (j m)))))
 
-(: bind
-  (forall (m)
-    (-> (Monad m)
-        (forall (a b)
-          (-> (m a) (-> a (m b)) (m b))))))
+(: bind (-> (Monad m) (forall (a b)
+          (-> (m a) (-> a (m b)) (m b)))))
 (= bind (mnd)
   (\ (m f) ((join mnd) ((map (monad-functor mnd)) f m))))
 
@@ -292,3 +289,40 @@
 
 ;; Some functions for demonstration purposes
 (= even-number? (n) (=? 0 (modulo n 2)))
+
+(:: Person ()
+  (forall (r) (-> (-> String Int r) r)))
+
+(: person (-> String Int (Person)))
+(= person (name age) (Person (\ (k) (k name age))))
+
+(: person-name (Lens (Person) (Person) String String))
+(= person-name (Lens (\ (mapper f p)
+  ((~Person p) (\ (name age) ((map mapper) (\ (n) (person n age)) (f name)))))))
+
+(: person-age (Lens (Person) (Person) Int Int))
+(= person-age (Lens (\ (mapper f p)
+  ((~Person p) (\ (name age) ((map mapper) (\ (a) (person name a)) (f age)))))))
+
+; A shitty map
+
+(:: SlowMap (k v) (List (Pair k v)))
+
+(: empty-slowmap (SlowMap k v))
+(= empty-slowmap (SlowMap empty-list))
+
+(: insert-slowmap (-> k v (SlowMap k v) (SlowMap k v)))
+(= insert-slowmap (key value slowmap)
+  (SlowMap (cons (pair key value) (~SlowMap slowmap))))
+
+(: lookup-slowmap (=> ((Eq key)) (-> key (SlowMap key value) (Optional value))))
+(= lookup-slowmap (key slowmap)
+  (foldl (\ (result entry)
+           (maybe
+             result
+             (if (=? key (fst entry))
+                 (just (snd entry))
+                 none)
+             just))
+         none
+         (~SlowMap slowmap)))
