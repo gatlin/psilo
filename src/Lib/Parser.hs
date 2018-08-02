@@ -178,8 +178,7 @@ classdef_parser = do
     name <- sym
     skipSpace
     vars <- parens (sym `sepBy` (many space))
-    vars' <- forM vars $ \var ->
-        return (TVar (TyVar (string_hash var) Star))
+    vars' <- forM vars $ \sym -> return $ TVar (TyVar (string_hash sym) Star)
     skipSpace
     body <- ((parens (class_sig_parser name (TList vars'))) <|>
              (parens defun_parser)) `sepBy` (many space)
@@ -189,68 +188,49 @@ classdef_parser = do
 scheme_parser :: Parser Type
 scheme_parser = sigma where
 
-    sigma :: Parser Type
-    sigma = (parens quantified) <|> unquantified
+sigma :: Parser Type
+sigma = (parens quantified) <|> unquantified
 
-    quantified :: Parser Type
-    quantified = do
-        skipSpace
-        string "forall"
-        skipSpace
-        vars <- parens (sym `sepBy` (many space))
-        skipSpace
-        t <- unquantified
-        skipSpace
-        return $ TForall (fmap (\v -> TyVar (string_hash v) Star) vars) t
+quantified :: Parser Type
+quantified = do
+    skipSpace
+    string "forall"
+    skipSpace
+    vars <- parens (sym `sepBy` (many space))
+    skipSpace
+    t <- unquantified
+    skipSpace
+    return $ TForall (fmap (\v -> TyVar (string_hash v) Star) vars) t
 
-    unquantified :: Parser Type
-    unquantified = do
-        skipSpace
-        t <- (parens pred_type) <|> rho
-        skipSpace
-        return $ t
+unquantified :: Parser Type
+unquantified = do
+    skipSpace
+    t <- (parens pred_type) <|> rho
+    skipSpace
+    return $ t
 
-    rho :: Parser Type
-    rho = (parens sigma_arrow) <|> tau
+rho :: Parser Type
+rho = (parens sigma_arrow) <|> tau
 
-    sigma_arrow :: Parser Type
-    sigma_arrow = do
-        skipSpace
-        string "->"
-        skipSpace
-        tys <- sigma `sepBy` (many space)
-        skipSpace
-        return $ TList $ tyFun : tys
+sigma_arrow :: Parser Type
+sigma_arrow = do
+    skipSpace
+    string "->"
+    skipSpace
+    tys <- sigma `sepBy` (many space)
+    skipSpace
+    return $ TList $ tyFun : tys
 
-    tau :: Parser Type
-    tau = ty_sym <|> (parens compound)
+tau :: Parser Type
+tau = ty_sym <|> (parens compound)
 
-    compound :: Parser Type
-    compound = do
+compound :: Parser Type
+compound = do
         skipSpace
         ts <- tau `sepBy` (many space)
         skipSpace
         return $ TList ts
 
-    pred_type :: Parser Type
-    pred_type = do
-        skipSpace
-        string "=>"
-        skipSpace
-        preds <- parens (pred `sepBy` (many space))
-        skipSpace
-        t <- rho
-        skipSpace
-        return $ (preds :=> t)
-
-    pred :: Parser Pred
-    pred = parens $ do
-        skipSpace
-        p <- sym
-        skipSpace
-        t <- ty_sym
-        skipSpace
-        return $ IsIn p t
 
 ty_sym :: Parser Type
 ty_sym = do
@@ -258,6 +238,27 @@ ty_sym = do
     return $ if (elem c ['a'..'z'])
                 then TVar (TyVar (string_hash s) Star)
                 else TSym (TyLit s Star)
+
+
+pred_type :: Parser Type
+pred_type = do
+    skipSpace
+    string "=>"
+    skipSpace
+    preds <- parens (Lib.Parser.pred `sepBy` (many space))
+    skipSpace
+    t <- rho
+    skipSpace
+    return $ (preds :=> t)
+
+pred :: Parser Pred
+pred = parens $ do
+    skipSpace
+    p <- sym
+    skipSpace
+    t <- ty_sym
+    skipSpace
+    return $ IsIn p t
 
 sig_parser :: Parser (SurfaceExpr a)
 sig_parser = do
