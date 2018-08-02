@@ -7,6 +7,7 @@ module Lib.Types
     , extendEnv
     , envLookup
     , defaultTypeEnv
+    , defaultClassEnv
     , emptyTypeEnv
     , buildTypeEnv
     , normalize
@@ -131,22 +132,19 @@ defaultClassEnv =     addCoreClasses
 -- | We build a dependency graph of different definitions and topologically sort
 -- them. Then typechecking, as crude as it may be, is simply folding the initial
 -- type environment with the 'typecheck_pass' function over the sorted list.
-typecheck
-    :: Map Symbol (AnnotatedExpr ())
-    -> TypeEnv
-    -> Compiler TypeEnv
-typecheck defns _te = do
-    let te = defaultTypeEnv <> _te
+typecheck :: TopLevel -> Compiler TopLevel
+typecheck (TopLevel defs sigs tydefs classdefs) = do
+    let te = defaultTypeEnv <> (TypeEnv sigs)
     classEnv <- transformCE defaultClassEnv mempty
-    let dependency_graph = make_dep_graph defns
-    let defns' = reverse $ topo' dependency_graph
-    te' <- foldM (typecheck_pass classEnv) te defns'
+    let dependency_graph = make_dep_graph defs
+    let defs' = reverse $ topo' dependency_graph
+    (TypeEnv sigs') <- foldM (typecheck_pass classEnv) te defs'
     logMsg . concat $ [ "Final type environment\n"
-                      , show te'
+                      , show sigs'
                       , "\n"
                       , "-----"
                       ]
-    return te'
+    return $ TopLevel defs sigs' tydefs classdefs
 
 typecheck_pass
     :: ClassEnv

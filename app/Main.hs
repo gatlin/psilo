@@ -50,23 +50,21 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
     Nothing -> return ()
     Just inFile -> do
         contents <- TextIO.readFile inFile
-        let result = compileWithLogs $
-                     process_file contents
-
-        case result of
+        let result = compileWithLogs (process_file contents)
+        case compileWithLogs (process_file contents) of
             Left err -> putStrLn . ushow $ err
-            Right ((typeEnv, defns), logs) -> do
+            Right (TopLevel defs sigs tydefs classdefs, logs) -> do
                 putStrLn "Logs\n-----"
-                forM_ logs putStrLn
+--                forM_ logs putStrLn
+                putStrLn . show $ classdefs
+                putStrLn . show $ sigs
                 putStrLn "-----"
 
-process_file :: Text -> Compiler (TypeEnv, Map Symbol (AnnotatedExpr ()))
+process_file :: Text -> Compiler TopLevel
 process_file file_contents = do
     exprs <- parse_multi $ removeComments file_contents
-    (TopLevel defns sigs _) <- preprocess $ do
+    topLevels<- preprocess $ do
         toplevel <- mapM surfaceToTopLevel exprs >>= return . fold
         boundVarCheck toplevel
         return toplevel
-    let tyEnv = TypeEnv sigs
-    typeEnv <- typecheck defns tyEnv
-    return (typeEnv, defns)
+    typecheck topLevels

@@ -21,7 +21,7 @@ data CoreAst a
     | IdC { idC :: Symbol }
     | AppC { appFun :: a, appArgs :: [a] }
     | FunC { funCArgs :: [Symbol], funCBody :: a }
-    | IfC { ifCond :: a, ifThen :: a, ifElse :: a }
+    | IfC { ifCond :: a, ifThen :: a, ifElse :: a } -- not for long
     deriving ( Functor
              , Foldable
              , Traversable

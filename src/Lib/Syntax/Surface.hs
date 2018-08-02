@@ -37,11 +37,11 @@ data SurfaceAst a
     | IfS { ifCondS :: a, ifThenS :: a, ifElseS :: a }
     | DefS { defSymS :: Symbol, defValueS :: a }
     | SigS { sigSymS :: Symbol , sigScheme :: Sigma }
-    | TypedefS { typedefSymS :: Symbol
+    | TypeDefS { typedefSymS :: Symbol
                , typedefVarsS :: [TyVar]
                , typedefBodyS :: Sigma }
     | ClassDefS { classDefnNameS :: Symbol
-                 , classDefnVarsS :: [TyVar]
+                 , classDefnVarsS :: Type
                  , classDefnMethodsS :: [a] -- sym / signature
                  }
     deriving ( Functor
@@ -90,18 +90,18 @@ aSig
     -> m a
 aSig sym t = join . liftF $ SigS sym t
 
-aTypedef
+aTypeDef
     :: (MonadFree SurfaceAst m)
     => Symbol
     -> [TyVar]
     -> Sigma
     -> m a
-aTypedef sym vars body = join . liftF $ TypedefS sym vars body
+aTypeDef sym vars body = join . liftF $ TypeDefS sym vars body
 
 aClassDef
     :: (MonadFree SurfaceAst m)
     => Symbol
-    -> [TyVar]
+    -> Type
     -> [m a]
     -> m a
 aClassDef name vars defns =

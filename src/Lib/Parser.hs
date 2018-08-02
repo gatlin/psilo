@@ -164,21 +164,27 @@ typedef_parser = do
     skipSpace
     body <- scheme_parser
     skipSpace
-    return $ aTypedef name vars' body
+    return $ aTypeDef name vars' body
+
+class_sig_parser :: String -> Type -> Parser (SurfaceExpr a)
+class_sig_parser className vars = do
+    (Free (SigS name t)) <- sig_parser
+    return $ aSig name ([IsIn className vars] :=> t)
 
 classdef_parser :: Parser (SurfaceExpr a)
 classdef_parser = do
-    string "class"
+    string "@:"
     skipSpace
     name <- sym
     skipSpace
     vars <- parens (sym `sepBy` (many space))
     vars' <- forM vars $ \var ->
-        return (TyVar (string_hash var) Star)
+        return (TVar (TyVar (string_hash var) Star))
     skipSpace
-    body <- (parens sig_parser) `sepBy` (many space)
+    body <- ((parens (class_sig_parser name (TList vars'))) <|>
+             (parens defun_parser)) `sepBy` (many space)
     skipSpace
-    return $ aClassDef name vars' body
+    return $ aClassDef name (TList vars') body
 
 scheme_parser :: Parser Type
 scheme_parser = sigma where
@@ -286,6 +292,7 @@ parse_expr' input = do
                                   <|> (parens def_parser)
                                   <|> (parens sig_parser)
                                   <|> (parens typedef_parser)
+                                  <|> (parens classdef_parser)
                                   <|> expr_parser) input
     return parse_result
 

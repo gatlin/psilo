@@ -43,6 +43,8 @@ import qualified Data.Map               as M
 import           Data.Set               (Set)
 import qualified Data.Set               as S
 
+import           Data.Monoid            ((<>))
+
 type SymbolMap = Map Symbol Symbol
 data PState = PState
     { uniqueInt :: Int -- ^ For generating unique IDs
@@ -151,7 +153,7 @@ surfaceToTopLevel (Free (SigS sym scheme)) = return $ mempty {
     }
 --    [ Signature sym $ normalize $ quantify scheme ]
 
-surfaceToTopLevel (Free (TypedefS name vars body)) = do
+surfaceToTopLevel (Free (TypeDefS name vars body)) = do
     let body' = normalize . quantify $ body
     let ret_type = TList $ (TSym (TyLit name Star)) : (fmap TVar vars)
     let ctor = normalize $ TForall vars $ TList $
@@ -167,13 +169,16 @@ surfaceToTopLevel (Free (TypedefS name vars body)) = do
         typedefs = M.singleton name (vars, normalize $ quantify body),
         signatures = M.fromList [(name, ctor), (('~':name), dtor)]
         }
-{-
-    return
-        [ Typedef name vars $ normalize $ quantify body
-        , Signature name ctor
-        , Signature ("~"++name) dtor
-        ]
--}
+
+surfaceToTopLevel (Free (ClassDefS name vars methods)) = do
+    methods' <- foldM (\tl method -> do
+                              tl' <- surfaceToTopLevel method
+                              return $ tl <> tl') mempty methods
+    return $ mempty {
+        definitions = definitions methods',
+        classdefs = M.singleton name (vars, signatures methods'),
+        signatures = signatures methods'
+    }
 
 surfaceToTopLevel _ = throwError $
     PreprocessError $
@@ -219,7 +224,7 @@ thd' (x, y, z) = z
 -- | Ensures that all symbols are either bound or global
 -- TODO why am I not using a Set here?
 boundVarCheck :: TopLevel -> Preprocess ()
-boundVarCheck (TopLevel defns sigs tds) =
+boundVarCheck (TopLevel defns sigs tds classdefs) =
     withBoundVars bvs $ mapM_ go $ M.toList defns
     where
         dup x = (x, x)
@@ -242,8 +247,10 @@ boundVarCheck (TopLevel defns sigs tds) =
 
         check (() :< (IdC s)) = do
             boundVars <- readBoundVars
-            when (M.notMember s boundVars) $
-                throwError $ UnboundVariable s
+            when (M.notMember s boundVars) $ do
+                case M.lookup s sigs of
+                    Nothing -> throwError $ UnboundVariable s
+                    Just _  -> return ()
             return ()
 
         check (() :< (AppC op erands)) = do
