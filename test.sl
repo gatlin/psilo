@@ -3,7 +3,6 @@
 (@: Functor (f)
   (: map (-> (-> a b) (f a) (f b))))
 
-
 (@: Monad (=> ((Functor m)) (m))
   (: unit (-> a (m a)))
 
@@ -12,6 +11,7 @@
   (: bind (-> (m a) (-> a (m b)) (m b)))
   (= bind (m f) (join (map f m))))
 
+(: square (=> ((Eq n)) (-> n n)))
 (= square (x) (* x x))
 
 (= factorial (n)
