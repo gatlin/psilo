@@ -3,8 +3,8 @@
 (@: Functor (f)
   (: map (-> (-> a b) (f a) (f b))))
 
-;(@: Monad (=> ((Functor m)) m)
-(@: Monad (m)
+
+(@: Monad (=> ((Functor m)) (m))
   (: unit (-> a (m a)))
 
   (: join (-> (m (m a)) (m a)))

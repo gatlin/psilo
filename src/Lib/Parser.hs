@@ -171,22 +171,30 @@ class_sig_parser className vars = do
     (Free (SigS name t)) <- sig_parser
     return $ aSig name ([IsIn className vars] :=> t)
 
+classdef_vars = (parens (pred_type class_vars)) <|> class_vars'
+    where class_vars = parens $ do
+              vs <- ty_sym `sepBy` (many space)
+              return $ TList vs
+
+          class_vars' = do
+              cvs <- class_vars
+              return $ [] :=> cvs
+
 classdef_parser :: Parser (SurfaceExpr a)
 classdef_parser = do
     string "@:"
     skipSpace
     name <- sym
     skipSpace
-    vars <- parens (sym `sepBy` (many space))
-    vars' <- forM vars $ \sym -> return $ TVar (TyVar (string_hash sym) Star)
+    (_ :=> (TList vars)) <- classdef_vars
     skipSpace
-    body <- ((parens (class_sig_parser name (TList vars'))) <|>
+    body <- ((parens (class_sig_parser name (TList vars))) <|>
              (parens defun_parser)) `sepBy` (many space)
     skipSpace
-    return $ aClassDef name (TList vars') body
+    return $ aClassDef name (TList vars) body
 
 scheme_parser :: Parser Type
-scheme_parser = sigma where
+scheme_parser = sigma
 
 sigma :: Parser Type
 sigma = (parens quantified) <|> unquantified
@@ -205,7 +213,7 @@ quantified = do
 unquantified :: Parser Type
 unquantified = do
     skipSpace
-    t <- (parens pred_type) <|> rho
+    t <- (parens $ pred_type rho) <|> rho
     skipSpace
     return $ t
 
@@ -240,14 +248,14 @@ ty_sym = do
                 else TSym (TyLit s Star)
 
 
-pred_type :: Parser Type
-pred_type = do
+pred_type :: Parser Type -> Parser Type
+pred_type p = do
     skipSpace
     string "=>"
     skipSpace
     preds <- parens (Lib.Parser.pred `sepBy` (many space))
     skipSpace
-    t <- rho
+    t <- p
     skipSpace
     return $ (preds :=> t)
 
