@@ -1,6 +1,5 @@
 module Lib.Types.Constraint where
 
-import           Lib.Syntax      (Symbol)
 import           Lib.Types.Frame
 import           Lib.Types.Type
 

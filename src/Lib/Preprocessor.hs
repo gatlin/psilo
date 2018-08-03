@@ -15,11 +15,13 @@ module Lib.Preprocessor where
 
 import           Lib.Compiler
 
+import           Lib.Syntax
 import           Lib.Syntax.Annotated
 import           Lib.Syntax.Core
 import           Lib.Syntax.Surface
 import           Lib.Syntax.Symbol
 import           Lib.Syntax.TopLevel
+import           Lib.Types.Class
 import           Lib.Types.Frame
 import           Lib.Types.Kind         (Kind (..))
 import           Lib.Types.Scheme
@@ -136,24 +138,24 @@ uniqueIds whatever = return whatever
 
 -- | Transforms a 'SurfaceExpr' into a 'TopLevel' expression
 surfaceToTopLevel
-    :: SurfaceExpr ()
+    :: TopLevel
+    -> SurfaceExpr ()
     -> Preprocess TopLevel
-surfaceToTopLevel (Free (DefS sym val)) = do
+surfaceToTopLevel topLevel (Free (DefS sym val)) = do
     uval <- uniqueIds val
     val' <- surfaceToCore uval
     case compile (annotated val') of
         Left _    -> throwError $ PreprocessError "wut"
-        Right ann -> return $ mempty {
+        Right ann -> return $ topLevel <> mempty {
             definitions = M.singleton sym ann
             }
---        Right ann -> return [ Define sym ann ]
 
-surfaceToTopLevel (Free (SigS sym scheme)) = return $ mempty {
+surfaceToTopLevel topLevel (Free (SigS sym scheme)) =
+    return $ topLevel <> mempty {
     signatures = M.singleton sym (normalize $ quantify scheme)
     }
---    [ Signature sym $ normalize $ quantify scheme ]
 
-surfaceToTopLevel (Free (TypeDefS name vars body)) = do
+surfaceToTopLevel topLevel (Free (TypeDefS name vars body)) = do
     let body' = normalize . quantify $ body
     let ret_type = TList $ (TSym (TyLit name Star)) : (fmap TVar vars)
     let ctor = normalize $ TForall vars $ TList $
@@ -165,25 +167,29 @@ surfaceToTopLevel (Free (TypeDefS name vars body)) = do
         Left err              -> throwError err
         Right (sk_vars, dtor) -> return $ TForall sk_vars dtor
 
-    return $ mempty {
+    return $ topLevel <> mempty {
         typedefs = M.singleton name (vars, normalize $ quantify body),
         signatures = M.fromList [(name, ctor), (('~':name), dtor)]
         }
 
-surfaceToTopLevel (Free (ClassDefS name vars methods)) = do
+surfaceToTopLevel topLevel (Free (ClassDefS name supers ty methods)) = do
     methods' <- foldM (\tl method -> do
-                              tl' <- surfaceToTopLevel method
+                              tl' <- surfaceToTopLevel mempty method
                               return $ tl <> tl') mempty methods
-    return $ mempty {
+    return $ topLevel <> mempty {
         definitions = definitions methods',
-        classdefs = M.singleton name (vars, signatures methods'),
-        signatures = signatures methods'
+        signatures = signatures methods',
+        classdefs = addClass name supers
     }
 
-surfaceToTopLevel _ = throwError $
+surfaceToTopLevel topLevel (Free (ClassInstS name supers ty defns)) = do
+    return $ topLevel <> mempty {
+        classdefs = addInst [] (IsIn name ty)
+        }
+
+surfaceToTopLevel _ _ = throwError $
     PreprocessError $
     "Expression is not a top level expression"
-
 
 -- | Called by 'surfaceToTopLevel' on a subset of 'SurfaceExpr's
 surfaceToCore

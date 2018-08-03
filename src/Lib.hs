@@ -30,6 +30,9 @@ module Lib
     , emptyTypeEnv
     , buildTypeEnv
     , normalize
+    , EnvTransformer(..)
+    , (<:>)
+    , ClassEnv(..)
       -- * Lifted Expressions
     , LiftedExpr(..)
     , liftExpr

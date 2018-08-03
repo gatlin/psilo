@@ -14,6 +14,10 @@ module Lib.Types
     , tyFun
     , quantify
     , removeEmptyPreds
+    , Class(..)
+    , ClassEnv(..)
+    , EnvTransformer(..)
+    , (<:>)
     )
 where
 
@@ -50,7 +54,7 @@ import qualified Data.Graph             as G
 import qualified Data.Text              as T
 import           Data.Tree              (flatten)
 
-import           Data.List              (intercalate, sort, sortBy)
+import           Data.List              (elem, intercalate, sort, sortBy)
 import           Data.Ord               (Ordering (..))
 
 import           Lib.Syntax             (AnnotatedExpr, CoreAst (..), CoreExpr,
@@ -88,6 +92,9 @@ ord_binop :: Type
 ord_binop = [IsIn "Ord" t_0] :=> (TList [tyFun, t_0, t_0, typeBool])
     where t_0 = TVar (TyVar 0 Star)
 
+not_fn :: Type
+not_fn = [] :=> (TList [tyFun, typeBool, typeBool])
+
 -- | Builtin operators and functions with explicit type schemes
 defaultTypeEnv :: TypeEnv
 defaultTypeEnv = TypeEnv $ M.fromList
@@ -95,10 +102,11 @@ defaultTypeEnv = TypeEnv $ M.fromList
     , ("+", generalize mempty num_binop)
     , ("-", generalize mempty num_binop)
     , ("/", generalize mempty num_binop)
-    , ("modulo", generalize mempty integral_binop)
+    , ("modulo", generalize mempty num_binop)
     , ("=?", generalize mempty eq_binop)
     , ("<", generalize mempty ord_binop)
     , (">", generalize mempty ord_binop)
+    , ("not", generalize mempty not_fn)
 --    , ("id", generalize mempty $ [] :=> (TList [tyFun, TVar (TyVar 0 Star),
 --                                               TVar (TyVar 0 Star)]))
     ]
@@ -111,23 +119,23 @@ addCoreClasses =     addClass "Eq" []
                  <:> addClass "Num" ["Eq"]
                  <:> addClass "Real" ["Num", "Ord"]
                  <:> addClass "Fractional" ["Num"]
-                 <:> addClass "Integral" ["Real", "Enum"]
+--                 <:> addClass "Integral" ["Real", "Enum"]
                  <:> addClass "Floating" ["Fractional"]
 
 defaultClassEnv :: EnvTransformer
 defaultClassEnv =     addCoreClasses
-                  <:> addInst [] (IsIn "Integral" typeInt)
-                  <:> addInst [] (IsIn "Floating" typeFloat)
-                  <:> addInst [] (IsIn "Fractional" typeFloat)
-                  <:> addInst [] (IsIn "Eq" typeBool)
-                  <:> addInst [] (IsIn "Real" typeFloat)
-                  <:> addInst [] (IsIn "Real" typeInt)
-                  <:> addInst [] (IsIn "Num" typeFloat)
-                  <:> addInst [] (IsIn "Num" typeInt)
-                  <:> addInst [] (IsIn "Ord" typeFloat)
-                  <:> addInst [] (IsIn "Ord" typeInt)
-                  <:> addInst [] (IsIn "Eq" typeFloat)
-                  <:> addInst [] (IsIn "Eq" typeInt)
+--                  <:> addInst [] (IsIn "Integral" (TList [typeInt]))
+                  <:> addInst [] (IsIn "Floating" (TList [typeFloat]))
+                  <:> addInst [] (IsIn "Fractional" (TList [typeFloat]))
+                  <:> addInst [] (IsIn "Eq" (TList [typeBool]))
+                  <:> addInst [] (IsIn "Real" (TList [typeFloat]))
+                  <:> addInst [] (IsIn "Real" (TList [typeInt]))
+                  <:> addInst [] (IsIn "Num" (TList [typeFloat]))
+                  <:> addInst [] (IsIn "Num" (TList [typeInt]))
+                  <:> addInst [] (IsIn "Ord" (TList [typeFloat]))
+                  <:> addInst [] (IsIn "Ord" (TList [typeInt]))
+                  <:> addInst [] (IsIn "Eq" (TList [typeFloat]))
+                  <:> addInst [] (IsIn "Eq" (TList [typeInt]))
 
 -- | We build a dependency graph of different definitions and topologically sort
 -- them. Then typechecking, as crude as it may be, is simply folding the initial
@@ -135,16 +143,11 @@ defaultClassEnv =     addCoreClasses
 typecheck :: TopLevel -> Compiler TopLevel
 typecheck (TopLevel defs sigs tydefs classdefs) = do
     let te = defaultTypeEnv <> (TypeEnv sigs)
-    classEnv <- transformCE defaultClassEnv mempty
+    classEnv <- transformCE (defaultClassEnv <:> classdefs) mempty
     let dependency_graph = make_dep_graph defs
     let defs' = reverse $ topo' dependency_graph
     (TypeEnv sigs') <- foldM (typecheck_pass classEnv) te defs'
-    logMsg . concat $ [ "Final type environment\n"
-                      , show sigs'
-                      , "\n"
-                      , "-----"
-                      ]
-    return $ TopLevel defs sigs' tydefs classdefs
+    return $ TopLevel defs sigs' tydefs (defaultClassEnv <:> classdefs)
 
 typecheck_pass
     :: ClassEnv
@@ -160,6 +163,9 @@ typecheck_pass ce te (sym, expr) = runTypeCheck te $ do
         (TVar v) -> if S.member v vars
                     then return [substitute frame pred]
                     else return []
+        (TSym _) -> if ([] :=> (IsIn c (TList [t]))) `elem` (insts ce c)
+                    then return []
+                    else throwError $ NoClassForInstance c (show t)
         _ -> return []
     let scheme = extract $ (extend $ toSigma frame (concat preds')) sig
     te' <- checkTypeEnv sym scheme te
@@ -174,7 +180,9 @@ checkTypeEnv sym t1 tyEnv = case envLookup tyEnv sym of
     Just t2 -> do
         let t1' = removeEmptyPreds t1
         let t2' = removeEmptyPreds t2
-        (frame, _) <- match t1' t2' `catchError` (addContext sym t2)
+        (_, s1) <- skolemize t1'
+        (_, s2) <- skolemize t2'
+        (frame, _) <- match s1 s2 `catchError` (addContext sym t2)
         return tyEnv
 
     where addContext sym ty err =

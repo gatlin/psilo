@@ -134,6 +134,8 @@ infer (_ :< IdC sym) = do
             ty <- instantiate scheme
             case ty of
                 (ps :=> ty') -> do
+                    logTypeCheck $ "ps = " ++ (show ps)
+                    logTypeCheck $ "ty' = " ++ (show ty')
                     tyInst ps
                     return ty'
                 _ -> return ty
@@ -297,6 +299,7 @@ solver = gets constraints >>= go . sort where
             preds = (IsIn c t') : cc,
             constraints = cs0
             }
+        logTypeCheck $ "su = " ++ (show su)
         solver
 
 -- |

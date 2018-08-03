@@ -50,21 +50,24 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
     Nothing -> return ()
     Just inFile -> do
         contents <- TextIO.readFile inFile
-        let result = compileWithLogs (process_file contents)
-        case compileWithLogs (process_file contents) of
+        let result = compileWithLogs $ do
+                topLevel <- (process_file contents)
+                classEnv <- transformCE (classdefs topLevel) mempty
+                return (topLevel, classEnv)
+        case result of
             Left err -> putStrLn . ushow $ err
-            Right (TopLevel defs sigs tydefs classdefs, logs) -> do
-                putStrLn "Logs\n-----"
---                forM_ logs putStrLn
-                putStrLn . show $ classdefs
-                putStrLn . show $ sigs
+            Right ((topLevel, classEnv), logs) -> do
+                putStrLn . show $ classEnv
+                putStrLn "-----"
+                putStrLn . show $ (signatures topLevel)
                 putStrLn "-----"
 
 process_file :: Text -> Compiler TopLevel
 process_file file_contents = do
     exprs <- parse_multi $ removeComments file_contents
     topLevels<- preprocess $ do
-        toplevel <- mapM surfaceToTopLevel exprs >>= return . fold
+--        toplevel <- mapM (surfaceToTopLevel mempty) exprs >>= return . fold
+        toplevel <- foldM surfaceToTopLevel mempty exprs
         boundVarCheck toplevel
         return toplevel
     typecheck topLevels

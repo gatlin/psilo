@@ -54,7 +54,7 @@ instance Show PsiloError where
         "Undefined super class: " ++ sym
 
     show (NoClassForInstance klass ty) =
-        "No class instance definition of " ++ klass ++
+        "No class instance of " ++ klass ++
         " for type " ++ (show ty)
 
     show (OverlappingInstance sym) = "Overlapping instance for " ++ sym
