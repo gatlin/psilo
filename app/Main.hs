@@ -61,6 +61,8 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
                 putStrLn "-----"
                 putStrLn . show $ (signatures topLevel)
                 putStrLn "-----"
+                putStrLn . show $ (definitions topLevel)
+                putStrLn "-----"
 
 process_file :: Text -> Compiler TopLevel
 process_file file_contents = do

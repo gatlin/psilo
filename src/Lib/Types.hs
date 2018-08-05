@@ -140,24 +140,24 @@ defaultClassEnv =     addCoreClasses
 -- | We build a dependency graph of different definitions and topologically sort
 -- them. Then typechecking, as crude as it may be, is simply folding the initial
 -- type environment with the 'typecheck_pass' function over the sorted list.
-typecheck :: TopLevel -> Compiler TopLevel
+typecheck :: TopLevel-> Compiler TopLevel
 typecheck (TopLevel defs sigs tydefs classdefs) = do
     let te = defaultTypeEnv <> (TypeEnv sigs)
     classEnv <- transformCE (defaultClassEnv <:> classdefs) mempty
     let dependency_graph = make_dep_graph defs
     let defs' = reverse $ topo' dependency_graph
-    (TypeEnv sigs') <- foldM (typecheck_pass classEnv) te defs'
-    return $ TopLevel defs sigs' tydefs (defaultClassEnv <:> classdefs)
+    (TypeEnv sigs', defs'') <- foldM (typecheck_pass classEnv) (te, defs) defs'
+    return $ TopLevel defs'' sigs' tydefs (defaultClassEnv <:> classdefs)
 
 typecheck_pass
     :: ClassEnv
-    -> TypeEnv
-    -> (Symbol, AnnotatedExpr ())
-    -> Compiler TypeEnv
-typecheck_pass ce te (sym, expr) = runTypeCheck te $ do
+    -> (TypeEnv, Map Symbol (AnnotatedExpr (Maybe Type)))
+    -> (Symbol, AnnotatedExpr (Maybe Type))
+    -> Compiler (TypeEnv, Map Symbol (AnnotatedExpr (Maybe Type)))
+typecheck_pass ce (te, defns) (sym, expr) = runTypeCheck te $ do
     expr' <- sequence . extend infer $ expr
     (frame, preds) <- solver `catchError` (handleTypecheckError sym)
-    let sig = fmap (substitute frame) expr'
+    let sig = fmap (substitute frame) expr' :: AnnotatedExpr Type
     let vars = ftv $ extract sig
     preds' <- forM preds $ \pred@(IsIn c t) -> case t of
         (TVar v) -> if S.member v vars
@@ -169,7 +169,7 @@ typecheck_pass ce te (sym, expr) = runTypeCheck te $ do
         _ -> return []
     let scheme = extract $ (extend $ toSigma frame (concat preds')) sig
     te' <- checkTypeEnv sym scheme te
-    return te'
+    return (te', M.insert sym (fmap Just sig) defns)
 
 handleTypecheckError sym err = throwError $
     OtherError $ "For " ++ sym ++ ", " ++ (show err)
@@ -196,14 +196,14 @@ toSigma frame preds expr =
 
 -- | Compute dependencies for a given expression and return as a list of Symbols
 --deps :: [(Symbol, AnnotatedExpr ())] -> AnnotatedExpr () -> [Symbol]
-deps :: Map Symbol (AnnotatedExpr ()) -> AnnotatedExpr () -> [Symbol]
+deps :: Map Symbol (AnnotatedExpr (Maybe Type)) -> AnnotatedExpr (Maybe Type) -> [Symbol]
 deps xs expr = go expr where
-    go (() :< (IdC sym)) = case M.lookup sym xs of
+    go (_ :< (IdC sym)) = case M.lookup sym xs of
         Nothing -> []
         Just _  -> [sym]
 
-    go (() :< (AppC op erands)) = (go op) ++ (concatMap go erands)
-    go (() :< (FunC _ body)) = go body
+    go (_ :< (AppC op erands)) = (go op) ++ (concatMap go erands)
+    go (_ :< (FunC _ body)) = go body
     go _ = []
 
 -- oh what do you know I\'m stealing more from Stephen Diehl:
@@ -214,7 +214,7 @@ data Grph node key = Grph
   , _vertices :: Vertex -> (node, key, [key])
   }
 
-type DepGraph = Grph (Symbol, AnnotatedExpr ()) Symbol
+type DepGraph = Grph (Symbol, AnnotatedExpr (Maybe Type)) Symbol
 
 fromList :: Ord key => [(node, key, [key])] -> Grph node key
 fromList = uncurry Grph . G.graphFromEdges'

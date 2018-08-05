@@ -12,7 +12,7 @@ import           Lib.Types.Scheme
 import           Lib.Types.Type       (Sigma, TyVar (..), Type (..))
 
 data TopLevel = TopLevel
-    { definitions :: Map Symbol (AnnotatedExpr ())
+    { definitions :: Map Symbol (AnnotatedExpr (Maybe Type))
     , signatures  :: Map Symbol Sigma
     , typedefs    :: Map Symbol ([TyVar], Sigma)
     -- for now we ignore default implementations

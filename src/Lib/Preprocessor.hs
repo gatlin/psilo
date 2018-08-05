@@ -147,7 +147,7 @@ surfaceToTopLevel topLevel (Free (DefS sym val)) = do
     case compile (annotated val') of
         Left _    -> throwError $ PreprocessError "wut"
         Right ann -> return $ topLevel <> mempty {
-            definitions = M.singleton sym ann
+            definitions = M.singleton sym $ fmap (\ _ -> Nothing) ann
             }
 
 surfaceToTopLevel topLevel (Free (SigS sym scheme)) =
@@ -242,16 +242,16 @@ boundVarCheck (TopLevel defns sigs tds classdefs) =
         builtins = fmap dup $ S.toList builtin_syms
         bvs = M.fromList $ builtins ++ syms
 
-        go :: (Symbol, AnnotatedExpr ()) -> Preprocess ()
+        go :: (Symbol, AnnotatedExpr (Maybe Type)) -> Preprocess ()
         go (s, core) = check core
 
-        check :: AnnotatedExpr () -> Preprocess ()
-        check (() :< (FunC args body)) = do
+        check :: AnnotatedExpr (Maybe Type) -> Preprocess ()
+        check (ty :< (FunC args body)) = do
             let argSyms = fmap (\x -> (x, x)) args
             b' <- withBoundVars (M.fromList argSyms) $ check body
             return ()
 
-        check (() :< (IdC s)) = do
+        check (_ :< (IdC s)) = do
             boundVars <- readBoundVars
             when (M.notMember s boundVars) $ do
                 case M.lookup s sigs of
@@ -259,12 +259,12 @@ boundVarCheck (TopLevel defns sigs tds classdefs) =
                     Just _  -> return ()
             return ()
 
-        check (() :< (AppC op erands)) = do
+        check (_ :< (AppC op erands)) = do
             op' <- check op
             erands' <- mapM check erands
             return ()
 
-        check (() :< (IfC c t e)) = do
+        check (_ :< (IfC c t e)) = do
             c' <- check c
             t' <- check t
             e' <- check e

@@ -115,7 +115,7 @@ instantiate (TForall vs t) = do
 instantiate qt = return qt
 
 -- | Constraint generation and type generation
-infer :: AnnotatedExpr () -> TypeCheck Rho
+infer :: AnnotatedExpr (Maybe Type) -> TypeCheck Rho
 
 -- constants are straightforward, except integers could be any @Num@ instance
 infer (_ :< IntC _) = do
