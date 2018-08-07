@@ -209,12 +209,17 @@ unify t1 t2                       = throwError $ UnificationFail t1 t2
 unifyMany :: [Type] -> [Type] -> TypeCheck Unifier
 unifyMany [] [] = return emptyUnifier
 unifyMany ty1@(t1 : ts1) ty2@(t2 : ts2)
-    | length ty1 > length ty2 = unifyUneven ty1 ty2
-    | length ty1 < length ty2 = unifyUneven ty2 ty1
+    | length ty1 > length ty2 = (unifyUneven ty1 ty2) `catchError` ce
+    | length ty1 < length ty2 = unifyUneven ty2 ty1 `catchError` ce
     | otherwise = do
           (su1, cs1) <- unify t1 t2
           (su2, cs2) <- unifyMany (substitute su1 ts1) (substitute su1 ts2)
           return (su2 `compose` su1, nub $ cs1 ++ cs2)
+
+    where ce err = throwError $ OtherError $
+                   "While unifying uneven type constructors " ++
+                   "(" ++ (show ty1) ++ ") and (" ++ (show ty2) ++ "), " ++
+                   (show err)
 
 unifyMany t1 t2 = throwError $ UnificationMismatch t1 t2
 

@@ -1,7 +1,7 @@
 module Lib.Errors where
 
 import           Lib.Syntax.Symbol
-import           Lib.Types.Type    (TyVar (..), Type (..))
+import           Lib.Types.Type    (TyVar (..), Type (..), showType)
 
 -- Basically every kind of error message will go in here so we can have one big
 -- Except/ExceptT jamboree throughout the whole project

@@ -11,7 +11,7 @@ import           Lib.Errors
 import           Data.Monoid          (Monoid, (<>))
 import           Lib.Syntax.Symbol
 import           Lib.Types.Type       (Pred, TyLit (..), TyVar (..), Type (..),
-                                       tyFun)
+                                       showType, tyFun)
 
 import           Data.Map             (Map)
 import qualified Data.Map.Lazy        as M

@@ -73,24 +73,26 @@ type Pred = Type
 
 parensShow :: Type -> String
 parensShow ty@(TList ts) = "(" ++ (show ty) ++ ")"
-parensShow ty            = show ty
+parensShow ty            = showType ty
+
+
+showType (TForall vs t) = "(" ++ prefix ++ (showType t) ++ ")"
+    where vs' = intercalate " " $ map show vs
+          prefix = "∀" ++ vs' ++ ". "
+showType (TVar n) = show n
+showType t@(TSym sym) = show sym
+showType t@(TList ts) = go ts where
+    go [] = "()"
+    go ((TSym (TyLit "->" _)):t:[]) = "-> " ++ (showType t)
+    go ((TSym (TyLit "->" Star)):ts') = intercalate " -> " $
+        map parensShow ts'
+    go ts' = intercalate " " $ map parensShow ts'
+showType (IsIn c t) = c ++ " " ++ (showType t)
+showType (ps :=> t) = "(" ++ ps' ++ ")" ++ " => " ++ showType t
+    where ps' = intercalate ", " $ map showType ps
 
 instance Show Type where
-    show (TForall vs t) = "(" ++ prefix ++ (show t) ++ ")"
-        where vs' = intercalate " " $ map show vs
-              prefix = "∀" ++ vs' ++ ". "
-    show (TVar n) = show n
-    show t@(TSym sym) = show sym
-    show t@(TList ts) = go ts where
-        go [] = ""
-        go ((TSym (TyLit "->" _)):t:[]) = "-> " ++ (show t)
-        go ((TSym (TyLit "->" Star)):ts') = intercalate " -> " $
-            map parensShow ts'
-        go ts' = intercalate " " $ map parensShow ts'
-    show (IsIn c t) = c ++ " " ++ (show t)
-    show ([] :=> t) = show t
-    show (ps :=> t) = "(" ++ ps' ++ ")" ++ " => " ++ show t
-        where ps' = intercalate ", " $ map show ps
+    show = showType
 
 instance HasKind Type where
     kind (TForall vs t) = kind t

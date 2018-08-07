@@ -18,6 +18,7 @@ module Lib.Types
     , ClassEnv(..)
     , EnvTransformer(..)
     , (<:>)
+    , showType
     )
 where
 
@@ -95,18 +96,33 @@ ord_binop = [IsIn "Ord" t_0] :=> (TList [tyFun, t_0, t_0, typeBool])
 not_fn :: Type
 not_fn = [] :=> (TList [tyFun, typeBool, typeBool])
 
+-- Builtin binary operators for specialized, non-typeclass math functions.
+int_binop :: Type
+int_binop = [] :=> (TList [tyFun, typeInt, typeInt, typeInt])
+
+float_binop :: Type
+float_binop = [] :=> (TList [tyFun, typeFloat, typeFloat, typeFloat])
+
 -- | Builtin operators and functions with explicit type schemes
 defaultTypeEnv :: TypeEnv
 defaultTypeEnv = TypeEnv $ M.fromList
-    [ ("*", generalize mempty num_binop)
-    , ("+", generalize mempty num_binop)
-    , ("-", generalize mempty num_binop)
-    , ("/", generalize mempty num_binop)
-    , ("modulo", generalize mempty num_binop)
-    , ("=?", generalize mempty eq_binop)
+    [ --("*", generalize mempty num_binop)
+    --, ("+", generalize mempty num_binop)
+    --, ("-", generalize mempty num_binop)
+    --, ("/", generalize mempty num_binop)
+    --, ("modulo", generalize mempty num_binop)
+        ("=?", generalize mempty eq_binop)
     , ("<", generalize mempty ord_binop)
     , (">", generalize mempty ord_binop)
     , ("not", generalize mempty not_fn)
+    , ("int-add", generalize mempty int_binop)
+    , ("int-sub", generalize mempty int_binop)
+    , ("int-mul", generalize mempty int_binop)
+    , ("int-div", generalize mempty int_binop)
+    , ("float-add", generalize mempty float_binop)
+    , ("float-sub", generalize mempty float_binop)
+    , ("float-mul", generalize mempty float_binop)
+    , ("float-div", generalize mempty float_binop)
 --    , ("id", generalize mempty $ [] :=> (TList [tyFun, TVar (TyVar 0 Star),
 --                                               TVar (TyVar 0 Star)]))
     ]
@@ -156,7 +172,7 @@ typecheck_pass
     -> Compiler (TypeEnv, Map Symbol (AnnotatedExpr (Maybe Type)))
 typecheck_pass ce (te, defns) (sym, expr) = runTypeCheck te $ do
     expr' <- sequence . extend infer $ expr
-    (frame, preds) <- solver `catchError` (handleTypecheckError sym)
+    (frame, preds) <- solver `catchError` (handleTypecheckError sym te)
     let sig = fmap (substitute frame) expr' :: AnnotatedExpr Type
     let vars = ftv $ extract sig
     preds' <- forM preds $ \pred@(IsIn c t) -> case t of
@@ -171,8 +187,10 @@ typecheck_pass ce (te, defns) (sym, expr) = runTypeCheck te $ do
     te' <- checkTypeEnv sym scheme te
     return (te', M.insert sym (fmap Just sig) defns)
 
-handleTypecheckError sym err = throwError $
-    OtherError $ "For " ++ sym ++ ", " ++ (show err)
+handleTypecheckError sym te err = case envLookup te sym of
+    Nothing -> throwError $ OtherError $ "For " ++ sym ++ ", " ++ (show err)
+    Just ty -> throwError $ OtherError $
+        "For " ++ sym ++ " : " ++ (show ty) ++ ", " ++ (show err)
 
 checkTypeEnv :: Symbol -> Sigma -> TypeEnv -> TypeCheck TypeEnv
 checkTypeEnv sym t1 tyEnv = case envLookup tyEnv sym of

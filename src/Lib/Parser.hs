@@ -344,19 +344,23 @@ parse_expr t = do
         Left err      -> throwError $ ParserError err
         Right result' -> return result'
 
-parse_multi' inp = do
-    let the_parser = module_parser
-    let parse_result = parseOnly the_parser inp
-    return parse_result
-
 parse_multi
     :: Text
     -> Compiler [SurfaceExpr ()]
+parse_multi inp = do -- parseOnly (module_parser <* endOfInput) inp
+    let result = parseOnly module_parser inp
+    case result of
+        Left err      -> throwError $ ParserError err
+        Right result' -> return result'
+
+
+{-
 parse_multi t = do
     result <- parse_multi' t
     case result of
         Left err      -> throwError $ ParserError err
         Right result' -> return result'
+-}
 
 -- | Remove ";" comments from source code
 removeComments :: Text -> Text

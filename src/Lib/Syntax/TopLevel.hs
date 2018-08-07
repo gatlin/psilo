@@ -19,7 +19,6 @@ data TopLevel = TopLevel
     , classdefs   :: EnvTransformer
     }
 
-
 instance Monoid TopLevel where
     mempty = TopLevel mempty mempty mempty mempty
     (TopLevel aD aS aT aC) `mappend` (TopLevel bD bS bT bC) = TopLevel {

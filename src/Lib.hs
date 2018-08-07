@@ -33,6 +33,7 @@ module Lib
     , EnvTransformer(..)
     , (<:>)
     , ClassEnv(..)
+    , showType
       -- * Lifted Expressions
     , LiftedExpr(..)
     , liftExpr

@@ -5,29 +5,30 @@
 ; ("result",Boolean),("unbox",(∀a. (Box a) -> a))
 ; All three should just be `Box a -> a`
 
+; Counter point: box-1 is in fact polymorphic. Just require a type annotation?
+
 (= id (x) x)
+(= bottom (bottom))
 
-(= is-even? (x) (=? 0 (modulo x 2.0)))
+(: add-int-test-1 Int)
+(= add-int-test-1 (int-add 1 2))
 
+; testing that classes and instances even parse
 (@: Wut (m)
   (: wut (-> a (m a))))
 
 (:: Box (a) (forall (r) (-> (-> a r) r)))
 
-(: unbox (-> (Box a) a))
-(= unbox (bx) ((~Box bx) id))
-
 (@= Wut (Box)
   (= wut (x) (Box (\ (k) (k x)))))
 
-(= huh (unbox (wut 1.0)))
+; The one typeclass to rule them all
+(@: C (l t)
+  (: ac (-> l t)))
 
-(@: Functor (f)
-  (: map (-> (-> a b) (f a) (f b))))
+(:: Add (a))
 
-(@= Functor (Box)
-  (= map (f bx) (box (f (unbox bx)))))
+(: + (=> ((C (Add a) (-> a a a))) (-> a a a)))
+(= + (ac bottom))
 
-(= box-1 (wut 1.0))
-(= box-2 (map is-even? box-1))
-(= result (unbox box-2))
+(= double (x) (+ x x))
