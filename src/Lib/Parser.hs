@@ -162,9 +162,12 @@ typedef_parser = do
     vars' <- forM vars $ \var ->
         return (TyVar (string_hash var) Star)
     skipSpace
-    body <- scheme_parser
+    body <- scheme_parser <|> void_typedef_body
     skipSpace
     return $ aTypeDef name vars' body
+
+void_typedef_body :: Parser Type
+void_typedef_body = skipSpace >> return (TList [])
 
 class_sig_parser :: String -> Type -> Parser (SurfaceExpr a)
 class_sig_parser className vars = do
