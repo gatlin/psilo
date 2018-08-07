@@ -88,7 +88,7 @@ t1 @= t2 = do
     }
 
 -- | helper to record a predicate constraint
-(@~) :: Pred -> Type -> TypeCheck ()
+(@~) :: Pred -> [Type] -> TypeCheck ()
 p @~ t = modify $ \st -> st {
     constraints = [p :~ t] ++ (constraints st)
     }
@@ -97,7 +97,7 @@ tyInst :: [Pred] -> TypeCheck ()
 tyInst [] = return ()
 tyInst ps = forM_ ps $ \pred -> do
     let tvs = S.toList . ftv $ pred
-    forM_ tvs $ \tv -> pred @~ (TVar tv)
+    forM_ tvs $ \tv -> pred @~ [TVar tv]
 
 -- | Locally modify a 'TypeEnv', do some work, and then revert it.
 withEnv :: [(Symbol, Sigma)] -> TypeCheck a -> TypeCheck a
@@ -120,7 +120,7 @@ infer :: AnnotatedExpr (Maybe Type) -> TypeCheck Rho
 -- constants are straightforward, except integers could be any @Num@ instance
 infer (_ :< IntC _) = do
     ty <- fresh Star >>= \tv -> return $ TVar tv
-    tyInst [IsIn "Num" ty]
+    tyInst [IsIn "Num" [ty]]
     return ty
 
 infer (_ :< BoolC _) = return $ typeBool

@@ -9,7 +9,7 @@ import qualified Data.Set        as S
 -- | An equality constraint for two types for type inference.
 data Constraint
     = Type := Type
-    | Pred :~ Type
+    | Pred :~ [Type]
     deriving (Eq, Ord, Show)
 
 instance TypeLike Constraint where

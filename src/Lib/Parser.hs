@@ -171,8 +171,11 @@ void_typedef_body = skipSpace >> return (TList [])
 
 class_sig_parser :: String -> Type -> Parser (SurfaceExpr a)
 class_sig_parser className vars = do
+    vars' <- case vars of
+        TList vs -> return vs
+        t        -> return [t]
     (Free (SigS name t)) <- sig_parser
-    return $ aSig name ([IsIn className vars] :=> t)
+    return $ aSig name ([IsIn className vars'] :=> t)
 
 {-
 classdef_vars = (parens (pred_type class_vars)) <|> class_vars'
@@ -215,7 +218,7 @@ classinst_parser = do
     name <- sym
     skipSpace
 --    ty <- parens $ ty_sym `sepBy` (many space)
-    (supers :=> ty) <- classdef_vars
+    (supers :=> (TList ty)) <- classdef_vars
     supers' <- forM supers $ \(IsIn super _) -> return super
     skipSpace
     defns <- (parens defun_parser) `sepBy` (many space)
@@ -225,7 +228,7 @@ scheme_parser :: Parser Type
 scheme_parser = sigma
 
 sigma :: Parser Type
-sigma = (parens quantified) <|> unquantified
+sigma = (parens quantified) <|> (parens $ pred_type rho) <|> unquantified
 
 quantified :: Parser Type
 quantified = do
@@ -241,7 +244,7 @@ quantified = do
 unquantified :: Parser Type
 unquantified = do
     skipSpace
-    t <- (parens $ pred_type rho) <|> rho
+    t <- rho
     skipSpace
     return $ t
 
@@ -292,7 +295,7 @@ pred = parens $ do
     skipSpace
     p <- sym
     skipSpace
-    t <- ty_sym
+    t <- tau `sepBy` (many space)
     skipSpace
     return $ IsIn p t
 

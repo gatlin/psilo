@@ -187,6 +187,7 @@ surfaceToTopLevel topLevel (Free (ClassInstS name supers ty defns)) = do
         classdefs = addInst [] (IsIn name ty)
         }
 
+
 surfaceToTopLevel _ _ = throwError $
     PreprocessError $
     "Expression is not a top level expression"

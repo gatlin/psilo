@@ -90,4 +90,4 @@ overlap (IsIn _ t1) (IsIn _ t2) = case runSolve u st of
     Right _ -> True
     where st = initTypeCheckState
           u :: TypeCheck Unifier
-          u = unify t1 t2
+          u = unifyMany t1 t2

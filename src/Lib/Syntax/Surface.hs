@@ -47,7 +47,7 @@ data SurfaceAst a
                  }
     | ClassInstS { classInstNameS :: Symbol
                  , classInstSuperS :: [Symbol]
-                 , classInstVarsS :: Type
+                 , classInstVarsS :: [Type]
                  , classInstDefnsS :: [a] -- definitions
                  }
     deriving ( Functor
@@ -118,7 +118,7 @@ aClassInst
     :: (MonadFree SurfaceAst m)
     => Symbol
     -> [Symbol]
-    -> Type
+    -> [Type]
     -> [m a]
     -> m a
 aClassInst name supers ty defns = join . liftF $ ClassInstS name supers ty defns

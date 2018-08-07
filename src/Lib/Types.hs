@@ -78,19 +78,19 @@ import           Lib.Parser             (parse_expr, parse_multi)
 -- * Defaults
 
 num_binop :: Type
-num_binop = [IsIn "Num" t_0] :=> (TList [tyFun, t_0, t_0, t_0])
+num_binop = [IsIn "Num" [t_0]] :=> (TList [tyFun, t_0, t_0, t_0])
     where t_0 = TVar (TyVar 0 Star)
 
 integral_binop :: Type
-integral_binop = [IsIn "Integral" t_0] :=> (TList [tyFun, t_0, t_0, t_0])
+integral_binop = [IsIn "Integral" [t_0]] :=> (TList [tyFun, t_0, t_0, t_0])
     where t_0 = TVar (TyVar 0 Star)
 
 eq_binop :: Type
-eq_binop = [IsIn "Eq" t_0] :=> (TList [tyFun, t_0, t_0, typeBool])
+eq_binop = [IsIn "Eq" [t_0]] :=> (TList [tyFun, t_0, t_0, typeBool])
     where t_0 = TVar (TyVar 0 Star)
 
 ord_binop :: Type
-ord_binop = [IsIn "Ord" t_0] :=> (TList [tyFun, t_0, t_0, typeBool])
+ord_binop = [IsIn "Ord" [t_0]] :=> (TList [tyFun, t_0, t_0, typeBool])
     where t_0 = TVar (TyVar 0 Star)
 
 not_fn :: Type
@@ -140,18 +140,18 @@ addCoreClasses =     addClass "Eq" []
 
 defaultClassEnv :: EnvTransformer
 defaultClassEnv =     addCoreClasses
---                  <:> addInst [] (IsIn "Integral" (TList [typeInt]))
-                  <:> addInst [] (IsIn "Floating" (TList [typeFloat]))
-                  <:> addInst [] (IsIn "Fractional" (TList [typeFloat]))
-                  <:> addInst [] (IsIn "Eq" (TList [typeBool]))
-                  <:> addInst [] (IsIn "Real" (TList [typeFloat]))
-                  <:> addInst [] (IsIn "Real" (TList [typeInt]))
-                  <:> addInst [] (IsIn "Num" (TList [typeFloat]))
-                  <:> addInst [] (IsIn "Num" (TList [typeInt]))
-                  <:> addInst [] (IsIn "Ord" (TList [typeFloat]))
-                  <:> addInst [] (IsIn "Ord" (TList [typeInt]))
-                  <:> addInst [] (IsIn "Eq" (TList [typeFloat]))
-                  <:> addInst [] (IsIn "Eq" (TList [typeInt]))
+--                  <:> addInst [] (IsIn "Integral" ( [typeInt]))
+                  <:> addInst [] (IsIn "Floating" ( [typeFloat]))
+                  <:> addInst [] (IsIn "Fractional" ( [typeFloat]))
+                  <:> addInst [] (IsIn "Eq" ( [typeBool]))
+                  <:> addInst [] (IsIn "Real" ( [typeFloat]))
+                  <:> addInst [] (IsIn "Real" ( [typeInt]))
+                  <:> addInst [] (IsIn "Num" ( [typeFloat]))
+                  <:> addInst [] (IsIn "Num" ( [typeInt]))
+                  <:> addInst [] (IsIn "Ord" ( [typeFloat]))
+                  <:> addInst [] (IsIn "Ord" ( [typeInt]))
+                  <:> addInst [] (IsIn "Eq" ( [typeFloat]))
+                  <:> addInst [] (IsIn "Eq" ( [typeInt]))
 
 -- | We build a dependency graph of different definitions and topologically sort
 -- them. Then typechecking, as crude as it may be, is simply folding the initial
@@ -175,15 +175,15 @@ typecheck_pass ce (te, defns) (sym, expr) = runTypeCheck te $ do
     (frame, preds) <- solver `catchError` (handleTypecheckError sym te)
     let sig = fmap (substitute frame) expr' :: AnnotatedExpr Type
     let vars = ftv $ extract sig
-    preds' <- forM preds $ \pred@(IsIn c t) -> case t of
+    preds' <- forM preds $ \pred@(IsIn c ts) -> forM ts $ \t -> case t of
         (TVar v) -> if S.member v vars
                     then return [substitute frame pred]
                     else return []
-        (TSym _) -> if ([] :=> (IsIn c (TList [t]))) `elem` (insts ce c)
+        (TSym _) -> if ([] :=> (IsIn c [t])) `elem` (insts ce c)
                     then return []
                     else throwError $ NoClassForInstance c (show t)
         _ -> return []
-    let scheme = extract $ (extend $ toSigma frame (concat preds')) sig
+    let scheme = extract $ (extend $ toSigma frame (concat (concat preds'))) sig
     te' <- checkTypeEnv sym scheme te
     return (te', M.insert sym (fmap Just sig) defns)
 

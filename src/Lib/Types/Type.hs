@@ -59,7 +59,7 @@ data Type
     | TList [Type]
     | TForall [TyVar] Type -- Sigma types
     | [Pred] :=> Type -- Qualified types
-    | IsIn Symbol Type -- Predicates
+    | IsIn Symbol [Type] -- Predicates
     deriving (Ord, Eq)
 
 -- | Type aliases for clarity throughout the project
@@ -87,8 +87,8 @@ showType t@(TList ts) = go ts where
     go ((TSym (TyLit "->" Star)):ts') = intercalate " -> " $
         map parensShow ts'
     go ts' = intercalate " " $ map parensShow ts'
-showType (IsIn c t) = c ++ " " ++ (showType t)
-showType (ps :=> t) = "(" ++ ps' ++ ")" ++ " => " ++ showType t
+showType (IsIn c t) = c ++ " " ++ (show t)
+showType (ps :=> t) = "[" ++ ps' ++ "]" ++ " => " ++ showType t
     where ps' = intercalate ", " $ map showType ps
 
 instance Show Type where
@@ -102,7 +102,7 @@ instance HasKind Type where
 
 
     kind (ps :=> t)     = kind t
-    kind (IsIn c t)     = kind t
+    kind (IsIn c t)     = kind (t !! 0) -- HACK BAD FIXME TODO
 
 typeInt, typeBool, typeFloat :: Type
 typeInt = TSym (TyLit "Int" Star)

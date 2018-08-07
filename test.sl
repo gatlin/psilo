@@ -14,21 +14,16 @@
 (= add-int-test-1 (int-add 1 2))
 
 ; testing that classes and instances even parse
-(@: Wut (m)
-  (: wut (-> a (m a))))
 
 (:: Box (a) (forall (r) (-> (-> a r) r)))
 
-(@= Wut (Box)
-  (= wut (x) (Box (\ (k) (k x)))))
-
-; The one typeclass to rule them all
 (@: C (l t)
   (: ac (-> l t)))
 
-(:: Add (a))
+(:: Mul (a))
+(: * (=> ((C (Mul a) (-> a a a))) (-> a a a)))
+(= * (ac bottom))
 
-(: + (=> ((C (Add a) (-> a a a))) (-> a a a)))
-(= + (ac bottom))
+(= square (x) (* x x))
 
-(= double (x) (+ x x))
+(= wut (square 2.0))
