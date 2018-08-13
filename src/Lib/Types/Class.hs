@@ -2,7 +2,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Lib.Types.Class where
-
+{-
 import           Lib.Syntax.Symbol
 import           Lib.Types.Kind        (HasKind, Kind (..))
 import           Lib.Types.Type        (Pred, TyLit (..), TyVar (..), Type (..))
@@ -91,3 +91,4 @@ overlap (IsIn _ t1) (IsIn _ t2) = case runSolve u st of
     where st = initTypeCheckState
           u :: TypeCheck Unifier
           u = unifyMany t1 t2
+-}

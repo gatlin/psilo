@@ -52,17 +52,14 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
         contents <- TextIO.readFile inFile
         let result = compileWithLogs $ do
                 topLevel <- (process_file contents)
-                classEnv <- transformCE (classdefs topLevel) mempty
-                return (topLevel, classEnv)
+                return topLevel
         case result of
             Left err -> putStrLn . ushow $ err
-            Right ((topLevel, classEnv), logs) -> do
-                putStrLn . show $ classEnv
-                putStrLn "-----"
+            Right (topLevel, logs) -> do
                 putStrLn . show $ (signatures topLevel)
                 putStrLn "-----"
-                putStrLn . show $ (definitions topLevel)
-                putStrLn "-----"
+--                putStrLn . show $ (definitions topLevel)
+--                putStrLn "-----"
 
 process_file :: Text -> Compiler TopLevel
 process_file file_contents = do

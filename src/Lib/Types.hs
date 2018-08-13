@@ -7,17 +7,17 @@ module Lib.Types
     , extendEnv
     , envLookup
     , defaultTypeEnv
-    , defaultClassEnv
+--    , defaultClassEnv
     , emptyTypeEnv
     , buildTypeEnv
     , normalize
     , tyFun
     , quantify
     , removeEmptyPreds
-    , Class(..)
-    , ClassEnv(..)
-    , EnvTransformer(..)
-    , (<:>)
+--    , Class(..)
+--    , ClassEnv(..)
+--    , EnvTransformer(..)
+--    , (<:>)
     , showType
     )
 where
@@ -62,7 +62,7 @@ import           Lib.Syntax             (AnnotatedExpr, CoreAst (..), CoreExpr,
                                          SurfaceAst (..), SurfaceExpr, Symbol,
                                          TopLevel (..), annotated)
 
-import           Lib.Types.Class
+--import           Lib.Types.Class
 import           Lib.Types.Constraint
 import           Lib.Types.Frame
 import           Lib.Types.Kind
@@ -75,115 +75,87 @@ import           Lib.Compiler
 import           Lib.Errors
 import           Lib.Parser             (parse_expr, parse_multi)
 
--- * Defaults
+-- * Default type environment
 
-num_binop :: Type
-num_binop = [IsIn "Num" [t_0]] :=> (TList [tyFun, t_0, t_0, t_0])
-    where t_0 = TVar (TyVar 0 Star)
+t_0 :: Type
+t_0 = TVar (TyVar 0 Star)
 
-integral_binop :: Type
-integral_binop = [IsIn "Integral" [t_0]] :=> (TList [tyFun, t_0, t_0, t_0])
-    where t_0 = TVar (TyVar 0 Star)
+tyEntail :: Type
+tyEntail = TSym (TyLit "=>" Star)
+
+clsEq :: Type
+clsEq = TSym (TyLit "Eq" Star)
+
+clsOrd :: Type
+clsOrd = TSym (TyLit "Ord" Star)
 
 eq_binop :: Type
-eq_binop = [IsIn "Eq" [t_0]] :=> (TList [tyFun, t_0, t_0, typeBool])
-    where t_0 = TVar (TyVar 0 Star)
+eq_binop = TList [tyEntail, TList [clsEq, t_0],
+                  TList [ tyFun, t_0, t_0, typeBool]]
+--eq_binop = [IsIn "Eq" [t_0]] :=> (TList [tyFun, t_0, t_0, typeBool])
+--    where t_0 = TVar (TyVar 0 Star)
 
 ord_binop :: Type
-ord_binop = [IsIn "Ord" [t_0]] :=> (TList [tyFun, t_0, t_0, typeBool])
-    where t_0 = TVar (TyVar 0 Star)
+ord_binop = TList [tyEntail, TList [ clsOrd, t_0],
+                   TList [ tyFun, t_0, t_0, typeBool]]
+--ord_binop = [IsIn "Ord" [t_0]] :=> (TList [tyFun, t_0, t_0, typeBool])
+--    where t_0 = TVar (TyVar 0 Star)
 
 not_fn :: Type
-not_fn = [] :=> (TList [tyFun, typeBool, typeBool])
+not_fn = TList [tyFun, typeBool, typeBool]
 
 -- Builtin binary operators for specialized, non-typeclass math functions.
 int_binop :: Type
-int_binop = [] :=> (TList [tyFun, typeInt, typeInt, typeInt])
+int_binop = TList [tyFun, typeInt, typeInt, typeInt]
 
 float_binop :: Type
-float_binop = [] :=> (TList [tyFun, typeFloat, typeFloat, typeFloat])
+float_binop = TList [tyFun, typeFloat, typeFloat, typeFloat]
+
+eq_fn :: Type -> Type
+eq_fn t = TList [tyFun, t, t, typeBool]
 
 -- | Builtin operators and functions with explicit type schemes
 defaultTypeEnv :: TypeEnv
 defaultTypeEnv = TypeEnv $ M.fromList
-    [ --("*", generalize mempty num_binop)
-    --, ("+", generalize mempty num_binop)
-    --, ("-", generalize mempty num_binop)
-    --, ("/", generalize mempty num_binop)
-    --, ("modulo", generalize mempty num_binop)
-        ("=?", generalize mempty eq_binop)
-    , ("<", generalize mempty ord_binop)
-    , (">", generalize mempty ord_binop)
-    , ("not", generalize mempty not_fn)
+    [ ("not", generalize mempty not_fn)
     , ("int-add", generalize mempty int_binop)
     , ("int-sub", generalize mempty int_binop)
     , ("int-mul", generalize mempty int_binop)
     , ("int-div", generalize mempty int_binop)
+    , ("int-modulo", generalize mempty int_binop)
+    , ("int=?", generalize mempty (eq_fn typeInt))
     , ("float-add", generalize mempty float_binop)
     , ("float-sub", generalize mempty float_binop)
     , ("float-mul", generalize mempty float_binop)
     , ("float-div", generalize mempty float_binop)
---    , ("id", generalize mempty $ [] :=> (TList [tyFun, TVar (TyVar 0 Star),
---                                               TVar (TyVar 0 Star)]))
+    , ("float-modulo", generalize mempty float_binop)
+    , ("float=?", generalize mempty (eq_fn typeFloat))
+    --("=?", generalize mempty eq_binop)
+    --, ("<", generalize mempty ord_binop)
+    --, (">", generalize mempty ord_binop)
     ]
-
-addCoreClasses :: EnvTransformer
-addCoreClasses =     addClass "Eq" []
-                 <:> addClass "Ord" ["Eq"]
-                 <:> addClass "Show" []
-                 <:> addClass "Enum" []
-                 <:> addClass "Num" ["Eq"]
-                 <:> addClass "Real" ["Num", "Ord"]
-                 <:> addClass "Fractional" ["Num"]
---                 <:> addClass "Integral" ["Real", "Enum"]
-                 <:> addClass "Floating" ["Fractional"]
-
-defaultClassEnv :: EnvTransformer
-defaultClassEnv =     addCoreClasses
---                  <:> addInst [] (IsIn "Integral" ( [typeInt]))
-                  <:> addInst [] (IsIn "Floating" ( [typeFloat]))
-                  <:> addInst [] (IsIn "Fractional" ( [typeFloat]))
-                  <:> addInst [] (IsIn "Eq" ( [typeBool]))
-                  <:> addInst [] (IsIn "Real" ( [typeFloat]))
-                  <:> addInst [] (IsIn "Real" ( [typeInt]))
-                  <:> addInst [] (IsIn "Num" ( [typeFloat]))
-                  <:> addInst [] (IsIn "Num" ( [typeInt]))
-                  <:> addInst [] (IsIn "Ord" ( [typeFloat]))
-                  <:> addInst [] (IsIn "Ord" ( [typeInt]))
-                  <:> addInst [] (IsIn "Eq" ( [typeFloat]))
-                  <:> addInst [] (IsIn "Eq" ( [typeInt]))
 
 -- | We build a dependency graph of different definitions and topologically sort
 -- them. Then typechecking, as crude as it may be, is simply folding the initial
 -- type environment with the 'typecheck_pass' function over the sorted list.
 typecheck :: TopLevel-> Compiler TopLevel
-typecheck (TopLevel defs sigs tydefs classdefs) = do
+typecheck (TopLevel defs sigs tydefs) = do
     let te = defaultTypeEnv <> (TypeEnv sigs)
-    classEnv <- transformCE (defaultClassEnv <:> classdefs) mempty
     let dependency_graph = make_dep_graph defs
     let defs' = reverse $ topo' dependency_graph
-    (TypeEnv sigs', defs'') <- foldM (typecheck_pass classEnv) (te, defs) defs'
-    return $ TopLevel defs'' sigs' tydefs (defaultClassEnv <:> classdefs)
+    (TypeEnv sigs', defs'') <- foldM typecheck_pass (te, defs) defs'
+    return $ TopLevel defs'' sigs' tydefs
 
 typecheck_pass
-    :: ClassEnv
-    -> (TypeEnv, Map Symbol (AnnotatedExpr (Maybe Type)))
+    :: (TypeEnv, Map Symbol (AnnotatedExpr (Maybe Type)))
     -> (Symbol, AnnotatedExpr (Maybe Type))
     -> Compiler (TypeEnv, Map Symbol (AnnotatedExpr (Maybe Type)))
-typecheck_pass ce (te, defns) (sym, expr) = runTypeCheck te $ do
+typecheck_pass (te, defns) (sym, expr) = runTypeCheck te $ do
     expr' <- sequence . extend infer $ expr
-    (frame, preds) <- solver `catchError` (handleTypecheckError sym te)
+    frame <- solver `catchError` (handleTypecheckError sym te)
     let sig = fmap (substitute frame) expr' :: AnnotatedExpr Type
     let vars = ftv $ extract sig
-    preds' <- forM preds $ \pred@(IsIn c ts) -> forM ts $ \t -> case t of
-        (TVar v) -> if S.member v vars
-                    then return [substitute frame pred]
-                    else return []
-        (TSym _) -> if ([] :=> (IsIn c [t])) `elem` (insts ce c)
-                    then return []
-                    else throwError $ NoClassForInstance c (show t)
-        _ -> return []
-    let scheme = extract $ (extend $ toSigma frame (concat (concat preds'))) sig
+    let scheme = extract $ (extend $ toSigma frame) sig
     te' <- checkTypeEnv sym scheme te
     return (te', M.insert sym (fmap Just sig) defns)
 
@@ -207,10 +179,10 @@ checkTypeEnv sym t1 tyEnv = case envLookup tyEnv sym of
               throwError $ OtherError $
               "For " ++ sym ++ " : " ++ (show ty) ++ ",\n " ++ (show err)
 
-toSigma :: Frame -> [Pred] -> AnnotatedExpr Type -> Sigma
-toSigma frame preds expr =
+toSigma :: Frame -> AnnotatedExpr Type -> Sigma
+toSigma frame expr =
     let ty = extract expr
-    in  closeOver frame (preds :=> ty)
+    in  closeOver frame ty
 
 -- | Compute dependencies for a given expression and return as a list of Symbols
 --deps :: [(Symbol, AnnotatedExpr ())] -> AnnotatedExpr () -> [Symbol]

@@ -58,18 +58,12 @@ data Type
     | TSym TyLit
     | TList [Type]
     | TForall [TyVar] Type -- Sigma types
-    | [Pred] :=> Type -- Qualified types
-    | IsIn Symbol [Type] -- Predicates
     deriving (Ord, Eq)
 
 -- | Type aliases for clarity throughout the project
 type Sigma = Type
 type Rho = Type
 type Tau = Type
-
--- | Type alias for refactor convenience because initially predicates were a
--- separate type
-type Pred = Type
 
 parensShow :: Type -> String
 parensShow ty@(TList ts) = "(" ++ (show ty) ++ ")"
@@ -87,9 +81,6 @@ showType t@(TList ts) = go ts where
     go ((TSym (TyLit "->" Star)):ts') = intercalate " -> " $
         map parensShow ts'
     go ts' = intercalate " " $ map parensShow ts'
-showType (IsIn c t) = c ++ " " ++ (show t)
-showType (ps :=> t) = "[" ++ ps' ++ "]" ++ " => " ++ showType t
-    where ps' = intercalate ", " $ map showType ps
 
 instance Show Type where
     show = showType
@@ -100,10 +91,6 @@ instance HasKind Type where
     kind (TVar tv)      = kind tv
     kind (TList (t:_))  = kind t
 
-
-    kind (ps :=> t)     = kind t
-    kind (IsIn c t)     = kind (t !! 0) -- HACK BAD FIXME TODO
-
 typeInt, typeBool, typeFloat :: Type
 typeInt = TSym (TyLit "Int" Star)
 typeBool = TSym (TyLit "Boolean" Star)
@@ -113,8 +100,6 @@ tyFun :: Type
 tyFun = TSym $ TyLit "->" Star
 
 removeEmptyPreds :: Type -> Type
-removeEmptyPreds ([] :=> t)     = removeEmptyPreds t
-removeEmptyPreds (ps :=> t)     = ps :=> (removeEmptyPreds t)
 removeEmptyPreds (TForall vs t) = TForall vs (removeEmptyPreds t)
 removeEmptyPreds (TList tys)    = TList $ fmap removeEmptyPreds tys
 removeEmptyPreds t              = t

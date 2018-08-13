@@ -41,11 +41,10 @@ data TypeCheckState = TypeCheckState
     { varCount    :: Int
     , frame       :: Frame
     , constraints :: [Constraint]
-    , preds       :: [Pred]
     } deriving (Eq, Show)
 
 initTypeCheckState :: TypeCheckState
-initTypeCheckState = TypeCheckState 0 mempty mempty mempty
+initTypeCheckState = TypeCheckState 0 mempty mempty
 
 -- | The TypeCheck monad consists of a read-only 'TypeEnv' and a mutable
 -- 'TypeCheckState'.
@@ -88,16 +87,6 @@ t1 @= t2 = do
     }
 
 -- | helper to record a predicate constraint
-(@~) :: Pred -> [Type] -> TypeCheck ()
-p @~ t = modify $ \st -> st {
-    constraints = [p :~ t] ++ (constraints st)
-    }
-
-tyInst :: [Pred] -> TypeCheck ()
-tyInst [] = return ()
-tyInst ps = forM_ ps $ \pred -> do
-    let tvs = S.toList . ftv $ pred
-    forM_ tvs $ \tv -> pred @~ [TVar tv]
 
 -- | Locally modify a 'TypeEnv', do some work, and then revert it.
 withEnv :: [(Symbol, Sigma)] -> TypeCheck a -> TypeCheck a
@@ -120,8 +109,10 @@ infer :: AnnotatedExpr (Maybe Type) -> TypeCheck Rho
 -- constants are straightforward, except integers could be any @Num@ instance
 infer (_ :< IntC _) = do
     ty <- fresh Star >>= \tv -> return $ TVar tv
-    tyInst [IsIn "Num" [ty]]
-    return ty
+-- TODO replace this with something
+--    tyInst [IsIn "Num" [ty]]
+--    return ty
+    return typeInt
 
 infer (_ :< BoolC _) = return $ typeBool
 infer (_ :< FloatC _) = return $ typeFloat
@@ -132,13 +123,7 @@ infer (_ :< IdC sym) = do
         Nothing -> fresh Star >>= return . TVar
         Just scheme -> do
             ty <- instantiate scheme
-            case ty of
-                (ps :=> ty') -> do
-                    logTypeCheck $ "ps = " ++ (show ps)
-                    logTypeCheck $ "ty' = " ++ (show ty')
-                    tyInst ps
-                    return ty'
-                _ -> return ty
+            return ty
 
 -- | A lambda abstraction is a list of symbols and an 'AnnotatedExpr' body. Each
 -- argument should generate a unique 'Sigma' and the 'TypeEnv' should be
@@ -191,8 +176,6 @@ showWithKind x = "(" ++ (show x) ++ " :: " ++ (show (kind x)) ++ ")"
 
 -- | Unification of two 'Type's
 unify :: Tau -> Tau -> TypeCheck Unifier
-unify (_ :=> t1) t2 = unify t1 t2
-unify t1 (_ :=> t2) = unify t1 t2
 
 unify (TVar tv) ty = bind tv ty
 unify ty (TVar tv) = bind tv ty
@@ -233,8 +216,6 @@ unifyUneven longer shorter = do
 -- | Determine if two types match. Similar to unification.
 match :: Type -> Type -> TypeCheck Unifier
 match t1 t2                         | t1 == t2 = return emptyUnifier
-match (_ :=> t1) t2         = match t1 t2
-match t1 (_ :=> t2) = match t1 t2
 --match (TVar v) t            | (kind v) == (kind t) = return (v |-> t, [])
 match (TVar v) t                    = return (v |-> t, [])
 match (TList as) (TList bs)           = matchMany as bs
@@ -281,9 +262,9 @@ occursCheck a t = a `S.member` (ftv t)
 -- | The actual solving algorithm. Reads the current 'Unifier' and iterates
 -- through the constraints generating 'Unifier's. These are then merged into the
 -- state.
-solver :: TypeCheck (Frame, [Pred])
+solver :: TypeCheck Frame
 solver = gets constraints >>= go . sort where
-    go [] = get >>= \(TypeCheckState  vc f cc ps) -> return (f, ps)
+    go [] = get >>= \(TypeCheckState  vc f cc) -> return f
 
     go (c@(t1 := t2):cs0) = do
         su <- gets frame
@@ -296,17 +277,6 @@ solver = gets constraints >>= go . sort where
             }
         solver
 
-    go (((IsIn c _)  :~ t ):cs0) = do
-        su <- gets frame
-        cc <- gets preds
-        let t' = substitute su t
-        modify $ \st -> st {
-            preds = (IsIn c t') : cc,
-            constraints = cs0
-            }
-        logTypeCheck $ "su = " ++ (show su)
-        solver
-
 -- |
 skolemize :: Sigma -> TypeCheck ([TyVar], Rho)
 skolemize (TForall vars ty) = do -- Rule PRPOLY
@@ -314,10 +284,6 @@ skolemize (TForall vars ty) = do -- Rule PRPOLY
     let frame = M.fromList $ zip vars (fmap TVar sks1)
     (sks2, ty') <- skolemize (substitute frame ty)
     return (sks1 ++ sks2, ty')
-
-skolemize qt@(preds :=> ty) = do -- Rule, uh, PRPRED
-    (sks, ty') <- skolemize ty
-    return (sks, preds :=> ty')
 
 skolemize (TList ((TSym (TyLit "->" _)):tys)) = do -- Rule PRFUN
     let tys_len = length tys

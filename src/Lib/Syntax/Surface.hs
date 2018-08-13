@@ -40,16 +40,6 @@ data SurfaceAst a
     | TypeDefS { typedefSymS :: Symbol
                , typedefVarsS :: [TyVar]
                , typedefBodyS :: Sigma }
-    | ClassDefS { classDefnNameS :: Symbol
-                , classDefSupersS :: [Symbol]
-                  , classDefnVarsS :: Type
-                  , classDefnMethodsS :: [a] -- sym / signature
-                 }
-    | ClassInstS { classInstNameS :: Symbol
-                 , classInstSuperS :: [Symbol]
-                 , classInstVarsS :: [Type]
-                 , classInstDefnsS :: [a] -- definitions
-                 }
     deriving ( Functor
              , Foldable
              , Traversable
@@ -103,22 +93,3 @@ aTypeDef
     -> Sigma
     -> m a
 aTypeDef sym vars body = join . liftF $ TypeDefS sym vars body
-
-aClassDef
-    :: (MonadFree SurfaceAst m)
-    => Symbol
-    -> [Symbol]
-    -> Type
-    -> [m a]
-    -> m a
-aClassDef name supers vars defns =
-    join . liftF $ ClassDefS name supers vars defns
-
-aClassInst
-    :: (MonadFree SurfaceAst m)
-    => Symbol
-    -> [Symbol]
-    -> [Type]
-    -> [m a]
-    -> m a
-aClassInst name supers ty defns = join . liftF $ ClassInstS name supers ty defns

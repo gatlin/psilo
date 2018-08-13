@@ -172,22 +172,6 @@ surfaceToTopLevel topLevel (Free (TypeDefS name vars body)) = do
         signatures = M.fromList [(name, ctor), (('~':name), dtor)]
         }
 
-surfaceToTopLevel topLevel (Free (ClassDefS name supers ty methods)) = do
-    methods' <- foldM (\tl method -> do
-                              tl' <- surfaceToTopLevel mempty method
-                              return $ tl <> tl') mempty methods
-    return $ topLevel <> mempty {
-        definitions = definitions methods',
-        signatures = signatures methods',
-        classdefs = addClass name supers
-    }
-
-surfaceToTopLevel topLevel (Free (ClassInstS name supers ty defns)) = do
-    return $ topLevel <> mempty {
-        classdefs = addInst [] (IsIn name ty)
-        }
-
-
 surfaceToTopLevel _ _ = throwError $
     PreprocessError $
     "Expression is not a top level expression"
@@ -231,7 +215,7 @@ thd' (x, y, z) = z
 -- | Ensures that all symbols are either bound or global
 -- TODO why am I not using a Set here?
 boundVarCheck :: TopLevel -> Preprocess ()
-boundVarCheck (TopLevel defns sigs tds classdefs) =
+boundVarCheck (TopLevel defns sigs tds) =
     withBoundVars bvs $ mapM_ go $ M.toList defns
     where
         dup x = (x, x)

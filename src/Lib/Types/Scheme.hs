@@ -3,7 +3,7 @@ module Lib.Types.Scheme where
 import           Lib.Syntax.Symbol
 import           Lib.Types.Frame
 import           Lib.Types.Kind
-import           Lib.Types.Type    (Pred, Sigma, TyVar (..), Type (..))
+import           Lib.Types.Type    (Sigma, TyVar (..), Type (..))
 import           Prelude           hiding (lookup)
 import qualified Prelude           as Prelude
 

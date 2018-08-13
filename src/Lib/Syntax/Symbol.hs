@@ -7,11 +7,20 @@ type Symbol = String
 
 builtin_syms :: Set Symbol
 builtin_syms = S.fromList
-    [ "=?", "<", ">", "modulo", "not"
+    [ "int-add", "int-mul", "int-div", "int-sub", "int-modulo"
+    , "float-add", "float-mul", "float-div", "float-sub", "float-modulo"
+    , "not"
+    , "int=?"
+    , "float=?"
+    ]
+
+{-
+    [-- "=?", "<", ">", "modulo", "not"
     -- some non-overloaded numeric functions
     , "int-add", "int-mul", "int-div", "int-sub"
     , "float-add", "float-mul", "float-div", "float-sub"
     ]
+-}
 
 mangle :: Symbol -> Symbol
 mangle sym
