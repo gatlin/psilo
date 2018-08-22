@@ -80,6 +80,9 @@ import           Lib.Parser             (parse_expr, parse_multi)
 t_0 :: Type
 t_0 = TVar (TyVar 0 Star)
 
+t_1 :: Type
+t_1 = TVar (TyVar 1 Star)
+
 tyEntail :: Type
 tyEntail = TSym (TyLit "=>" Star)
 
@@ -111,18 +114,39 @@ int_binop = TList [tyFun, typeInt, typeInt, typeInt]
 float_binop :: Type
 float_binop = TList [tyFun, typeFloat, typeFloat, typeFloat]
 
+byte_binop :: Type
+byte_binop = TList [ tyFun, typeByte, typeByte, typeByte ]
+
 eq_fn :: Type -> Type
 eq_fn t = TList [tyFun, t, t, typeBool]
+
+fromint_fn :: Type -> Type
+fromint_fn t = TList [tyFun, typeInt, t]
+
+eval_fn :: Type
+eval_fn = TList [ tyFun
+                , TList [ TSym (TyLit "FFI")
+                        , t_0
+                        ]
+                , TList [ tyFun
+                        , t_0
+                        , t_1
+                        ]
+                , t_1
+                ]
 
 -- | Builtin operators and functions with explicit type schemes
 defaultTypeEnv :: TypeEnv
 defaultTypeEnv = TypeEnv $ M.fromList
     [ ("not", generalize mempty not_fn)
+    , ("boolean-fromint", generalize mempty (fromint_fn typeBool))
+    , ("boolean=?", generalize mempty (eq_fn typeBool))
     , ("int-add", generalize mempty int_binop)
     , ("int-sub", generalize mempty int_binop)
     , ("int-mul", generalize mempty int_binop)
     , ("int-div", generalize mempty int_binop)
     , ("int-modulo", generalize mempty int_binop)
+    , ("int-fromint", generalize mempty (fromint_fn typeInt))
     , ("int=?", generalize mempty (eq_fn typeInt))
     , ("float-add", generalize mempty float_binop)
     , ("float-sub", generalize mempty float_binop)
@@ -130,6 +154,13 @@ defaultTypeEnv = TypeEnv $ M.fromList
     , ("float-div", generalize mempty float_binop)
     , ("float-modulo", generalize mempty float_binop)
     , ("float=?", generalize mempty (eq_fn typeFloat))
+    , ("float-fromint", generalize mempty (fromint_fn typeFloat))
+    , ("byte-and", generalize mempty byte_binop)
+    , ("byte-or", generalize mempty byte_binop)
+    , ("byte-not", generalize mempty byte_binop)
+    , ("byte-xor", generalize mempty byte_binop)
+    , ("byte-2c", generalize mempty byte_binop)
+    , ("eval", generalize mempty eval_fn)
     --("=?", generalize mempty eq_binop)
     --, ("<", generalize mempty ord_binop)
     --, (">", generalize mempty ord_binop)

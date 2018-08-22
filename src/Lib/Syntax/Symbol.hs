@@ -12,6 +12,14 @@ builtin_syms = S.fromList
     , "not"
     , "int=?"
     , "float=?"
+    , "float-fromint"
+    , "boolean-fromint"
+    , "byte-and"
+    , "byte-or"
+    , "byte-not"
+    , "byte-xor"
+    , "byte-2c"
+    , "eval"
     ]
 
 {-

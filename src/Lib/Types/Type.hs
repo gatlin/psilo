@@ -95,6 +95,7 @@ typeInt, typeBool, typeFloat :: Type
 typeInt = TSym (TyLit "Int" Star)
 typeBool = TSym (TyLit "Boolean" Star)
 typeFloat = TSym (TyLit "Float" Star)
+typeByte = TSym (TyLit "Byte" Star)
 
 tyFun :: Type
 tyFun = TSym $ TyLit "->" Star
