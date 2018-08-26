@@ -11,7 +11,7 @@ as I've learned more (which unfortunately causes me to want to destroy huge
 portions of it and start over every so often).
 
 The end result will be a strong, linearly typed, functional language with an
-S-expression syntax and a relatively small core syntax.
+S-expression syntax and a relatively small core grammar.
 
 As of now the linear part isn't done. Nor is the interpreter part. But I have a
 reasonably sound implementation of a System F type inference engine with
