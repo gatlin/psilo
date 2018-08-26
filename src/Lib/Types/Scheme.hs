@@ -3,7 +3,8 @@ module Lib.Types.Scheme where
 import           Lib.Syntax.Symbol
 import           Lib.Types.Frame
 import           Lib.Types.Kind
-import           Lib.Types.Type    (Sigma, TyVar (..), Type (..))
+import           Lib.Types.Type    (Sigma, TyVar (..), Type (..),
+                                    removeEmptyPreds)
 import           Prelude           hiding (lookup)
 import qualified Prelude           as Prelude
 
@@ -26,5 +27,5 @@ normalize (TForall vs t) = TForall vs' $ normalize t'
         len_vs = (length vs) - 1
         vs' = map (\v -> TyVar v Star) [0..len_vs]
         frame = M.fromList $ zip vs (map TVar vs')
-        t' = substitute frame t
-normalize t = t
+        t' = substitute frame (removeEmptyPreds t)
+normalize t = removeEmptyPreds t

@@ -5,6 +5,7 @@ import           Lib.Syntax.Annotated
 import           Lib.Syntax.Core
 import           Lib.Syntax.Symbol
 
+import           Lib.Types.Class
 import           Lib.Types.Constraint
 import           Lib.Types.Frame
 import           Lib.Types.Kind
@@ -41,10 +42,11 @@ data TypeCheckState = TypeCheckState
     { varCount    :: Int
     , frame       :: Frame
     , constraints :: [Constraint]
+    , predicates  :: Map (Set TyVar) [Pred]
     } deriving (Eq, Show)
 
 initTypeCheckState :: TypeCheckState
-initTypeCheckState = TypeCheckState 0 mempty mempty
+initTypeCheckState = TypeCheckState 0 mempty mempty mempty
 
 -- | The TypeCheck monad consists of a read-only 'TypeEnv' and a mutable
 -- 'TypeCheckState'.
@@ -86,6 +88,12 @@ t1 @= t2 = do
         constraints = [t1 := t2] ++ (constraints st)
     }
 
+(@~) :: Symbol -> [Type] -> TypeCheck ()
+cls @~ tys = do
+    modify $ \st -> st {
+        constraints = [cls :~ tys] ++ (constraints st)
+        }
+
 -- | helper to record a predicate constraint
 
 -- | Locally modify a 'TypeEnv', do some work, and then revert it.
@@ -110,12 +118,12 @@ infer :: AnnotatedExpr (Maybe Type) -> TypeCheck Rho
 infer (_ :< IntC _) = do
     ty <- fresh Star >>= \tv -> return $ TVar tv
 -- TODO replace this with something
---    tyInst [IsIn "Num" [ty]]
---    return ty
-    return typeInt
+    "Num" @~ [ty]
+    return ty
+--    return typeInt
 
-infer (_ :< BoolC _) = return $ typeBool
-infer (_ :< FloatC _) = return $ typeFloat
+infer (_ :< BoolC _) = return typeBool
+infer (_ :< FloatC _) = return typeFloat
 
 infer (_ :< IdC sym) = do
     te <- getEnv
@@ -141,10 +149,16 @@ infer (_ :< FunC args body) = do
 -- athat the operator is equivalent to a function consuming the operands and
 -- producing the return value.
 infer (_ :< AppC op erands) = do
-    op' <- infer op
+    op'<- do
+        op'' <- infer op
+        case op'' of
+            ps :=> ty -> do
+                forM_ ps $ \(TPred sym tys) -> sym @~ tys
+                return ty
+            _ -> return op''
     erands' <- mapM infer erands
     var <- fresh Star >>= return . TVar
-    op' @= (TList $ tyFun : (erands' ++ [var]))
+    op'@= (TList $ tyFun : (erands' ++ [var]))
     return var
 
 -- | Assert that the condition expression is a boolean and that the two branches
@@ -179,12 +193,29 @@ unify :: Tau -> Tau -> TypeCheck Unifier
 
 unify (TVar tv) ty = bind tv ty
 unify ty (TVar tv) = bind tv ty
+
 unify t1@(TList as) t2@(TList bs)   = unifyMany as bs
 unify t1@(TSym s1) t2@(TSym s2)
     | s1 == s2 = return emptyUnifier
     | otherwise = throwError $ UnificationFail t1 t2
+
+-- this is almost certainly wrong
 unify (TForall _ t1) t2 = unify t1 t2
 unify t1 (TForall _ t2) = unify t1 t2
+
+unify ty1@(ps1 :=> t1) ty2@(ps2 :=> t2) = do
+    logS $ "ty1 = " ++ (show ty1) ++ ", ty2 = " ++ (show ty2)
+    (su, cs) <- unify t1 t2
+    (su', cs') <- unifyMany (substitute su ps1) (substitute su ps2)
+    return (su' `compose` su, nub $ cs ++ cs')
+
+unify ty1@(ps :=> t1) t2 = do
+    logS $ "ps = " ++ (show ps)
+    unify t1 t2
+
+unify (TPred s1 ts1) (TPred s2 ts2)
+    | s1 /= s2 = throwError $ UnificationFail (TPred s1 ts1) (TPred s2 ts2)
+    | otherwise = unifyMany ts1 ts2
 
 unify t1 t2                       = throwError $ UnificationFail t1 t2
 
@@ -223,6 +254,15 @@ match t1@(TForall _ _) t2@(TForall _ _) = do
     (_, t1') <- skolemize t1
     (_, t2') <- skolemize t2
     match t1' t2'
+match (ps1 :=> t1) (ps2 :=> t2) = do
+    (su, cs) <- match t1 t2
+    (su', cs') <- matchMany (substitute su ps1) (substitute su ps2)
+    case merge su su' of
+        Nothing   -> throwError $ TypeMismatch (ps1 :=> t1) (ps2 :=> t2)
+        Just su'' -> return (su'', nub $ cs ++ cs')
+match (TPred s1 ts1) (TPred s2 ts2)
+    | s1 /= s2 = throwError $ TypeMismatch (TPred s1 ts1) (TPred s2 ts2)
+    | otherwise = unifyMany ts1 ts2
 match t1 t2                         = throwError $ TypeMismatch t1 t2
 
 matchMany :: [Type] -> [Type] -> TypeCheck Unifier
@@ -262,18 +302,36 @@ occursCheck a t = a `S.member` (ftv t)
 -- | The actual solving algorithm. Reads the current 'Unifier' and iterates
 -- through the constraints generating 'Unifier's. These are then merged into the
 -- state.
-solver :: TypeCheck Frame
+solver :: TypeCheck (Frame, Map (Set TyVar) [Pred])
 solver = gets constraints >>= go . sort where
-    go [] = get >>= \(TypeCheckState  vc f cc) -> return f
+    go [] = get >>= \(TypeCheckState  vc f cc ps ) -> return (f, ps)
 
+    -- unify these two types
     go (c@(t1 := t2):cs0) = do
         su <- gets frame
-        (_, t1') <- skolemize (substitute su t1)
-        (_, t2') <- skolemize (substitute su t2)
+        (_, t1') <- skolemize (substitute su (removeEmptyPreds t1))
+        (_, t2') <- skolemize (substitute su (removeEmptyPreds t2))
         (su1, cs1) <- unify t1' t2'
         modify $ \st -> st {
             frame = su1 `compose` su,
             constraints = nub $ (substitute su1 cs1) ++ (substitute su1 cs0)
+            }
+        solver
+
+    -- construct our elaborate stupid predicate map
+    go (c:cs0) = do
+        su <- gets frame
+        preds <- gets predicates
+        let (sym :~ tys) = substitute su c
+            vars = ftv tys
+            preds' = case M.lookup vars preds of
+                         Nothing -> M.insert vars [TPred sym tys] preds
+                         Just ps -> M.insert vars
+                                    ((TPred sym tys):(substitute su ps))
+                                    preds
+        modify $ \st -> st {
+            constraints = cs0,
+            predicates = preds'
             }
         solver
 

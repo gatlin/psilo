@@ -42,10 +42,10 @@ instance HasKind TyLit where
 --
 --   Type variables a, b
 --   Type constants K
---   Qualified type : qual ::= [<symbol> <tau>...] => <rho>
 --   Sigma types :    sigma ::= forall [a...] <rho>
 --   Rho types :      rho   ::= <tau> | <sigma> -> <sigma> | <qual>
 --   Tau types :      tau   ::= K | <tau> -> <tau> | a
+--   Qualified type : qual  ::= [<symbol> <tau>...] => <tau>
 --
 -- There are a number of invariants that are (should be) maintained throughout
 -- the code, but the grammar itself permits all sorts of violations. Perhaps in
@@ -58,12 +58,16 @@ data Type
     | TSym TyLit
     | TList [Type]
     | TForall [TyVar] Type -- Sigma types
+    | TPred Symbol [Type]
+    | [Pred] :=> Type
     deriving (Ord, Eq)
 
--- | Type aliases for clarity throughout the project
+-- | Type aliases for clarity throughout the project.
 type Sigma = Type
 type Rho = Type
 type Tau = Type
+type Pred = Type
+type Qual = Type
 
 parensShow :: Type -> String
 parensShow ty@(TList ts) = "(" ++ (show ty) ++ ")"
@@ -81,6 +85,8 @@ showType t@(TList ts) = go ts where
     go ((TSym (TyLit "->" Star)):ts') = intercalate " -> " $
         map parensShow ts'
     go ts' = intercalate " " $ map parensShow ts'
+showType (TPred sym tys) = "{ " ++ sym ++ " " ++ (show tys) ++ " }"
+showType (ps :=> ty) = (show ps) ++ " => " ++ (show ty)
 
 instance Show Type where
     show = showType
@@ -90,6 +96,7 @@ instance HasKind Type where
     kind (TSym tc)      = kind tc
     kind (TVar tv)      = kind tv
     kind (TList (t:_))  = kind t
+    kind (TPred _ tys)  = kind $ tys !! 0
 
 typeInt, typeBool, typeFloat :: Type
 typeInt = TSym (TyLit "Int" Star)
@@ -101,6 +108,7 @@ tyFun :: Type
 tyFun = TSym $ TyLit "->" Star
 
 removeEmptyPreds :: Type -> Type
+removeEmptyPreds ([] :=> t)     = removeEmptyPreds t
 removeEmptyPreds (TForall vs t) = TForall vs (removeEmptyPreds t)
 removeEmptyPreds (TList tys)    = TList $ fmap removeEmptyPreds tys
 removeEmptyPreds t              = t

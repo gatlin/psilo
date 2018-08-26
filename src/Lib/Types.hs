@@ -92,11 +92,15 @@ clsEq = TSym (TyLit "Eq" Star)
 clsOrd :: Type
 clsOrd = TSym (TyLit "Ord" Star)
 
+clsNum :: Type
+clsNum = TSym (TyLit "Num" Star)
+
 eq_binop :: Type
 eq_binop = TList [tyEntail, TList [clsEq, t_0],
                   TList [ tyFun, t_0, t_0, typeBool]]
---eq_binop = [IsIn "Eq" [t_0]] :=> (TList [tyFun, t_0, t_0, typeBool])
---    where t_0 = TVar (TyVar 0 Star)
+
+num_binop :: Type
+num_binop = [TPred "Num" [t_0]] :=> (TList [tyFun, t_0, t_0, t_0])
 
 ord_binop :: Type
 ord_binop = TList [tyEntail, TList [ clsOrd, t_0],
@@ -125,7 +129,7 @@ fromint_fn t = TList [tyFun, typeInt, t]
 
 eval_fn :: Type
 eval_fn = TList [ tyFun
-                , TList [ TSym (TyLit "FFI")
+                , TList [ TSym (TyLit "FFI" Star)
                         , t_0
                         ]
                 , TList [ tyFun
@@ -138,7 +142,8 @@ eval_fn = TList [ tyFun
 -- | Builtin operators and functions with explicit type schemes
 defaultTypeEnv :: TypeEnv
 defaultTypeEnv = TypeEnv $ M.fromList
-    [ ("not", generalize mempty not_fn)
+    [ ("=?", generalize mempty $ [TPred "Eq" [t_0]] :=> (eq_fn t_0))
+    , ("not", generalize mempty not_fn)
     , ("boolean-fromint", generalize mempty (fromint_fn typeBool))
     , ("boolean=?", generalize mempty (eq_fn typeBool))
     , ("int-add", generalize mempty int_binop)
@@ -160,7 +165,13 @@ defaultTypeEnv = TypeEnv $ M.fromList
     , ("byte-not", generalize mempty byte_binop)
     , ("byte-xor", generalize mempty byte_binop)
     , ("byte-2c", generalize mempty byte_binop)
+    , ("byte=?", generalize mempty (eq_fn typeByte))
     , ("eval", generalize mempty eval_fn)
+    , ("+", generalize mempty num_binop)
+    , ("*", generalize mempty num_binop)
+    , ("-", generalize mempty num_binop)
+    , ("/", generalize mempty num_binop)
+    , ("modulo", generalize mempty num_binop)
     --("=?", generalize mempty eq_binop)
     --, ("<", generalize mempty ord_binop)
     --, (">", generalize mempty ord_binop)
@@ -183,12 +194,21 @@ typecheck_pass
     -> Compiler (TypeEnv, Map Symbol (AnnotatedExpr (Maybe Type)))
 typecheck_pass (te, defns) (sym, expr) = runTypeCheck te $ do
     expr' <- sequence . extend infer $ expr
-    frame <- solver `catchError` (handleTypecheckError sym te)
+    (frame, preds) <- solver `catchError` (handleTypecheckError sym te)
     let sig = fmap (substitute frame) expr' :: AnnotatedExpr Type
     let vars = ftv $ extract sig
-    let scheme = extract $ (extend $ toSigma frame) sig
+    let ps = predicatesForSignature preds vars frame
+    let scheme = extract $ (extend $ toSigma frame ps) sig
     te' <- checkTypeEnv sym scheme te
     return (te', M.insert sym (fmap Just sig) defns)
+
+-- | Stupid and slow but necessary method to support MPTCs.
+-- Iterate through every
+predicatesForSignature :: Map (Set TyVar) [Pred] -> Set TyVar -> Frame -> [Pred]
+predicatesForSignature predMap tvs su = M.foldMapWithKey go predMap
+    where go predTvs ps = if predTvs `S.isSubsetOf` tvs
+                          then (substitute su ps)
+                          else []
 
 handleTypecheckError sym te err = case envLookup te sym of
     Nothing -> throwError $ OtherError $ "For " ++ sym ++ ", " ++ (show err)
@@ -210,10 +230,10 @@ checkTypeEnv sym t1 tyEnv = case envLookup tyEnv sym of
               throwError $ OtherError $
               "For " ++ sym ++ " : " ++ (show ty) ++ ",\n " ++ (show err)
 
-toSigma :: Frame -> AnnotatedExpr Type -> Sigma
-toSigma frame expr =
+toSigma :: Frame -> [Pred] -> AnnotatedExpr Type -> Sigma
+toSigma frame ps expr =
     let ty = extract expr
-    in  closeOver frame ty
+    in  closeOver frame (ps :=> ty)
 
 -- | Compute dependencies for a given expression and return as a list of Symbols
 --deps :: [(Symbol, AnnotatedExpr ())] -> AnnotatedExpr () -> [Symbol]

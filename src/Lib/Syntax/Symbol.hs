@@ -19,7 +19,14 @@ builtin_syms = S.fromList
     , "byte-not"
     , "byte-xor"
     , "byte-2c"
+    , "byte=?"
     , "eval"
+    , "=?"
+    , "+"
+    , "*"
+    , "/"
+    , "-"
+    , "modulo"
     ]
 
 {-

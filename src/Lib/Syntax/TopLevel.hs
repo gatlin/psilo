@@ -13,7 +13,6 @@ data TopLevel = TopLevel
     { definitions :: Map Symbol (AnnotatedExpr (Maybe Type))
     , signatures  :: Map Symbol Sigma
     , typedefs    :: Map Symbol ([TyVar], Sigma)
-    -- for now we ignore default implementations
     }
 
 instance Monoid TopLevel where

@@ -56,6 +56,8 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
         case result of
             Left err -> putStrLn . ushow $ err
             Right (topLevel, logs) -> do
+                forM_ logs $ putStrLn . show
+                putStrLn "-----"
                 putStrLn . show $ (signatures topLevel)
                 putStrLn "-----"
 --                putStrLn . show $ (definitions topLevel)
@@ -64,8 +66,7 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
 process_file :: Text -> Compiler TopLevel
 process_file file_contents = do
     exprs <- parse_multi $ removeComments file_contents
-    topLevels<- preprocess $ do
---        toplevel <- mapM (surfaceToTopLevel mempty) exprs >>= return . fold
+    topLevels <- preprocess $ do
         toplevel <- foldM surfaceToTopLevel mempty exprs
         boundVarCheck toplevel
         return toplevel

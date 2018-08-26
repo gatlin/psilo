@@ -8,8 +8,6 @@
 -- [x] Converting surface-level signatures into TopLevel
 -- [x] Ensuring all symbols are either bound or top level
 -- [x] Forming a default type environment for type checking
--- [ ] Gathering predicate information to form a class environment
--- [ ] Lambda lifting
 
 module Lib.Preprocessor where
 
@@ -155,6 +153,8 @@ surfaceToTopLevel topLevel (Free (SigS sym scheme)) =
     signatures = M.singleton sym (normalize $ quantify scheme)
     }
 
+-- Generates signatures for constructor and destructor, as well as a proper
+-- typedef object.
 surfaceToTopLevel topLevel (Free (TypeDefS name vars body)) = do
     let body' = normalize . quantify $ body
     let ret_type = TList $ (TSym (TyLit name Star)) : (fmap TVar vars)

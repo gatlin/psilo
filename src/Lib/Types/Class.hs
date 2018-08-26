@@ -2,22 +2,23 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Lib.Types.Class where
-{-
-import           Lib.Syntax.Symbol
-import           Lib.Types.Kind        (HasKind, Kind (..))
-import           Lib.Types.Type        (Pred, TyLit (..), TyVar (..), Type (..))
-import           Lib.Types.TypeCheck
 
 import           Data.Map              (Map)
 import qualified Data.Map              as M
 import           Data.Maybe
 import           Data.Monoid
+import           Lib.Syntax.Symbol
+import           Lib.Types.Frame
+import           Lib.Types.Kind        (HasKind, Kind (..))
+import           Lib.Types.Type        (Pred, Qual, TyLit (..), TyVar (..),
+                                        Type (..))
 
 import           Data.Functor.Identity
 
 import           Lib.Compiler
 import           Lib.Errors
 
+{-
 -- | A typeclass instance is a qualified predicate
 type Inst = Type
 
