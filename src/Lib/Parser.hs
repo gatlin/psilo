@@ -8,7 +8,7 @@ import           Control.Monad.Except
 import           Control.Monad.Free
 import           Data.Attoparsec.Text
 import           Data.Char            (isAlpha, isDigit, ord)
-import           Data.List            (nub)
+import           Data.List            (nub, sort)
 import qualified Data.Set             as S
 import           Data.Text            (Text)
 import qualified Data.Text            as Text
@@ -194,7 +194,27 @@ unquantified = do
     return $ t
 
 rho :: Parser Type
-rho = (parens sigma_arrow) <|> tau
+rho = (parens sigma_arrow) <|> (parens qualified) <|> tau
+
+qualified :: Parser Type
+qualified = do
+    skipSpace
+    string "=>"
+    skipSpace
+    preds <- parens $ predicate `sepBy` (many space)
+    skipSpace
+    ty <- rho
+    skipSpace
+    return $ preds :=> ty
+
+predicate :: Parser Pred
+predicate = parens $ do
+    skipSpace
+    name <- sym
+    skipSpace
+    vars <- tau `sepBy` (many space)
+    skipSpace
+    return $ TPred name $ sort vars
 
 sigma_arrow :: Parser Type
 sigma_arrow = do

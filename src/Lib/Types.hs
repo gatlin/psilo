@@ -203,7 +203,6 @@ typecheck_pass (te, defns) (sym, expr) = runTypeCheck te $ do
     return (te', M.insert sym (fmap Just sig) defns)
 
 -- | Stupid and slow but necessary method to support MPTCs.
--- Iterate through every
 predicatesForSignature :: Map (Set TyVar) [Pred] -> Set TyVar -> Frame -> [Pred]
 predicatesForSignature predMap tvs su = M.foldMapWithKey go predMap
     where go predTvs ps = if predTvs `S.isSubsetOf` tvs

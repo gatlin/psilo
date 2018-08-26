@@ -256,7 +256,7 @@ match t1@(TForall _ _) t2@(TForall _ _) = do
     match t1' t2'
 match (ps1 :=> t1) (ps2 :=> t2) = do
     (su, cs) <- match t1 t2
-    (su', cs') <- matchMany (substitute su ps1) (substitute su ps2)
+    (su', cs') <- matchMany (sort $ substitute su ps1) (sort $ substitute su ps2)
     case merge su su' of
         Nothing   -> throwError $ TypeMismatch (ps1 :=> t1) (ps2 :=> t2)
         Just su'' -> return (su'', nub $ cs ++ cs')
