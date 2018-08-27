@@ -187,6 +187,7 @@ surfaceToTopLevel topLevel (Free (ClassDefS name vars preds mthods)) = do
                   mDfns
     -- get the method names for the class -> method names map
     method_names <- forM mthods' $ \(Free (SigS sym _)) -> return sym
+    -- get any potential impls
     impls <- forM method_names $ \sym ->
         case M.lookup sym (signatures topLevel'') of
             Nothing -> return []
@@ -194,7 +195,7 @@ surfaceToTopLevel topLevel (Free (ClassDefS name vars preds mthods)) = do
                             Nothing -> return [(sym, S.empty)]
                             Just dfn -> return $
                                 [(sym, S.singleton (sig, dfn))]
-    -- get any potential impls
+
     return $ topLevel <> topLevel' {
         classes = M.singleton name (S.fromList method_names),
         methods = M.fromList $ concat impls
