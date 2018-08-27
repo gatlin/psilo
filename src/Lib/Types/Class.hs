@@ -18,6 +18,15 @@ import           Data.Functor.Identity
 import           Lib.Compiler
 import           Lib.Errors
 
+-- | Qualify a type with predicates.
+-- Handle both cases: where there are existing predicates, and not.
+-- NB: This will become more sophisticated when we have an actual class taxonomy
+-- and some means of merging contexts.
+qualify :: [Pred] -> Type -> Qual
+qualify [] ty                 = ty
+qualify preds (preds' :=> ty) = (preds ++ preds') :=> ty
+qualify preds ty              = qualify preds $ [] :=> ty
+
 {-
 -- | A typeclass instance is a qualified predicate
 type Inst = Type

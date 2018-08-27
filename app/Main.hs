@@ -58,6 +58,10 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
             Right (topLevel, logs) -> do
                 forM_ logs $ putStrLn . show
                 putStrLn "-----"
+                putStrLn . show $ (classes topLevel)
+                putStrLn "-----"
+                putStrLn . show $ (methods topLevel)
+                putStrLn "-----"
                 putStrLn . show $ (signatures topLevel)
                 putStrLn "-----"
 --                putStrLn . show $ (definitions topLevel)

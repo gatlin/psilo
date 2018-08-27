@@ -40,6 +40,11 @@ data SurfaceAst a
     | TypeDefS { typedefSymS :: Symbol
                , typedefVarsS :: [TyVar]
                , typedefBodyS :: Sigma }
+    | ClassDefS { classDefNameS :: Symbol
+                , classDefVarsS :: [Type]
+                , classDefPreds :: [Pred]
+                , classDefMethodsS :: [(a, Maybe a)] -- method names
+                }
     deriving ( Functor
              , Foldable
              , Traversable
@@ -93,3 +98,13 @@ aTypeDef
     -> Sigma
     -> m a
 aTypeDef sym vars body = join . liftF $ TypeDefS sym vars body
+
+aClassDef
+    :: (MonadFree SurfaceAst m)
+    => Symbol
+    -> [Type]
+    -> [Pred]
+    -> [(m a, Maybe (m a))]
+    -> m a
+aClassDef name vars preds methods = join . liftF $
+    ClassDefS name vars preds methods

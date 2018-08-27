@@ -181,12 +181,12 @@ defaultTypeEnv = TypeEnv $ M.fromList
 -- them. Then typechecking, as crude as it may be, is simply folding the initial
 -- type environment with the 'typecheck_pass' function over the sorted list.
 typecheck :: TopLevel-> Compiler TopLevel
-typecheck (TopLevel defs sigs tydefs) = do
+typecheck (TopLevel defs sigs tydefs cls mthds) = do
     let te = defaultTypeEnv <> (TypeEnv sigs)
     let dependency_graph = make_dep_graph defs
     let defs' = reverse $ topo' dependency_graph
     (TypeEnv sigs', defs'') <- foldM typecheck_pass (te, defs) defs'
-    return $ TopLevel defs'' sigs' tydefs
+    return $ TopLevel defs'' sigs' tydefs cls mthds
 
 typecheck_pass
     :: (TypeEnv, Map Symbol (AnnotatedExpr (Maybe Type)))

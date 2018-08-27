@@ -135,6 +135,9 @@ uniqueIds (Free (SigS sym pt)) = do
 uniqueIds whatever = return whatever
 
 -- | Transforms a 'SurfaceExpr' into a 'TopLevel' expression
+-- In general, a surface level syntax object might generate multiple types of
+-- "top level" declarations; eg, a class definition generates signatures and
+-- potential method implementations as well as the actual class info.
 surfaceToTopLevel
     :: TopLevel
     -> SurfaceExpr ()
@@ -172,6 +175,31 @@ surfaceToTopLevel topLevel (Free (TypeDefS name vars body)) = do
         signatures = M.fromList [(name, ctor), (('~':name), dtor)]
         }
 
+surfaceToTopLevel topLevel (Free (ClassDefS name vars preds mthods)) = do
+    -- gather the methods into the type env for now
+    (mthods', mDfns) <- mapAndUnzipM (\((Free (SigS sym scheme)), dfn) ->
+        return (Free $ SigS sym (qualify [TPred name vars] scheme), dfn)) mthods
+    topLevel' <- foldM surfaceToTopLevel mempty mthods'
+    topLevel'' <- foldM (\tl mDfn -> case mDfn of
+                                         Nothing  -> return tl
+                                         Just dfn -> surfaceToTopLevel tl dfn)
+                  topLevel'
+                  mDfns
+    -- get the method names for the class -> method names map
+    method_names <- forM mthods' $ \(Free (SigS sym _)) -> return sym
+    impls <- forM method_names $ \sym ->
+        case M.lookup sym (definitions topLevel'') of
+            Nothing -> return []
+            Just dfn -> case M.lookup sym (signatures topLevel'') of
+                            Nothing -> return []
+                            Just sig -> return $
+                                [(sym, S.singleton (sig, (fmap (const ()) dfn)))]
+    -- get any potential impls
+    return $ topLevel <> topLevel' {
+        classes = M.singleton name (S.fromList method_names),
+        methods = M.fromList $ concat impls
+        }
+
 surfaceToTopLevel _ _ = throwError $
     PreprocessError $
     "Expression is not a top level expression"
@@ -203,19 +231,10 @@ surfaceToCore (Free (IfS c t e)) = do
 surfaceToCore s = throwError $ PreprocessError $
     "Expression " ++ show s ++ " cannot be converted into a core expression."
 
-fst' :: (a, b, c) -> a
-fst' (x, y, z) = x
-
-snd' :: (a, b, c) -> b
-snd' (x, y, z) = y
-
-thd' :: (a, b, c) -> c
-thd' (x, y, z) = z
-
 -- | Ensures that all symbols are either bound or global
 -- TODO why am I not using a Set here?
 boundVarCheck :: TopLevel -> Preprocess ()
-boundVarCheck (TopLevel defns sigs tds) =
+boundVarCheck (TopLevel defns sigs tds cls mthds) =
     withBoundVars bvs $ mapM_ go $ M.toList defns
     where
         dup x = (x, x)

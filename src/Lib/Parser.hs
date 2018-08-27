@@ -169,6 +169,46 @@ typedef_parser = do
 void_typedef_body :: Parser Type
 void_typedef_body = skipSpace >> return (TList [])
 
+classdef_parser :: Parser (SurfaceExpr a)
+classdef_parser = do
+    string "@:"
+    skipSpace
+    name <- sym
+    skipSpace
+    (preds, vars) <- classdef_preds_vars
+    skipSpace
+--    methods <- ((parens sig_parser) `sepBy` (many space)) <|> (return [])
+    methods <- (classdef_method `sepBy` (many space))
+    skipSpace
+    return $ aClassDef name vars preds methods
+
+classdef_method :: Parser (SurfaceExpr a, Maybe (SurfaceExpr a))
+classdef_method = do
+    sig <- parens sig_parser
+    skipSpace
+    def <- (parens mthd_parser) <|> (return Nothing)
+    skipSpace
+    return (sig, def)
+
+    where mthd_parser = (defun_parser <|> def_parser) >>= return . Just
+
+classdef_preds_vars :: Parser ([Pred], [Type])
+classdef_preds_vars = parens $ has_preds <|> no_preds
+    where
+        has_preds = do
+            skipSpace
+            string "=>"
+            skipSpace
+            preds <- parens $ predicate `sepBy` (many space)
+            skipSpace
+            vars <- parens $ tau `sepBy` (many space)
+            skipSpace
+            return $ (preds, vars)
+
+        no_preds = do
+            vars <- tau `sepBy` (many space)
+            return $ ([], vars)
+
 scheme_parser :: Parser Type
 scheme_parser = sigma
 
@@ -260,6 +300,7 @@ toplevel_parser = do
         <|> (parens def_parser)
         <|> (parens sig_parser)
         <|> (parens typedef_parser)
+        <|> (parens classdef_parser)
     skipSpace
     return defn
 
@@ -275,6 +316,7 @@ parse_expr' input = do
                                   <|> (parens def_parser)
                                   <|> (parens sig_parser)
                                   <|> (parens typedef_parser)
+                                  <|> (parens classdef_parser)
                                   <|> expr_parser) input
     return parse_result
 
