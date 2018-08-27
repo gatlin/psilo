@@ -74,4 +74,6 @@ process_file file_contents = do
         toplevel <- foldM surfaceToTopLevel mempty exprs
         boundVarCheck toplevel
         return toplevel
-    typecheck topLevels
+    topLevels' <- typecheck topLevels
+    -- now typecheck the methods
+    return topLevels'

@@ -16,7 +16,7 @@ data TopLevel = TopLevel
     , signatures  :: Map Symbol Sigma
     , typedefs    :: Map Symbol ([TyVar], Sigma)
     , classes     :: Map Symbol (Set Symbol)
-    , methods     :: Map Symbol (Set (Sigma, AnnotatedExpr ()))
+    , methods     :: Map Symbol (Set (Sigma, AnnotatedExpr (Maybe Type)))
     }
 
 instance Monoid TopLevel where
