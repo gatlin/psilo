@@ -209,6 +209,23 @@ classdef_preds_vars = parens $ has_preds <|> no_preds
             vars <- tau `sepBy` (many space)
             return $ ([], vars)
 
+classinst_parser :: Parser (SurfaceExpr a)
+classinst_parser = do
+    string "@="
+    skipSpace
+    name <- sym
+    skipSpace
+    (preds, vars) <- classdef_preds_vars
+    skipSpace
+    methods <- (parens classinst_method) `sepBy` (many space)
+    skipSpace
+    return $ aClassInst name vars preds methods
+
+classinst_method :: Parser (SurfaceExpr a)
+classinst_method = do
+    def <- defun_parser <|> def_parser
+    return def
+
 scheme_parser :: Parser Type
 scheme_parser = sigma
 
@@ -301,6 +318,7 @@ toplevel_parser = do
         <|> (parens sig_parser)
         <|> (parens typedef_parser)
         <|> (parens classdef_parser)
+        <|> (parens classinst_parser)
     skipSpace
     return defn
 
@@ -317,6 +335,7 @@ parse_expr' input = do
                                   <|> (parens sig_parser)
                                   <|> (parens typedef_parser)
                                   <|> (parens classdef_parser)
+                                  <|> (parens classinst_parser)
                                   <|> expr_parser) input
     return parse_result
 

@@ -7,6 +7,8 @@ import           Data.Map              (Map)
 import qualified Data.Map              as M
 import           Data.Maybe
 import           Data.Monoid
+import           Data.Set              (Set)
+import qualified Data.Set              as S
 import           Lib.Syntax.Symbol
 import           Lib.Types.Frame
 import           Lib.Types.Kind        (HasKind, Kind (..))
@@ -27,37 +29,29 @@ qualify [] ty                 = ty
 qualify preds (preds' :=> ty) = (preds ++ preds') :=> ty
 qualify preds ty              = qualify preds $ [] :=> ty
 
-{-
--- | A typeclass instance is a qualified predicate
-type Inst = Type
+-- | A class stores its variables, any "superclasses" (qualifications on its
+-- type variables) and instances.
+data Class = Class
+    { vars      :: [Type]
+    , supers    :: [Pred] -- Superclass / constraint information
+    , instances :: [[Type]]
+    } deriving (Show)
 
--- | A typeclass carries information about its superclasses and instances
-type Class = ([Symbol], [Inst])
+newtype ClassEnv = ClassEnv (Map Symbol Class) deriving (Show, Monoid)
 
--- | Organizes information about the typeclass environment
-newtype ClassEnv = ClassEnv (Map Symbol Class)
-    deriving (Show, Monoid)
-
--- | Extracts typeclass information from a 'ClassEnv', if available.
-classes :: ClassEnv -> Symbol -> Maybe Class
-classes (ClassEnv ce) sym = M.lookup sym ce
-
--- These two functions assume the class actually exists. Use carefully.
-super :: ClassEnv -> Symbol -> [Symbol]
-super ce i = case classes ce i of Just (is, its) -> is
-
-insts :: ClassEnv -> Symbol -> [Inst]
-insts ce i = case classes ce i of Just (is, its) -> its
+classLookup :: ClassEnv -> Symbol -> Maybe Class
+classLookup (ClassEnv ce) name = M.lookup name ce
 
 -- | Insert / Update a mapping in a 'ClassEnv'
 modifyCE :: ClassEnv -> Symbol -> Class -> ClassEnv
 modifyCE (ClassEnv ce) sym klass = ClassEnv $ M.insert sym klass ce
 
--- | For code readability
+-- | Alias for readibility.
 defined :: Maybe Class -> Bool
 defined = isJust
 
--- | Represents a 'ClassEnv' transformation
+-- | Transforms class environments, allowing us to do quality control and
+-- potentially throw exceptions along the way.
 newtype EnvTransformer = EnvT {
     transformCE :: ClassEnv -> Compiler ClassEnv }
 
@@ -73,14 +67,27 @@ instance Monoid EnvTransformer where
     mempty = EnvT return
     mappend = (<:>)
 
--- | Adds a new typeclass to a 'ClassEnv', ensuring the name is not already
--- taken and that the superclasses are already defined.
-addClass :: Symbol -> [Symbol] -> EnvTransformer
-addClass sym is = EnvT go where
-    go ce | defined (classes ce sym) = throwError $ ClassAlreadyDefined sym
-          | any (not . defined . classes ce) is =
-                throwError $ SuperclassNotDefined sym
-          | otherwise = return (modifyCE ce sym (is, []))
+-- | Transforms a 'ClassEnv' by inserting a new 'Class'.
+addClass :: Symbol -> [Type] -> [Pred] -> EnvTransformer
+addClass name vars preds = EnvT go where
+    go ce | defined (classLookup ce name) =
+                throwError $ ClassAlreadyDefined name
+          | any (not . defined . classLookup ce) predNames =
+                throwError $ SuperclassNotDefined name
+          | otherwise = return (modifyCE ce name (Class vars preds []))
+
+    predNames = fmap (\(TPred sym _) -> sym) preds
+
+{-
+-- | A typeclass instance is a qualified predicate
+type Inst = Type
+
+-- These two functions assume the class actually exists. Use carefully.
+super :: ClassEnv -> Symbol -> [Symbol]
+super ce i = case classes ce i of Just (is, its) -> is
+
+insts :: ClassEnv -> Symbol -> [Inst]
+insts ce i = case classes ce i of Just (is, its) -> its
 
 -- | Adds an instance to a class, ensuring it does not overlap with others and
 -- that the class exists.

@@ -8,6 +8,7 @@ import qualified Data.Set             as S
 import           Lib.Syntax.Annotated
 import           Lib.Syntax.Core
 import           Lib.Syntax.Symbol
+import           Lib.Types.Class
 import           Lib.Types.Scheme
 import           Lib.Types.Type       (Sigma, TyVar (..), Type (..))
 
@@ -15,7 +16,7 @@ data TopLevel = TopLevel
     { definitions :: Map Symbol (AnnotatedExpr (Maybe Type))
     , signatures  :: Map Symbol Sigma
     , typedefs    :: Map Symbol ([TyVar], Sigma)
-    , classes     :: Map Symbol (Set Symbol)
+    , classes     :: EnvTransformer
     , methods     :: Map Symbol (Set (Sigma, AnnotatedExpr (Maybe Type)))
     }
 

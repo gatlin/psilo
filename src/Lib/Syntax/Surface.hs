@@ -45,6 +45,11 @@ data SurfaceAst a
                 , classDefPreds :: [Pred]
                 , classDefMethodsS :: [(a, Maybe a)] -- method names
                 }
+    | ClassInstS { classInstNameS :: Symbol -- the class we're instantiating
+                 , classInstVarsS :: [Type]
+                 , classInstPredsS :: [Pred]
+                 , classInstMethodsS :: [a]
+                 }
     deriving ( Functor
              , Foldable
              , Traversable
@@ -108,3 +113,13 @@ aClassDef
     -> m a
 aClassDef name vars preds methods = join . liftF $
     ClassDefS name vars preds methods
+
+aClassInst
+    :: (MonadFree SurfaceAst m)
+    => Symbol
+    -> [Type]
+    -> [Pred]
+    -> [ m a]
+    -> m a
+aClassInst name vars preds methods = join . liftF $
+    ClassInstS name vars preds methods

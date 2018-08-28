@@ -14,10 +14,10 @@ module Lib.Types
     , tyFun
     , quantify
     , removeEmptyPreds
---    , Class(..)
---    , ClassEnv(..)
---    , EnvTransformer(..)
---    , (<:>)
+    , Class(..)
+    , ClassEnv(..)
+    , EnvTransformer(..)
+    , (<:>)
     , showType
     )
 where
@@ -62,7 +62,7 @@ import           Lib.Syntax             (AnnotatedExpr, CoreAst (..), CoreExpr,
                                          SurfaceAst (..), SurfaceExpr, Symbol,
                                          TopLevel (..), annotated)
 
---import           Lib.Types.Class
+import           Lib.Types.Class
 import           Lib.Types.Constraint
 import           Lib.Types.Frame
 import           Lib.Types.Kind

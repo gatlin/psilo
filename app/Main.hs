@@ -22,8 +22,6 @@ import           Text.Show.Unicode
 data CmdLnOpts = CmdLnOpts
     { inputFile :: Maybe String
 --    , debugOut :: Bool
-    , asmDump   :: Bool
---    , execRepl  :: Bool
     } deriving (Show)
 
 optParser :: Parser CmdLnOpts
@@ -32,10 +30,12 @@ optParser = CmdLnOpts
          (long "in")
       <> (metavar "FILE_INPUT")
       <> (help "Path to input file."))
+    {-
     <*> (switch $
          (long "asm")
       <> (short 'm')
       <> (help "Dump generated assembly code (when applicable)"))
+-}
 
 main :: IO ()
 main = execParser opts >>= begin where
@@ -52,13 +52,14 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
         contents <- TextIO.readFile inFile
         let result = compileWithLogs $ do
                 topLevel <- (process_file contents)
-                return topLevel
+                ce <- transformCE (classes topLevel) mempty
+                return (topLevel, ce)
         case result of
             Left err -> putStrLn . ushow $ err
-            Right (topLevel, logs) -> do
+            Right ((topLevel, ce), logs) -> do
                 forM_ logs $ putStrLn . show
                 putStrLn "-----"
-                putStrLn . show $ (classes topLevel)
+                putStrLn . show $ ce
                 putStrLn "-----"
                 putStrLn . show $ (methods topLevel)
                 putStrLn "-----"

@@ -197,8 +197,26 @@ surfaceToTopLevel topLevel (Free (ClassDefS name vars preds mthods)) = do
                                 [(sym, S.singleton (sig, dfn))]
 
     return $ topLevel <> topLevel' {
-        classes = M.singleton name (S.fromList method_names),
+        classes = addClass name vars preds,
         methods = M.fromList $ concat impls
+        }
+
+surfaceToTopLevel topLevel (Free (ClassInstS name vars preds mthods)) = do
+    -- process the methods as normal definitions
+    topLevel' <- foldM surfaceToTopLevel mempty mthods
+
+    -- this function will be folded over the definition map we just created
+    let fold_fn method_name dfn =
+            case M.lookup method_name (signatures topLevel) of
+                Nothing -> []
+                Just ty ->
+                    case M.lookup method_name (methods topLevel) of
+                        Nothing -> []
+                        Just set -> [( method_name
+                                     , S.union set (S.singleton (ty, dfn)))]
+    let methods' = M.foldMapWithKey fold_fn (definitions topLevel')
+    return $ topLevel {
+        methods = M.fromList methods'
         }
 
 surfaceToTopLevel _ _ = throwError $
