@@ -51,12 +51,13 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
     Just inFile -> do
         contents <- TextIO.readFile inFile
         let result = compileWithLogs $ do
-                topLevel <- (process_file contents)
+                (topLevel, exprs) <- (process_file contents)
                 ce <- transformCE (classes topLevel) mempty
-                return (topLevel, ce)
+                return (topLevel, ce, exprs)
         case result of
             Left err -> putStrLn . ushow $ err
-            Right ((topLevel, ce), logs) -> do
+            Right ((topLevel, ce, exprs), logs) -> do
+                forM_ exprs $ putStrLn . show
                 forM_ logs $ putStrLn . show
                 putStrLn "-----"
                 putStrLn . show $ ce
@@ -68,7 +69,7 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
 --                putStrLn . show $ (definitions topLevel)
 --                putStrLn "-----"
 
-process_file :: Text -> Compiler TopLevel
+process_file :: Text -> Compiler (TopLevel, [SurfaceExpr ()])
 process_file file_contents = do
     exprs <- parse_multi $ removeComments file_contents
     topLevels <- preprocess $ do
@@ -77,4 +78,4 @@ process_file file_contents = do
         return toplevel
     topLevels' <- typecheck topLevels
     -- now typecheck the methods
-    return topLevels'
+    return (topLevels', exprs)

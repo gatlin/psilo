@@ -204,13 +204,13 @@ unify (TForall _ t1) t2 = unify t1 t2
 unify t1 (TForall _ t2) = unify t1 t2
 
 unify ty1@(ps1 :=> t1) ty2@(ps2 :=> t2) = do
-    logS $ "ty1 = " ++ (show ty1) ++ ", ty2 = " ++ (show ty2)
+--    logS $ "ty1 = " ++ (show ty1) ++ ", ty2 = " ++ (show ty2)
     (su, cs) <- unify t1 t2
     (su', cs') <- unifyMany (substitute su ps1) (substitute su ps2)
     return (su' `compose` su, nub $ cs ++ cs')
 
 unify ty1@(ps :=> t1) t2 = do
-    logS $ "ps = " ++ (show ps)
+--    logS $ "ps = " ++ (show ps)
     unify t1 t2
 
 unify (TPred s1 ts1) (TPred s2 ts2)

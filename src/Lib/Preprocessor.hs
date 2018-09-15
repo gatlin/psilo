@@ -180,17 +180,16 @@ surfaceToTopLevel topLevel (Free (ClassDefS name vars preds mthods)) = do
     (mthods', mDfns) <- mapAndUnzipM (\((Free (SigS sym scheme)), dfn) ->
         return (Free $ SigS sym (qualify [TPred name vars] scheme), dfn)) mthods
     topLevel' <- foldM surfaceToTopLevel mempty mthods'
-    topLevel'' <- foldM (\tl mDfn -> case mDfn of
-                                         Nothing  -> return tl
-                                         Just dfn -> surfaceToTopLevel tl dfn)
-                  topLevel'
-                  mDfns
+    let topLevelFold tl mDfn = case mDfn of
+            Nothing  -> return tl
+            Just dfn -> surfaceToTopLevel tl dfn
+    topLevel'' <- foldM topLevelFold topLevel' mDfns
     -- get the method names for the class -> method names map
     method_names <- forM mthods' $ \(Free (SigS sym _)) -> return sym
     -- get any potential impls
     impls <- forM method_names $ \sym ->
         case M.lookup sym (signatures topLevel'') of
-            Nothing -> return []
+            Nothing -> throwError $ OtherError "wot in tarnation"
             Just sig -> case M.lookup sym (definitions topLevel'') of
                             Nothing -> return [(sym, S.empty)]
                             Just dfn -> return $
@@ -198,25 +197,25 @@ surfaceToTopLevel topLevel (Free (ClassDefS name vars preds mthods)) = do
 
     return $ topLevel <> topLevel' {
         classes = addClass name vars preds,
-        methods = M.fromList $ concat impls
+        methods = (M.fromList $ concat impls) <> (methods topLevel)
         }
 
 surfaceToTopLevel topLevel (Free (ClassInstS name vars preds mthods)) = do
+
     -- process the methods as normal definitions
     topLevel' <- foldM surfaceToTopLevel mempty mthods
 
     -- this function will be folded over the definition map we just created
+
     let fold_fn method_name dfn =
             case M.lookup method_name (signatures topLevel) of
                 Nothing -> []
-                Just ty ->
-                    case M.lookup method_name (methods topLevel) of
-                        Nothing -> []
-                        Just set -> [( method_name
-                                     , S.union set (S.singleton (ty, dfn)))]
+                Just sig -> [( method_name
+                             , (S.singleton (sig, dfn)))]
+
     let methods' = M.foldMapWithKey fold_fn (definitions topLevel')
-    return $ topLevel {
-        methods = M.fromList methods'
+    return $  mempty {
+        methods = M.fromList methods' <> (methods topLevel)
         }
 
 surfaceToTopLevel _ _ = throwError $

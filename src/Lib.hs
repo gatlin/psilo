@@ -9,6 +9,7 @@ module Lib
     , parse_multi
     , removeComments
     , AnnotatedExpr
+    , SurfaceExpr
     , CoreAst(..)
     , annotated
     , TopLevel(..)
