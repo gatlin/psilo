@@ -171,7 +171,7 @@ surfaceToTopLevel topLevel (Free (TypeDefS name vars body)) = do
         Right (sk_vars, dtor) -> return $ TForall sk_vars dtor
 
     return $ topLevel <> mempty {
-        typedefs = M.singleton name (vars, normalize $ quantify body),
+        typedefs = M.singleton name (vars, normalize $ quantify body) <> (typedefs topLevel),
         signatures = M.fromList [(name, ctor), (('~':name), dtor)]
         }
 
@@ -195,7 +195,8 @@ surfaceToTopLevel topLevel (Free (ClassDefS name vars preds mthods)) = do
                             Just dfn -> return $
                                 [(sym, S.singleton (sig, dfn))]
 
-    return $ topLevel <> topLevel' {
+    return $ topLevel <> mempty {
+        signatures = (signatures topLevel''),
         classes = addClass name vars preds,
         methods = (M.fromList $ concat impls) <> (methods topLevel)
         }
@@ -214,7 +215,7 @@ surfaceToTopLevel topLevel (Free (ClassInstS name vars preds mthods)) = do
                              , (S.singleton (sig, dfn)))]
 
     let methods' = M.foldMapWithKey fold_fn (definitions topLevel')
-    return $  mempty {
+    return $ topLevel <> mempty {
         methods = M.fromList methods' <> (methods topLevel)
         }
 
