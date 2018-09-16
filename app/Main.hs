@@ -68,7 +68,7 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
                 putStrLn "-----"
                 putStrLn . show $ (typedefs topLevel)
                 putStrLn "-----"
-                putStrLn . show $ (definitions topLevel)
+                putStrLn . show $ (definitions topLevel)y
 --                putStrLn . show $ (definitions topLevel)
 --                putStrLn "-----"
 

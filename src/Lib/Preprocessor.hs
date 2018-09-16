@@ -215,7 +215,9 @@ surfaceToTopLevel topLevel (Free (ClassInstS name vars preds mthods)) = do
                              , (S.singleton (sig, dfn)))]
 
     let methods' = M.foldMapWithKey fold_fn (definitions topLevel')
-    return $ topLevel <> mempty {
+    if length methods' == 0
+        then throwError $ OtherError "what in tarnation"
+        else return $ topLevel <> mempty {
         methods = M.fromList methods' <> (methods topLevel)
         }
 
