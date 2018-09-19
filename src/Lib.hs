@@ -20,6 +20,7 @@ module Lib
     , preprocess
     , uniqueIds
     , surfaceToTopLevel
+    , PState(..)
 --    , splitUp
     , boundVarCheck
       -- * Type checking

@@ -5,6 +5,7 @@ module Main where
 import           Control.Comonad.Cofree
 import           Control.Monad              (foldM, forM_, mapM, mapM_, when)
 import           Control.Monad.Except
+import           Control.Monad.State        (get)
 import           Data.Foldable
 import           Data.Map                   (Map)
 import qualified Data.Map                   as M
@@ -59,26 +60,25 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
             Right ((topLevel, ce, exprs), logs) -> do
                 forM_ exprs $ putStrLn . show
                 forM_ logs $ putStrLn . show
-                putStrLn "-----"
+                putStrLn "Class Env\n-----"
                 putStrLn . show $ ce
-                putStrLn "-----"
+                putStrLn "\nClass Methods\n-----"
                 putStrLn . show $ (methods topLevel)
-                putStrLn "-----"
+                putStrLn "\nSignatures\n-----"
                 putStrLn . show $ (signatures topLevel)
-                putStrLn "-----"
+                putStrLn "\nTypedefs\n-----"
                 putStrLn . show $ (typedefs topLevel)
-                putStrLn "-----"
+                putStrLn "\nDefinitions\n-----"
                 putStrLn . show $ (definitions topLevel)
---                putStrLn . show $ (definitions topLevel)
---                putStrLn "-----"
 
 process_file :: Text -> Compiler (TopLevel, [SurfaceExpr ()])
 process_file file_contents = do
     exprs <- parse_multi $ removeComments file_contents
     topLevels <- preprocess $ do
-        toplevel <- foldM surfaceToTopLevel mempty exprs
-        boundVarCheck toplevel
-        return toplevel
+        mapM surfaceToTopLevel exprs
+        tl <- get >>= return . toplevel
+        boundVarCheck tl
+        return tl
     topLevels' <- typecheck topLevels
     -- now typecheck the methods
     return (topLevels', exprs)

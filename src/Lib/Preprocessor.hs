@@ -48,10 +48,11 @@ import           Data.Monoid            ((<>))
 type SymbolMap = Map Symbol Symbol
 data PState = PState
     { uniqueInt :: Int -- ^ For generating unique IDs
+    , toplevel  :: TopLevel
     }
 
 pState :: PState
-pState = PState 0
+pState = PState 0 mempty
 
 -- | A monad for transforming parsed surface syntax into what the compiler needs
 newtype Preprocess a = Preprocess {
@@ -67,8 +68,10 @@ newtype Preprocess a = Preprocess {
 
 preprocess
     :: Preprocess a
-    -> Compiler a
-preprocess (Preprocess p) = runReaderT (evalStateT p pState ) M.empty
+    -> Compiler TopLevel
+preprocess (Preprocess p) = do
+    (PState _ toplevel ) <- runReaderT (execStateT p pState ) M.empty
+    return toplevel
 
 -- | Generate unique symbols
 gensym :: Preprocess String
@@ -134,31 +137,90 @@ uniqueIds (Free (SigS sym pt)) = do
 
 uniqueIds whatever = return whatever
 
+addDefinition :: Symbol -> AnnotatedExpr (Maybe Type) -> Preprocess ()
+addDefinition sym dfn = do
+    tl <- gets toplevel
+    let tl' = tl {
+            definitions = M.insert sym dfn (definitions tl)
+            }
+    modify $ \st -> st { toplevel = tl' }
+
+lookupDefinition :: Symbol -> Preprocess (Maybe (AnnotatedExpr (Maybe Type)))
+lookupDefinition sym = do
+    tl <- gets toplevel
+    return $ M.lookup sym (definitions tl)
+
+addSignature :: Symbol -> Sigma -> Preprocess ()
+addSignature sym sig = do
+    tl <- gets toplevel
+    let tl' = tl {
+            signatures = M.insert sym sig (signatures tl)
+            }
+    modify $ \st -> st { toplevel = tl' }
+
+lookupSignature :: Symbol -> Preprocess (Maybe Sigma)
+lookupSignature sym = do
+    tl <- gets toplevel
+    return $ M.lookup sym (signatures tl)
+
+addTypedef :: Symbol -> ([TyVar], Sigma) -> Preprocess ()
+addTypedef sym td = do
+    tl <- gets toplevel
+    let tl' = tl {
+            typedefs = M.insert sym td (typedefs tl)
+            }
+    modify $ \st -> st { toplevel = tl' }
+
+lookupTypedef :: Symbol -> Preprocess (Maybe ([TyVar], Sigma))
+lookupTypedef sym = do
+    tl <- gets toplevel
+    return $ M.lookup sym (typedefs tl)
+
+addClassdef :: Symbol -> [Type] -> [Pred] -> Preprocess ()
+addClassdef sym vars preds = do
+    tl <- gets toplevel
+    let tl' = tl {
+            classes = (classes tl) <:> (addClass sym vars preds)
+            }
+
+    modify $ \st -> st { toplevel = tl' }
+
+addMethod
+    :: Symbol
+    -> (Set (Sigma, AnnotatedExpr (Maybe Type)))
+    -> Preprocess ()
+addMethod sym mthds = do
+    tl <- gets toplevel
+    let ms = case M.lookup sym (methods tl) of
+                  Nothing -> M.insert sym mthds (methods tl)
+                  Just mthds' ->
+                      M.insert sym (mthds `S.union` mthds') (methods tl)
+    let tl' = tl {
+            methods = ms
+            }
+    modify $ \st -> st { toplevel = tl' }
+
 -- | Transforms a 'SurfaceExpr' into a 'TopLevel' expression
 -- In general, a surface level syntax object might generate multiple types of
 -- "top level" declarations; eg, a class definition generates signatures and
 -- potential method implementations as well as the actual class info.
 surfaceToTopLevel
-    :: TopLevel
-    -> SurfaceExpr ()
-    -> Preprocess TopLevel
-surfaceToTopLevel topLevel (Free (DefS sym val)) = do
+    :: SurfaceExpr ()
+    -> Preprocess ()
+surfaceToTopLevel  (Free (DefS sym val)) = do
     uval <- uniqueIds val
     val' <- surfaceToCore uval
     case compile (annotated val') of
         Left _    -> throwError $ PreprocessError "wut"
-        Right ann -> return $ topLevel <> mempty {
-            definitions = M.singleton sym $ fmap (\ _ -> Nothing) ann
-            }
+        Right ann ->  addDefinition sym $ fmap (const Nothing) ann
 
-surfaceToTopLevel topLevel (Free (SigS sym scheme)) =
-    return $ topLevel <> mempty {
-    signatures = M.singleton sym (normalize $ quantify scheme)
-    }
+surfaceToTopLevel  (Free (SigS sym scheme)) = do
+    let sig = normalize $ quantify scheme
+    addSignature sym sig
 
 -- Generates signatures for constructor and destructor, as well as a proper
 -- typedef object.
-surfaceToTopLevel topLevel (Free (TypeDefS name vars body)) = do
+surfaceToTopLevel  (Free (TypeDefS name vars body)) = do
     let body' = normalize . quantify $ body
     let ret_type = TList $ (TSym (TyLit name Star)) : (fmap TVar vars)
     let ctor = normalize $ TForall vars $ TList $
@@ -169,59 +231,40 @@ surfaceToTopLevel topLevel (Free (TypeDefS name vars body)) = do
     dtor <- case mDtor of
         Left err              -> throwError err
         Right (sk_vars, dtor) -> return $ TForall sk_vars dtor
+    addSignature name ctor
+    addSignature ('~':name) dtor
+    addTypedef name (vars, normalize $ quantify body)
 
-    return $ topLevel <> mempty {
-        typedefs = M.singleton name (vars, normalize $ quantify body) <> (typedefs topLevel),
-        signatures = M.fromList [(name, ctor), (('~':name), dtor)]
-        }
+surfaceToTopLevel (Free (ClassDefS name vars preds mthods)) = do
+    addClassdef name vars preds
+    forM_ mthods $ \(Free (SigS sym scheme), mDfn) -> do
+        let sig = normalize . quantify $ qualify [TPred name vars] scheme
+        addSignature sym sig
+        case mDfn of
+            Nothing -> addMethod sym S.empty
+            Just (Free (DefS sym val)) -> do
+                dfn' <- do
+                    uval <- uniqueIds val >>= surfaceToCore
+                    case compile (annotated uval) of
+                        Left _ -> throwError $ PreprocessError "Error in your definition."
+                        Right ann -> return $ fmap (const Nothing) ann
+                let s = S.fromList [(sig, dfn')]
+                addMethod sym s
 
-surfaceToTopLevel topLevel (Free (ClassDefS name vars preds mthods)) = do
-    -- gather the methods into the type env for now
-    (mthods', mDfns) <- mapAndUnzipM (\((Free (SigS sym scheme)), dfn) ->
-        return (Free $ SigS sym (qualify [TPred name vars] scheme), dfn)) mthods
-    topLevel' <- foldM surfaceToTopLevel mempty mthods'
-    let topLevelFold tl mDfn = case mDfn of
-            Nothing  -> return tl
-            Just dfn -> surfaceToTopLevel tl dfn
-    topLevel'' <- foldM topLevelFold topLevel' mDfns
-    -- get the method names for the class -> method names map
-    method_names <- forM mthods' $ \(Free (SigS sym _)) -> return sym
-    -- get any potential impls
-    impls <- forM method_names $ \sym ->
-        case M.lookup sym (signatures topLevel'') of
-            Nothing -> throwError $ OtherError "wot in tarnation"
-            Just sig -> case M.lookup sym (definitions topLevel'') of
-                            Nothing -> return [(sym, S.empty)]
-                            Just dfn -> return $
-                                [(sym, S.singleton (sig, dfn))]
+surfaceToTopLevel (Free (ClassInstS name vars preds mthods)) = do
+    forM_ mthods $ \d@(Free (DefS sym val)) -> do
+        dfn <- do
+            uval <- uniqueIds val >>= surfaceToCore
+            case compile (annotated uval) of
+                Left _ -> throwError $ PreprocessError "Error in your definition."
+                Right ann -> return $ fmap (const Nothing) ann
 
-    return $ topLevel <> mempty {
-        signatures = (signatures topLevel''),
-        classes = addClass name vars preds,
-        methods = (M.fromList $ concat impls) <> (methods topLevel)
-        }
+        mSig <- lookupSignature sym
+        case mSig of
+            Nothing  -> throwError $ PreprocessError "Not a class method."
+            Just sig -> addMethod sym $ S.fromList [(sig, dfn)]
 
-surfaceToTopLevel topLevel (Free (ClassInstS name vars preds mthods)) = do
-
-    -- process the methods as normal definitions
-    topLevel' <- foldM surfaceToTopLevel mempty mthods
-
-    -- this function will be folded over the definition map we just created
-
-    let fold_fn method_name dfn =
-            case M.lookup method_name (signatures topLevel) of
-                Nothing -> []
-                Just sig -> [( method_name
-                             , (S.singleton (sig, dfn)))]
-
-    let methods' = M.foldMapWithKey fold_fn (definitions topLevel')
-    if length methods' == 0
-        then throwError $ OtherError "what in tarnation"
-        else return $ topLevel <> mempty {
-        methods = M.fromList methods' <> (methods topLevel)
-        }
-
-surfaceToTopLevel _ _ = throwError $
+surfaceToTopLevel _ = throwError $
     PreprocessError $
     "Expression is not a top level expression"
 
