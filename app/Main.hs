@@ -80,5 +80,4 @@ process_file file_contents = do
         boundVarCheck tl
         return tl
     topLevels' <- typecheck topLevels
-    -- now typecheck the methods
     return (topLevels', exprs)

@@ -20,12 +20,14 @@ import qualified Data.Set          as S
 -- in its own module. Look, one thing at a time.
 
 -- | Ideally, after normalization we can determine if two types are the same
+
 normalize :: Sigma -> Sigma
 normalize (TForall [] t) = normalize t
-normalize (TForall vs t) = TForall vs' $ normalize t'
+normalize (TForall vs t) = TForall (S.toList vs') $ normalize t'
     where
-        len_vs = (length vs) - 1
-        vs' = map (\v -> TyVar v Star) [0..len_vs]
-        frame = M.fromList $ zip vs (map TVar vs')
+        vs' = (ftv t) `S.difference` (S.fromList vs)
+        len_vs = (length $ S.toList vs') - 1
+        vs'' = map (\v -> TyVar v Star) [0..len_vs]
+        frame = M.fromList $ zip vs (map TVar vs'')
         t' = substitute frame (removeEmptyPreds t)
 normalize t = removeEmptyPreds t

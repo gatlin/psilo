@@ -15,17 +15,17 @@ import           Lib.Types.Type       (Sigma, TyVar (..), Type (..))
 data TopLevel = TopLevel
     { definitions :: Map Symbol (AnnotatedExpr (Maybe Type))
     , signatures  :: Map Symbol Sigma
-    , typedefs    :: Map Symbol ([TyVar], Sigma)
+    , typedefs    :: Map Symbol ([TyVar], Sigma, Bool)
     , classes     :: EnvTransformer
-    , methods     :: Map Symbol (Set (Sigma, AnnotatedExpr (Maybe Type)))
+    , methods     :: Map Symbol (Set (AnnotatedExpr (Maybe Type)))
     }
 
 instance Monoid TopLevel where
     mempty = TopLevel mempty mempty mempty mempty mempty
-    (TopLevel aD aS aT aC aM) `mappend` (TopLevel bD bS bT bC bM) = TopLevel {
-        definitions = (aD `mappend` bD),
-        signatures = (aS `mappend` bS),
-        typedefs = (aT `mappend` bT),
-        classes = (aC `mappend` bC),
-        methods = (aM `mappend` bM)
+    tlA `mappend` tlB = TopLevel {
+        definitions = (definitions tlA) `mappend` (definitions tlB),
+        signatures = (signatures tlA) `mappend` (signatures tlB),
+        typedefs = (typedefs tlA) `mappend` (typedefs tlB),
+        classes = (classes tlA) `mappend` (classes tlB),
+        methods = (methods tlA) `mappend` (methods tlB)
         }

@@ -185,14 +185,25 @@ typecheck (TopLevel defs sigs tydefs cls mthds) = do
     let te = defaultTypeEnv <> (TypeEnv sigs)
     let dependency_graph = make_dep_graph defs
     let defs' = reverse $ topo' dependency_graph
-    (TypeEnv sigs', defs'') <- foldM typecheck_pass (te, defs) defs'
+    -- rewrite any annotated types using the aliases we've collected
+    let aliases = fmap (\ (sym, (vars, ty, _)) -> (sym, vars, ty)) $
+                  M.toList $
+                  M.filter (\(_,_,isAlias) -> isAlias) tydefs
+--    let te' = transform_aliases te aliases
+    (TypeEnv sigs', defs'') <- runTypeCheck te $ do
+        foldM typecheck_pass (te, defs) defs'
+--    (TypeEnv sigs', mthds') <- typecheck_methods te' mthds
     return $ TopLevel defs'' sigs' tydefs cls mthds
+
+transform_aliases :: TypeEnv -> [(Symbol, [TyVar], Sigma)] -> TypeEnv
+transform_aliases (TypeEnv sigs) aliases = TypeEnv $ foldl go sigs aliases where
+    go sigs (sym, vars, ty) = fmap (alias_rewrite sym vars ty) sigs
 
 typecheck_pass
     :: (TypeEnv, Map Symbol (AnnotatedExpr (Maybe Type)))
     -> (Symbol, AnnotatedExpr (Maybe Type))
-    -> Compiler (TypeEnv, Map Symbol (AnnotatedExpr (Maybe Type)))
-typecheck_pass (te, defns) (sym, expr) = runTypeCheck te $ do
+    -> TypeCheck (TypeEnv, Map Symbol (AnnotatedExpr (Maybe Type)))
+typecheck_pass (te, defns) (sym, expr) = do
     expr' <- sequence . extend infer $ expr
     (frame, preds) <- solver `catchError` (handleTypecheckError sym te)
     let sig = fmap (substitute frame) expr' :: AnnotatedExpr Type

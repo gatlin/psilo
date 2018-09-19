@@ -73,7 +73,6 @@ parensShow :: Type -> String
 parensShow ty@(TList ts) = "(" ++ (show ty) ++ ")"
 parensShow ty            = showType ty
 
-
 showType (TForall vs t) = "(" ++ prefix ++ (showType t) ++ ")"
     where vs' = intercalate " " $ map show vs
           prefix = "∀" ++ vs' ++ ". "
@@ -112,3 +111,17 @@ removeEmptyPreds ([] :=> t)     = removeEmptyPreds t
 removeEmptyPreds (TForall vs t) = TForall vs (removeEmptyPreds t)
 removeEmptyPreds (TList tys)    = TList $ fmap removeEmptyPreds tys
 removeEmptyPreds t              = t
+
+alias_rewrite :: Symbol -> [TyVar] -> Type -> Sigma -> Sigma
+alias_rewrite sym vars ty sig = case sig of
+    TSym (TyLit lit _) -> if lit == sym then ty else sig
+    TList [] -> TList []
+    (TList (t@(TSym (TyLit lit _)) : tys)) ->
+        if lit == sym
+        then ty
+        else TList $ fmap (alias_rewrite sym vars ty) (t:tys)
+    TForall vs t -> TForall vs $ alias_rewrite sym vars ty t
+    ps :=> t ->
+        (fmap (alias_rewrite sym vars ty) ps) :=> (alias_rewrite sym vars ty t)
+    TPred s t -> TPred s $ fmap (alias_rewrite sym vars ty) t
+    t -> t

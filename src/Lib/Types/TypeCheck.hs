@@ -254,12 +254,16 @@ match t1@(TForall _ _) t2@(TForall _ _) = do
     (_, t1') <- skolemize t1
     (_, t2') <- skolemize t2
     match t1' t2'
+
 match (ps1 :=> t1) (ps2 :=> t2) = do
     (su, cs) <- match t1 t2
     (su', cs') <- matchMany (sort $ substitute su ps1) (sort $ substitute su ps2)
     case merge su su' of
         Nothing   -> throwError $ TypeMismatch (ps1 :=> t1) (ps2 :=> t2)
         Just su'' -> return (su'', nub $ cs ++ cs')
+
+match t1 (ps :=> t2) = match t1 t2
+
 match (TPred s1 ts1) (TPred s2 ts2)
     | s1 /= s2 = throwError $ TypeMismatch (TPred s1 ts1) (TPred s2 ts2)
     | otherwise = unifyMany ts1 ts2
@@ -304,7 +308,7 @@ occursCheck a t = a `S.member` (ftv t)
 -- state.
 solver :: TypeCheck (Frame, Map (Set TyVar) [Pred])
 solver = gets constraints >>= go . sort where
-    go [] = get >>= \(TypeCheckState  vc f cc ps ) -> return (f, ps)
+    go [] = get >>= \(TypeCheckState  vc f cc ps) -> return (f, ps)
 
     -- unify these two types
     go (c@(t1 := t2):cs0) = do

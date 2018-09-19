@@ -163,7 +163,7 @@ lookupSignature sym = do
     tl <- gets toplevel
     return $ M.lookup sym (signatures tl)
 
-addTypedef :: Symbol -> ([TyVar], Sigma) -> Preprocess ()
+addTypedef :: Symbol -> ([TyVar], Sigma, Bool) -> Preprocess ()
 addTypedef sym td = do
     tl <- gets toplevel
     let tl' = tl {
@@ -171,7 +171,7 @@ addTypedef sym td = do
             }
     modify $ \st -> st { toplevel = tl' }
 
-lookupTypedef :: Symbol -> Preprocess (Maybe ([TyVar], Sigma))
+lookupTypedef :: Symbol -> Preprocess (Maybe ([TyVar], Sigma, Bool))
 lookupTypedef sym = do
     tl <- gets toplevel
     return $ M.lookup sym (typedefs tl)
@@ -187,7 +187,7 @@ addClassdef sym vars preds = do
 
 addMethod
     :: Symbol
-    -> (Set (Sigma, AnnotatedExpr (Maybe Type)))
+    -> (Set (AnnotatedExpr (Maybe Type)))
     -> Preprocess ()
 addMethod sym mthds = do
     tl <- gets toplevel
@@ -200,6 +200,15 @@ addMethod sym mthds = do
             }
     modify $ \st -> st { toplevel = tl' }
 
+makeDefinition :: SurfaceExpr () -> Preprocess (AnnotatedExpr (Maybe Type))
+makeDefinition (Free (DefS sym val)) = do
+    uval <- uniqueIds val >>= surfaceToCore
+    case compile (annotated uval) of
+        Left _ -> throwError $ PreprocessError $ "Error desugaring " ++ sym
+        Right ann -> return $ fmap (const Nothing) ann
+
+makeDefinition _ = throwError $ PreprocessError "Not a valid definition."
+
 -- | Transforms a 'SurfaceExpr' into a 'TopLevel' expression
 -- In general, a surface level syntax object might generate multiple types of
 -- "top level" declarations; eg, a class definition generates signatures and
@@ -207,62 +216,51 @@ addMethod sym mthds = do
 surfaceToTopLevel
     :: SurfaceExpr ()
     -> Preprocess ()
-surfaceToTopLevel  (Free (DefS sym val)) = do
-    uval <- uniqueIds val
-    val' <- surfaceToCore uval
-    case compile (annotated val') of
-        Left _    -> throwError $ PreprocessError "wut"
-        Right ann ->  addDefinition sym $ fmap (const Nothing) ann
+surfaceToTopLevel  d@(Free (DefS sym val)) = do
+    dfn <- makeDefinition d
+    addDefinition sym dfn
 
 surfaceToTopLevel  (Free (SigS sym scheme)) = do
-    let sig = normalize $ quantify scheme
+    let sig = quantify scheme
     addSignature sym sig
 
 -- Generates signatures for constructor and destructor, as well as a proper
 -- typedef object.
-surfaceToTopLevel  (Free (TypeDefS name vars body)) = do
-    let body' = normalize . quantify $ body
-    let ret_type = TList $ (TSym (TyLit name Star)) : (fmap TVar vars)
-    let ctor = normalize $ TForall vars $ TList $
-               tyFun : (body : [ret_type])
-    let dtor' = normalize $ TForall vars $ TList $
-               tyFun : (ret_type : [body])
-    let mDtor = runSolve (skolemize dtor') initTypeCheckState
-    dtor <- case mDtor of
-        Left err              -> throwError err
-        Right (sk_vars, dtor) -> return $ TForall sk_vars dtor
-    addSignature name ctor
-    addSignature ('~':name) dtor
-    addTypedef name (vars, normalize $ quantify body)
+surfaceToTopLevel  (Free (TypeDefS name vars body isAlias)) = do
+    let body' = quantify body
+    addTypedef name (vars, body', isAlias)
+    when (not isAlias) $ do
+        let ret_type = TList $ (TSym (TyLit name Star)) : (fmap TVar vars)
+        let ctor = TForall vars $ TList $
+                   tyFun : (body : [ret_type])
+        let dtor' = TForall vars $ TList $
+                    tyFun : (ret_type : [body])
+        let mDtor = runSolve (skolemize dtor') initTypeCheckState
+        dtor <- case mDtor of
+            Left err              -> throwError err
+            Right (sk_vars, dtor) -> return $ TForall sk_vars dtor
+        addSignature name ctor
+        addSignature ('~':name) dtor
 
 surfaceToTopLevel (Free (ClassDefS name vars preds mthods)) = do
     addClassdef name vars preds
     forM_ mthods $ \(Free (SigS sym scheme), mDfn) -> do
-        let sig = normalize . quantify $ qualify [TPred name vars] scheme
+        let sig = quantify $ qualify [TPred name vars] scheme
         addSignature sym sig
         case mDfn of
             Nothing -> addMethod sym S.empty
-            Just (Free (DefS sym val)) -> do
-                dfn' <- do
-                    uval <- uniqueIds val >>= surfaceToCore
-                    case compile (annotated uval) of
-                        Left _ -> throwError $ PreprocessError "Error in your definition."
-                        Right ann -> return $ fmap (const Nothing) ann
-                let s = S.fromList [(sig, dfn')]
+            Just d@(Free (DefS sym val)) -> do
+                dfn' <- makeDefinition d
+                let s = S.fromList [dfn']
                 addMethod sym s
 
 surfaceToTopLevel (Free (ClassInstS name vars preds mthods)) = do
     forM_ mthods $ \d@(Free (DefS sym val)) -> do
-        dfn <- do
-            uval <- uniqueIds val >>= surfaceToCore
-            case compile (annotated uval) of
-                Left _ -> throwError $ PreprocessError "Error in your definition."
-                Right ann -> return $ fmap (const Nothing) ann
-
+        dfn <- makeDefinition d
         mSig <- lookupSignature sym
         case mSig of
             Nothing  -> throwError $ PreprocessError "Not a class method."
-            Just sig -> addMethod sym $ S.fromList [(sig, dfn)]
+            Just sig -> addMethod sym $ S.fromList [dfn]
 
 surfaceToTopLevel _ = throwError $
     PreprocessError $

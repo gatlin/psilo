@@ -39,7 +39,8 @@ data SurfaceAst a
     | SigS { sigSymS :: Symbol , sigScheme :: Sigma }
     | TypeDefS { typedefSymS :: Symbol
                , typedefVarsS :: [TyVar]
-               , typedefBodyS :: Sigma }
+               , typedefBodyS :: Sigma
+               , alias :: Bool}
     | ClassDefS { classDefNameS :: Symbol
                 , classDefVarsS :: [Type]
                 , classDefPreds :: [Pred]
@@ -101,8 +102,9 @@ aTypeDef
     => Symbol
     -> [TyVar]
     -> Sigma
+    -> Bool
     -> m a
-aTypeDef sym vars body = join . liftF $ TypeDefS sym vars body
+aTypeDef sym vars body alias = join . liftF $ TypeDefS sym vars body alias
 
 aClassDef
     :: (MonadFree SurfaceAst m)

@@ -153,18 +153,27 @@ defun_parser = do
                                (map snd args))
 
 typedef_parser :: Parser (SurfaceExpr a)
-typedef_parser = do
-    string "::"
-    skipSpace
-    name <- sym
-    skipSpace
-    vars <- parens (sym `sepBy` (many space))
-    vars' <- forM vars $ \var ->
-        return (TyVar (string_hash var) Star)
-    skipSpace
-    body <- scheme_parser <|> void_typedef_body
-    skipSpace
-    return $ aTypeDef name vars' body
+typedef_parser = alias <|> not_alias where
+    alias = do
+        string "=:"
+        go True
+
+    not_alias = do
+        string "::"
+        go False
+
+    go :: Bool -> Parser (SurfaceExpr a)
+    go isAlias = do
+        skipSpace
+        name <- sym
+        skipSpace
+        vars <- parens (sym `sepBy` (many space))
+        vars' <- forM vars $ \var ->
+            return (TyVar (string_hash var) Star)
+        skipSpace
+        body <- scheme_parser <|> void_typedef_body
+        skipSpace
+        return $ aTypeDef name vars' body isAlias
 
 void_typedef_body :: Parser Type
 void_typedef_body = skipSpace >> return (TList [])
@@ -239,7 +248,7 @@ quantified = do
     skipSpace
     vars <- parens (sym `sepBy` (many space))
     skipSpace
-    t <- unquantified
+    t <- sigma
     skipSpace
     return $ TForall (fmap (\v -> TyVar (string_hash v) Star) vars) t
 
