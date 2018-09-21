@@ -56,12 +56,26 @@ instance TypeLike a => TypeLike [a] where
     substitute = map . substitute
 
 instance TypeLike Type where
+    ftv t = go S.empty S.empty t where
+        go bound acc (TVar v)
+            | v `S.member` bound = acc
+            | otherwise = v `S.insert` acc
+        go bound acc (TForall vs t) = go ((S.fromList vs) `S.union` bound) acc t
+        go bound acc (TPred _ tys) = foldl (<>) mempty $ fmap ftv tys
+        go bound acc (ps :=> tys) = (ftv ps) `S.union` (ftv tys)
+        go bound acc (TList ((TSym (TyLit "->" _)):[])) = acc
+        go bound acc (TList ((TSym (TyLit "->" _)):(ty:tys))) =
+            go bound (go bound acc (TList (tyFun : tys))) ty
+        go bound acc (TList tys) = ftv tys
+        go bound acc _ = acc
+{-
     ftv (TForall vs t) = (ftv t) `S.difference` (S.fromList vs)
     ftv (TVar n)       = S.singleton n
     ftv (TList ts)     = foldl (<>) mempty $ fmap ftv ts
     ftv (ps :=> t)     = (ftv ps) `S.union` (ftv t)
     ftv (TPred sym t)  = ftv t
     ftv _              = mempty
+-}
 
     substitute frame (TForall vs t) = TForall vs $
         substitute (foldr M.delete frame vs) t

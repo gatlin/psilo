@@ -13,6 +13,7 @@ module Lib
     , CoreAst(..)
     , annotated
     , TopLevel(..)
+    , showSignatures
     , Symbol
     , builtin_syms
       -- * Preprocessing
@@ -36,13 +37,6 @@ module Lib
     , (<:>)
     , ClassEnv(..)
     , showType
-      -- * Lifted Expressions
-    , LiftedExpr(..)
-    , liftExpr
-    , convertClosure
-      -- * Codegen
---    , codegen
---    , emptyModule
       -- * Errors
     , PsiloError(..)
     ) where

@@ -80,6 +80,12 @@ gensym = do
     modify $ \s -> s { uniqueInt = n + 1 }
     return $ "_" ++ (show n)
 
+genint :: Preprocess Int
+genint = do
+    n <- gets uniqueInt
+    modify $ \s -> s { uniqueInt = n + 1 }
+    return n
+
 readBoundVars :: Preprocess SymbolMap
 readBoundVars = ask
 
@@ -153,8 +159,9 @@ lookupDefinition sym = do
 addSignature :: Symbol -> Sigma -> Preprocess ()
 addSignature sym sig = do
     tl <- gets toplevel
+    let sig' = normalize $ quantify sig
     let tl' = tl {
-            signatures = M.insert sym sig (signatures tl)
+            signatures = M.insert sym sig' (signatures tl)
             }
     modify $ \st -> st { toplevel = tl' }
 
@@ -220,9 +227,7 @@ surfaceToTopLevel  d@(Free (DefS sym val)) = do
     dfn <- makeDefinition d
     addDefinition sym dfn
 
-surfaceToTopLevel  (Free (SigS sym scheme)) = do
-    let sig = quantify scheme
-    addSignature sym sig
+surfaceToTopLevel  (Free (SigS sym sig)) = addSignature sym sig
 
 -- Generates signatures for constructor and destructor, as well as a proper
 -- typedef object.

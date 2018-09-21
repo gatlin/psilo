@@ -20,9 +20,7 @@ module Lib.Syntax
     , fromTypeLit
     , LiftedExpr(..)
     , liftExpr
-    , mangle
-    , convertClosure
---    , convertClosure
+    , showSignatures
     )
 where
 

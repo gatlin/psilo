@@ -58,18 +58,18 @@ begin cmdLnOpts = case inputFile cmdLnOpts of
         case result of
             Left err -> putStrLn . ushow $ err
             Right ((topLevel, ce, exprs), logs) -> do
-                forM_ exprs $ putStrLn . show
-                forM_ logs $ putStrLn . show
-                putStrLn "Class Env\n-----"
-                putStrLn . show $ ce
-                putStrLn "\nClass Methods\n-----"
-                putStrLn . show $ (methods topLevel)
+                --forM_ exprs $ putStrLn . show
+                --forM_ logs $ putStrLn . show
+                --putStrLn "Class Env\n-----"
+                --putStrLn . show $ ce
+                --putStrLn "\nClass Methods\n-----"
+                --putStrLn . show $ (methods topLevel)
                 putStrLn "\nSignatures\n-----"
-                putStrLn . show $ (signatures topLevel)
+                putStrLn . showSignatures $ signatures topLevel
                 putStrLn "\nTypedefs\n-----"
                 putStrLn . show $ (typedefs topLevel)
-                putStrLn "\nDefinitions\n-----"
-                putStrLn . show $ (definitions topLevel)
+                --putStrLn "\nDefinitions\n-----"
+                --putStrLn . show $ (definitions topLevel)
 
 process_file :: Text -> Compiler (TopLevel, [SurfaceExpr ()])
 process_file file_contents = do

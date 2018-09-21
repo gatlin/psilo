@@ -58,6 +58,8 @@ import           Data.Tree              (flatten)
 import           Data.List              (elem, intercalate, sort, sortBy)
 import           Data.Ord               (Ordering (..))
 
+import           Text.Show.Unicode
+
 import           Lib.Syntax             (AnnotatedExpr, CoreAst (..), CoreExpr,
                                          SurfaceAst (..), SurfaceExpr, Symbol,
                                          TopLevel (..), annotated)
@@ -189,6 +191,7 @@ typecheck (TopLevel defs sigs tydefs cls mthds) = do
     let aliases = fmap (\ (sym, (vars, ty, _)) -> (sym, vars, ty)) $
                   M.toList $
                   M.filter (\(_,_,isAlias) -> isAlias) tydefs
+    logMsg . ushow $ aliases
 --    let te' = transform_aliases te aliases
     (TypeEnv sigs', defs'') <- runTypeCheck te $ do
         foldM typecheck_pass (te, defs) defs'
@@ -206,7 +209,7 @@ typecheck_pass
 typecheck_pass (te, defns) (sym, expr) = do
     expr' <- sequence . extend infer $ expr
     (frame, preds) <- solver `catchError` (handleTypecheckError sym te)
-    let sig = fmap (substitute frame) expr' :: AnnotatedExpr Type
+    let sig = fmap (quantify . substitute frame) expr' :: AnnotatedExpr Type
     let vars = ftv $ extract sig
     let ps = predicatesForSignature preds vars frame
     let scheme = extract $ (extend $ toSigma frame ps) sig
@@ -223,7 +226,7 @@ predicatesForSignature predMap tvs su = M.foldMapWithKey go predMap
 handleTypecheckError sym te err = case envLookup te sym of
     Nothing -> throwError $ OtherError $ "For " ++ sym ++ ", " ++ (show err)
     Just ty -> throwError $ OtherError $
-        "For " ++ sym ++ " : " ++ (show ty) ++ ", " ++ (show err)
+        "For " ++ sym ++ " : " ++ (show ty ) ++ " " ++ (show $ ftv ty) ++ ", " ++ (show err)
 
 checkTypeEnv :: Symbol -> Sigma -> TypeEnv -> TypeCheck TypeEnv
 checkTypeEnv sym t1 tyEnv = case envLookup tyEnv sym of
@@ -238,7 +241,7 @@ checkTypeEnv sym t1 tyEnv = case envLookup tyEnv sym of
 
     where addContext sym ty err =
               throwError $ OtherError $
-              "For " ++ sym ++ " : " ++ (show ty) ++ ",\n " ++ (show err)
+              "For " ++ sym ++ " : " ++ (show $ ftv ty) ++ ",\n " ++ (show err)
 
 toSigma :: Frame -> [Pred] -> AnnotatedExpr Type -> Sigma
 toSigma frame ps expr =
