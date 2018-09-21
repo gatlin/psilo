@@ -263,6 +263,7 @@ match (ps1 :=> t1) (ps2 :=> t2) = do
         Just su'' -> return (su'', nub $ cs ++ cs')
 
 match t1 (ps :=> t2) = match t1 t2
+match (ps :=> t1) t2 = match t1 t2
 
 match (TPred s1 ts1) (TPred s2 ts2)
     | s1 /= s2 = throwError $ TypeMismatch (TPred s1 ts1) (TPred s2 ts2)
